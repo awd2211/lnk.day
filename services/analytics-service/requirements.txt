@@ -1,0 +1,15 @@
+fastapi==0.108.0
+uvicorn[standard]==0.25.0
+clickhouse-driver==0.2.6
+redis==5.0.1
+celery==5.3.6
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+httpx==0.26.0
+pandas==2.1.4
+numpy==1.26.2
+aiokafka==0.10.0
+reportlab==4.0.8
+matplotlib==3.8.2
+Pillow==10.1.0

@@ -1,0 +1,77 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+
+export interface ServiceHealth {
+  name: string;
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  responseTime?: number;
+  error?: string;
+}
+
+@Injectable()
+export class HealthService {
+  private readonly services: { name: string; url: string }[];
+
+  constructor(private readonly configService: ConfigService) {
+    this.services = [
+      { name: 'user-service', url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60001') },
+      { name: 'link-service', url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60002') },
+      { name: 'analytics-service', url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60003') },
+      { name: 'qr-service', url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60004') },
+      { name: 'page-service', url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60005') },
+      { name: 'notification-service', url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60006') },
+    ];
+  }
+
+  async checkHealth(): Promise<{
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    timestamp: string;
+    services: ServiceHealth[];
+  }> {
+    const results = await Promise.all(
+      this.services.map((service) => this.checkServiceHealth(service)),
+    );
+
+    const unhealthyCount = results.filter((r) => r.status === 'unhealthy').length;
+    const status =
+      unhealthyCount === 0
+        ? 'healthy'
+        : unhealthyCount < results.length / 2
+          ? 'degraded'
+          : 'unhealthy';
+
+    return {
+      status,
+      timestamp: new Date().toISOString(),
+      services: results,
+    };
+  }
+
+  private async checkServiceHealth(service: { name: string; url: string }): Promise<ServiceHealth> {
+    const startTime = Date.now();
+
+    try {
+      await axios.get(`${service.url}/health`, { timeout: 5000 });
+      return {
+        name: service.name,
+        status: 'healthy',
+        responseTime: Date.now() - startTime,
+      };
+    } catch (error: any) {
+      return {
+        name: service.name,
+        status: 'unhealthy',
+        responseTime: Date.now() - startTime,
+        error: error.message,
+      };
+    }
+  }
+
+  getServiceRoutes() {
+    return this.services.map((s) => ({
+      name: s.name,
+      url: s.url,
+    }));
+  }
+}
