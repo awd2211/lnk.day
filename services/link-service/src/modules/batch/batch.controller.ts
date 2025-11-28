@@ -26,6 +26,15 @@ import { BatchService } from './batch.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ImportLinksDto, ImportResultDto } from './dto/import-links.dto';
 import { ExportLinksQueryDto } from './dto/export-links.dto';
+import {
+  BatchUpdateDto,
+  BatchDeleteDto,
+  BatchArchiveDto,
+  BatchRestoreDto,
+  BatchMoveToFolderDto,
+  BatchOperationResultDto,
+  BulkSelectQueryDto,
+} from './dto/batch-edit.dto';
 
 @ApiTags('batch')
 @Controller('links/batch')
@@ -108,5 +117,112 @@ export class BatchController {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="import-template.csv"');
     res.send(template);
+  }
+
+  // ========== 批量编辑操作 ==========
+
+  @Post('update')
+  @ApiOperation({ summary: '批量更新链接（标签、文件夹、状态等）' })
+  @ApiResponse({ status: 200, type: BatchOperationResultDto })
+  async batchUpdate(
+    @Body() dto: BatchUpdateDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchUpdate(dto, teamId || userId);
+  }
+
+  @Post('delete')
+  @ApiOperation({ summary: '批量删除链接' })
+  @ApiResponse({ status: 200, type: BatchOperationResultDto })
+  async batchDelete(
+    @Body() dto: BatchDeleteDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchDelete(dto, teamId || userId);
+  }
+
+  @Post('archive')
+  @ApiOperation({ summary: '批量归档链接' })
+  @ApiResponse({ status: 200, type: BatchOperationResultDto })
+  async batchArchive(
+    @Body() dto: BatchArchiveDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchArchive(dto, teamId || userId);
+  }
+
+  @Post('restore')
+  @ApiOperation({ summary: '批量恢复已归档/删除的链接' })
+  @ApiResponse({ status: 200, type: BatchOperationResultDto })
+  async batchRestore(
+    @Body() dto: BatchRestoreDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchRestore(dto, teamId || userId);
+  }
+
+  @Post('move')
+  @ApiOperation({ summary: '批量移动链接到文件夹' })
+  @ApiResponse({ status: 200, type: BatchOperationResultDto })
+  async batchMoveToFolder(
+    @Body() dto: BatchMoveToFolderDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchMoveToFolder(dto, teamId || userId);
+  }
+
+  @Get('select')
+  @ApiOperation({ summary: '根据条件批量选择链接ID（用于后续批量操作）' })
+  async bulkSelectIds(
+    @Query() query: BulkSelectQueryDto,
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<{ ids: string[]; total: number }> {
+    return this.batchService.bulkSelectIds(query, teamId || userId);
+  }
+
+  @Post('tags/add')
+  @ApiOperation({ summary: '批量添加标签' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        linkIds: { type: 'array', items: { type: 'string' } },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  })
+  async batchAddTags(
+    @Body('linkIds') linkIds: string[],
+    @Body('tags') tags: string[],
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchAddTags(linkIds, tags, teamId || userId);
+  }
+
+  @Post('tags/remove')
+  @ApiOperation({ summary: '批量移除标签' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        linkIds: { type: 'array', items: { type: 'string' } },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  })
+  async batchRemoveTags(
+    @Body('linkIds') linkIds: string[],
+    @Body('tags') tags: string[],
+    @Headers('x-team-id') teamId: string,
+    @Headers('x-user-id') userId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchService.batchRemoveTags(linkIds, tags, teamId || userId);
   }
 }

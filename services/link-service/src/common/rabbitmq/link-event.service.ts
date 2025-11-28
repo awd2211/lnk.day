@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as amqplib from 'amqplib';
-import { RABBITMQ_CHANNEL, LINK_EVENTS_EXCHANGE } from './rabbitmq.module';
+import { RABBITMQ_CHANNEL, LINK_EVENTS_EXCHANGE } from './rabbitmq.constants';
 
 export enum LinkEventType {
   CREATED = 'link.created',
@@ -22,8 +22,12 @@ export class LinkEventService {
 
   constructor(
     @Inject(RABBITMQ_CHANNEL)
-    private readonly channel: amqplib.Channel,
-  ) {}
+    private readonly channel: amqplib.Channel | null,
+  ) {
+    if (!channel) {
+      this.logger.warn('RabbitMQ channel not available - events will not be published');
+    }
+  }
 
   async publishLinkCreated(linkId: string, shortCode: string, data?: Record<string, any>): Promise<void> {
     await this.publish({
@@ -55,6 +59,11 @@ export class LinkEventService {
   }
 
   private async publish(event: LinkEvent): Promise<void> {
+    if (!this.channel) {
+      this.logger.debug(`Skipping event publish (no channel): ${event.type} for link ${event.shortCode}`);
+      return;
+    }
+
     try {
       const message = Buffer.from(JSON.stringify(event));
       const routingKey = event.type;

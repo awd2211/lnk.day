@@ -38,7 +38,22 @@ export class SearchService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    // Run initialization in background to not block app startup
+    this.initializeAsync();
+  }
+
+  private async initializeAsync() {
+    const timeout = 5000; // 5 second timeout
+
     try {
+      // Test connection first with timeout
+      const healthPromise = this.client.health();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Connection timeout')), timeout)
+      );
+
+      await Promise.race([healthPromise, timeoutPromise]);
+
       // Create or get the index
       await this.client.createIndex('links', { primaryKey: 'id' });
       this.index = this.client.index('links');
@@ -73,7 +88,7 @@ export class SearchService implements OnModuleInit {
       this.initialized = true;
       this.logger.log('Meilisearch index initialized');
     } catch (error: any) {
-      this.logger.warn(`Failed to initialize Meilisearch: ${error.message}`);
+      this.logger.warn(`Failed to initialize Meilisearch: ${error.message}. Search functionality will be unavailable.`);
     }
   }
 

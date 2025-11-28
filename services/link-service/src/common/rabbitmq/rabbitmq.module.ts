@@ -1,26 +1,34 @@
-import { Module, Global, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Module, Global, Logger } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as amqplib from 'amqplib';
 import { LinkEventService } from './link-event.service';
+import {
+  RABBITMQ_CONNECTION,
+  RABBITMQ_CHANNEL,
+  LINK_EVENTS_EXCHANGE,
+  LINK_CACHE_INVALIDATION_QUEUE,
+} from './rabbitmq.constants';
 
-export const RABBITMQ_CONNECTION = 'RABBITMQ_CONNECTION';
-export const RABBITMQ_CHANNEL = 'RABBITMQ_CHANNEL';
-
-// Exchange and queue names
-export const LINK_EVENTS_EXCHANGE = 'link.events';
-export const LINK_CACHE_INVALIDATION_QUEUE = 'link.cache.invalidation';
+export { RABBITMQ_CONNECTION, RABBITMQ_CHANNEL, LINK_EVENTS_EXCHANGE, LINK_CACHE_INVALIDATION_QUEUE };
 
 @Global()
 @Module({
+  imports: [ConfigModule],
   providers: [
     {
       provide: RABBITMQ_CONNECTION,
       useFactory: async (configService: ConfigService) => {
         const logger = new Logger('RabbitMQModule');
         const url = configService.get('RABBITMQ_URL', 'amqp://rabbit:rabbit123@localhost:60036');
+        const timeout = 5000; // 5 second timeout
 
         try {
-          const connection = await amqplib.connect(url);
+          const connectionPromise = amqplib.connect(url);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection timeout')), timeout)
+          );
+
+          const connection = await Promise.race([connectionPromise, timeoutPromise]) as amqplib.Connection;
           logger.log('RabbitMQ connected');
 
           connection.on('error', (err) => {
@@ -33,8 +41,8 @@ export const LINK_CACHE_INVALIDATION_QUEUE = 'link.cache.invalidation';
 
           return connection;
         } catch (error: any) {
-          logger.error(`Failed to connect to RabbitMQ: ${error.message}`);
-          throw error;
+          logger.warn(`Failed to connect to RabbitMQ: ${error.message}. Service will continue without messaging.`);
+          return null;
         }
       },
       inject: [ConfigService],
@@ -44,20 +52,22 @@ export const LINK_CACHE_INVALIDATION_QUEUE = 'link.cache.invalidation';
       useFactory: async (connection: any) => {
         const logger = new Logger('RabbitMQModule');
 
+        if (!connection) {
+          logger.warn('RabbitMQ connection not available, skipping channel creation');
+          return null;
+        }
+
         try {
           const channel = await connection.createChannel();
 
-          // Declare exchange for link events
           await channel.assertExchange(LINK_EVENTS_EXCHANGE, 'topic', {
             durable: true,
           });
 
-          // Declare queue for cache invalidation
           await channel.assertQueue(LINK_CACHE_INVALIDATION_QUEUE, {
             durable: true,
           });
 
-          // Bind queue to exchange with routing keys
           await channel.bindQueue(
             LINK_CACHE_INVALIDATION_QUEUE,
             LINK_EVENTS_EXCHANGE,
@@ -77,8 +87,8 @@ export const LINK_CACHE_INVALIDATION_QUEUE = 'link.cache.invalidation';
           logger.log('RabbitMQ channel and exchanges configured');
           return channel;
         } catch (error: any) {
-          logger.error(`Failed to create RabbitMQ channel: ${error.message}`);
-          throw error;
+          logger.warn(`Failed to create RabbitMQ channel: ${error.message}`);
+          return null;
         }
       },
       inject: [RABBITMQ_CONNECTION],

@@ -1,11 +1,15 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+  logger.log('Creating Nest application...');
+
   const app = await NestFactory.create(AppModule);
+  logger.log('Nest application created');
 
   app.enableCors();
   app.setGlobalPrefix('api');
@@ -15,18 +19,17 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  logger.log('Middleware configured');
 
-  const config = new DocumentBuilder()
-    .setTitle('Link Service API')
-    .setDescription('链接服务 API 文档')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  // Skip Swagger for now to debug startup issue
+  logger.log('Skipping Swagger setup');
 
   const port = process.env.PORT || 60003;
-  await app.listen(port);
+  logger.log(`Starting to listen on port ${port}...`);
+
+  // Try binding to all interfaces
+  await app.listen(port, '0.0.0.0');
+  logger.log(`Link Service running on port ${port}`);
   console.log(`Link Service running on port ${port}`);
 }
 bootstrap();

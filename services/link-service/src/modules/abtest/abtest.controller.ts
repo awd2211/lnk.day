@@ -7,8 +7,9 @@ import {
   Param,
   Headers,
   UseGuards,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { ABTestService } from './abtest.service';
 import { CreateABTestDto } from './dto/create-abtest.dto';
@@ -48,9 +49,15 @@ export class ABTestController {
   }
 
   @Get(':id/stats')
-  @ApiOperation({ summary: '获取 A/B 测试统计' })
+  @ApiOperation({ summary: '获取 A/B 测试统计（含统计显著性分析）' })
   getStats(@Param('id') id: string) {
     return this.abtestService.getStats(id);
+  }
+
+  @Get(':id/comparison')
+  @ApiOperation({ summary: '获取变体详细对比' })
+  getComparison(@Param('id') id: string) {
+    return this.abtestService.getVariantComparison(id);
   }
 
   @Get('link/:linkId')
@@ -78,6 +85,61 @@ export class ABTestController {
     @Body() body: { winnerVariantId?: string },
   ) {
     return this.abtestService.complete(id, body.winnerVariantId);
+  }
+
+  @Post(':id/events')
+  @ApiOperation({ summary: '记录测试事件（点击、转化等）' })
+  recordEvent(
+    @Param('id') testId: string,
+    @Body()
+    body: {
+      variantId: string;
+      visitorId: string;
+      eventType: 'click' | 'conversion' | 'bounce' | 'engagement';
+      value?: number;
+      metadata?: Record<string, any>;
+      ipAddress?: string;
+      userAgent?: string;
+      country?: string;
+      device?: string;
+    },
+  ) {
+    return this.abtestService.recordEvent(
+      testId,
+      body.variantId,
+      body.visitorId,
+      body.eventType,
+      {
+        value: body.value,
+        metadata: body.metadata,
+        ipAddress: body.ipAddress,
+        userAgent: body.userAgent,
+        country: body.country,
+        device: body.device,
+      },
+    );
+  }
+
+  @Get(':id/select-variant')
+  @ApiOperation({ summary: '为访客选择变体（用于流量分配）' })
+  @ApiQuery({ name: 'visitorId', required: true })
+  @ApiQuery({ name: 'useBandit', required: false })
+  async selectVariant(
+    @Param('id') id: string,
+    @Query('visitorId') visitorId: string,
+    @Query('useBandit') useBandit?: string,
+  ) {
+    const abtest = await this.abtestService.findOne(id);
+
+    const variant = useBandit === 'true'
+      ? await this.abtestService.selectVariantBandit(abtest, visitorId)
+      : this.abtestService.selectVariant(abtest, visitorId);
+
+    return {
+      variantId: variant.id,
+      variantName: variant.name,
+      targetUrl: variant.targetUrl,
+    };
   }
 
   @Delete(':id')

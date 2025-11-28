@@ -13,6 +13,10 @@ import { SearchModule } from './modules/search/search.module';
 import { DeepLinkModule } from './modules/deeplink/deeplink.module';
 import { BatchModule } from './modules/batch/batch.module';
 import { PreviewModule } from './modules/preview/preview.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SecurityModule } from './modules/security/security.module';
+import { RedirectRulesModule } from './modules/redirect-rules/redirect-rules.module';
+import { LinkTemplateModule } from './modules/link-template/link-template.module';
 
 @Module({
   imports: [
@@ -47,6 +51,10 @@ import { PreviewModule } from './modules/preview/preview.module';
     DeepLinkModule,
     BatchModule,
     PreviewModule,
+    AnalyticsModule,
+    SecurityModule,
+    RedirectRulesModule,
+    LinkTemplateModule,
   ],
 })
 export class AppModule {}

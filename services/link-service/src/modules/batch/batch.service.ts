@@ -1,6 +1,6 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In, Like } from 'typeorm';
+import { Repository, Between, In, Like, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 
 import { Link, LinkStatus } from '../link/entities/link.entity';
 import { LinkService } from '../link/link.service';
@@ -14,6 +14,15 @@ import {
   ExportFormat,
   ParsedCsvRow,
 } from './dto/export-links.dto';
+import {
+  BatchUpdateDto,
+  BatchDeleteDto,
+  BatchArchiveDto,
+  BatchRestoreDto,
+  BatchMoveToFolderDto,
+  BatchOperationResultDto,
+  BulkSelectQueryDto,
+} from './dto/batch-edit.dto';
 
 @Injectable()
 export class BatchService {
@@ -371,5 +380,374 @@ export class BatchService {
     ];
 
     return [headers.join(','), exampleRow.join(',')].join('\n');
+  }
+
+  // ========== 批量编辑操作 ==========
+
+  /**
+   * 批量更新链接
+   */
+  async batchUpdate(
+    dto: BatchUpdateDto,
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    const result: BatchOperationResultDto = {
+      operation: 'update',
+      totalProcessed: dto.linkIds.length,
+      successCount: 0,
+      failedCount: 0,
+      successIds: [],
+      errors: [],
+    };
+
+    // 验证所有链接属于该团队
+    const links = await this.linkRepository.find({
+      where: { id: In(dto.linkIds), teamId },
+    });
+
+    const foundIds = new Set(links.map((l) => l.id));
+    const notFoundIds = dto.linkIds.filter((id) => !foundIds.has(id));
+
+    for (const id of notFoundIds) {
+      result.failedCount++;
+      result.errors.push({ linkId: id, error: 'Link not found or unauthorized' });
+    }
+
+    // 批量更新找到的链接
+    for (const link of links) {
+      try {
+        // 处理标签
+        if (dto.setTags !== undefined) {
+          link.tags = dto.setTags;
+        } else {
+          if (dto.addTags && dto.addTags.length > 0) {
+            const existingTags = link.tags || [];
+            link.tags = [...new Set([...existingTags, ...dto.addTags])];
+          }
+          if (dto.removeTags && dto.removeTags.length > 0) {
+            link.tags = (link.tags || []).filter((t) => !dto.removeTags!.includes(t));
+          }
+        }
+
+        // 处理文件夹
+        if (dto.folderId !== undefined) {
+          link.folderId = dto.folderId || null;
+        }
+
+        // 处理状态
+        if (dto.status) {
+          link.status = dto.status;
+        }
+
+        // 处理过期时间
+        if (dto.removeExpiry) {
+          link.expiresAt = null;
+        } else if (dto.expiresAt) {
+          link.expiresAt = dto.expiresAt;
+        }
+
+        link.updatedAt = new Date();
+        await this.linkRepository.save(link);
+
+        result.successCount++;
+        result.successIds.push(link.id);
+      } catch (error: any) {
+        result.failedCount++;
+        result.errors.push({ linkId: link.id, error: error.message });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 批量删除链接
+   */
+  async batchDelete(
+    dto: BatchDeleteDto,
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    const result: BatchOperationResultDto = {
+      operation: dto.permanent ? 'permanent_delete' : 'soft_delete',
+      totalProcessed: dto.linkIds.length,
+      successCount: 0,
+      failedCount: 0,
+      successIds: [],
+      errors: [],
+    };
+
+    const links = await this.linkRepository.find({
+      where: { id: In(dto.linkIds), teamId },
+    });
+
+    const foundIds = new Set(links.map((l) => l.id));
+    const notFoundIds = dto.linkIds.filter((id) => !foundIds.has(id));
+
+    for (const id of notFoundIds) {
+      result.failedCount++;
+      result.errors.push({ linkId: id, error: 'Link not found or unauthorized' });
+    }
+
+    for (const link of links) {
+      try {
+        if (dto.permanent) {
+          await this.linkRepository.remove(link);
+        } else {
+          link.status = LinkStatus.DELETED;
+          link.updatedAt = new Date();
+          await this.linkRepository.save(link);
+        }
+
+        result.successCount++;
+        result.successIds.push(link.id);
+      } catch (error: any) {
+        result.failedCount++;
+        result.errors.push({ linkId: link.id, error: error.message });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 批量归档链接
+   */
+  async batchArchive(
+    dto: BatchArchiveDto,
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    const result: BatchOperationResultDto = {
+      operation: 'archive',
+      totalProcessed: dto.linkIds.length,
+      successCount: 0,
+      failedCount: 0,
+      successIds: [],
+      errors: [],
+    };
+
+    const links = await this.linkRepository.find({
+      where: { id: In(dto.linkIds), teamId },
+    });
+
+    const foundIds = new Set(links.map((l) => l.id));
+    const notFoundIds = dto.linkIds.filter((id) => !foundIds.has(id));
+
+    for (const id of notFoundIds) {
+      result.failedCount++;
+      result.errors.push({ linkId: id, error: 'Link not found or unauthorized' });
+    }
+
+    for (const link of links) {
+      try {
+        link.status = LinkStatus.ARCHIVED;
+        link.updatedAt = new Date();
+        await this.linkRepository.save(link);
+
+        result.successCount++;
+        result.successIds.push(link.id);
+      } catch (error: any) {
+        result.failedCount++;
+        result.errors.push({ linkId: link.id, error: error.message });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 批量恢复链接
+   */
+  async batchRestore(
+    dto: BatchRestoreDto,
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    const result: BatchOperationResultDto = {
+      operation: 'restore',
+      totalProcessed: dto.linkIds.length,
+      successCount: 0,
+      failedCount: 0,
+      successIds: [],
+      errors: [],
+    };
+
+    const links = await this.linkRepository.find({
+      where: {
+        id: In(dto.linkIds),
+        teamId,
+        status: In([LinkStatus.ARCHIVED, LinkStatus.DELETED]),
+      },
+    });
+
+    const foundIds = new Set(links.map((l) => l.id));
+    const notFoundIds = dto.linkIds.filter((id) => !foundIds.has(id));
+
+    for (const id of notFoundIds) {
+      result.failedCount++;
+      result.errors.push({ linkId: id, error: 'Link not found, unauthorized, or not archived/deleted' });
+    }
+
+    for (const link of links) {
+      try {
+        link.status = LinkStatus.ACTIVE;
+        link.updatedAt = new Date();
+        await this.linkRepository.save(link);
+
+        result.successCount++;
+        result.successIds.push(link.id);
+      } catch (error: any) {
+        result.failedCount++;
+        result.errors.push({ linkId: link.id, error: error.message });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 批量移动到文件夹
+   */
+  async batchMoveToFolder(
+    dto: BatchMoveToFolderDto,
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    const result: BatchOperationResultDto = {
+      operation: 'move_to_folder',
+      totalProcessed: dto.linkIds.length,
+      successCount: 0,
+      failedCount: 0,
+      successIds: [],
+      errors: [],
+    };
+
+    // 批量更新
+    try {
+      const updateResult = await this.linkRepository.update(
+        { id: In(dto.linkIds), teamId },
+        { folderId: dto.folderId || null, updatedAt: new Date() },
+      );
+
+      result.successCount = updateResult.affected || 0;
+      result.failedCount = dto.linkIds.length - result.successCount;
+
+      // 获取成功更新的ID
+      if (result.successCount > 0) {
+        const updatedLinks = await this.linkRepository.find({
+          where: { id: In(dto.linkIds), teamId },
+          select: ['id'],
+        });
+        result.successIds = updatedLinks.map((l) => l.id);
+      }
+
+      // 记录失败的ID
+      const successIdSet = new Set(result.successIds);
+      for (const id of dto.linkIds) {
+        if (!successIdSet.has(id)) {
+          result.errors.push({ linkId: id, error: 'Link not found or unauthorized' });
+        }
+      }
+    } catch (error: any) {
+      result.failedCount = dto.linkIds.length;
+      for (const id of dto.linkIds) {
+        result.errors.push({ linkId: id, error: error.message });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * 根据条件批量选择链接ID
+   */
+  async bulkSelectIds(
+    query: BulkSelectQueryDto,
+    teamId: string,
+  ): Promise<{ ids: string[]; total: number }> {
+    const where: any = { teamId };
+
+    if (query.folderId) {
+      where.folderId = query.folderId;
+    }
+
+    if (query.status) {
+      where.status = query.status;
+    }
+
+    if (query.createdAfter) {
+      where.createdAt = MoreThanOrEqual(new Date(query.createdAfter));
+    }
+
+    if (query.createdBefore) {
+      if (where.createdAt) {
+        where.createdAt = Between(
+          new Date(query.createdAfter!),
+          new Date(query.createdBefore),
+        );
+      } else {
+        where.createdAt = LessThanOrEqual(new Date(query.createdBefore));
+      }
+    }
+
+    let queryBuilder = this.linkRepository
+      .createQueryBuilder('link')
+      .select('link.id')
+      .where(where);
+
+    // 标签过滤
+    if (query.tags) {
+      const tagList = query.tags.split(',').map((t) => t.trim());
+      // PostgreSQL array overlap
+      queryBuilder = queryBuilder.andWhere(
+        'link.tags && ARRAY[:...tags]::varchar[]',
+        { tags: tagList },
+      );
+    }
+
+    // 搜索
+    if (query.search) {
+      queryBuilder = queryBuilder.andWhere(
+        '(link.title ILIKE :search OR link.originalUrl ILIKE :search OR link.shortCode ILIKE :search)',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    const limit = Math.min(query.limit || 500, 500);
+
+    const [links, total] = await queryBuilder
+      .orderBy('link.createdAt', 'DESC')
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      ids: links.map((l) => l.id),
+      total,
+    };
+  }
+
+  /**
+   * 批量添加标签
+   */
+  async batchAddTags(
+    linkIds: string[],
+    tags: string[],
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchUpdate(
+      { linkIds, addTags: tags },
+      teamId,
+    );
+  }
+
+  /**
+   * 批量移除标签
+   */
+  async batchRemoveTags(
+    linkIds: string[],
+    tags: string[],
+    teamId: string,
+  ): Promise<BatchOperationResultDto> {
+    return this.batchUpdate(
+      { linkIds, removeTags: tags },
+      teamId,
+    );
   }
 }

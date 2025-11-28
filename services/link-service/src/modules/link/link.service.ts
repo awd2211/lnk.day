@@ -14,6 +14,7 @@ import { CloneLinkDto } from './dto/clone-link.dto';
 import { ScheduleLinkDto, UpdateScheduleDto } from './dto/schedule-link.dto';
 import { RedisService } from '../../common/redis/redis.service';
 import { LinkEventService } from '../../common/rabbitmq/link-event.service';
+import { SecurityService } from '../security/security.service';
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 7);
 
@@ -28,9 +29,23 @@ export class LinkService {
     private readonly scheduleRepository: Repository<LinkSchedule>,
     private readonly redisService: RedisService,
     private readonly linkEventService: LinkEventService,
+    private readonly securityService: SecurityService,
   ) {}
 
   async create(createLinkDto: CreateLinkDto, userId: string, teamId: string): Promise<Link> {
+    // 安全检查：验证目标 URL 是否安全
+    const safetyCheck = await this.securityService.quickSafetyCheck(createLinkDto.originalUrl);
+    if (!safetyCheck.allowed) {
+      throw new BadRequestException(`URL 被拒绝: ${safetyCheck.reason}`);
+    }
+
+    // 如果 URL 可疑但允许，记录警告
+    if (safetyCheck.reputation?.category === 'suspicious') {
+      this.logger.warn(
+        `Suspicious URL created by team ${teamId}: ${createLinkDto.originalUrl} (score: ${safetyCheck.reputation.score})`,
+      );
+    }
+
     let shortCode = createLinkDto.customSlug;
 
     if (shortCode) {
