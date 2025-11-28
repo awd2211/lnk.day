@@ -211,10 +211,45 @@ export class BioLinkItem {
 
   @Column({
     type: 'enum',
-    enum: ['link', 'header', 'embed', 'product', 'collection'],
+    enum: [
+      'link',
+      'header',
+      'embed',
+      'product',
+      'collection',
+      'carousel',
+      'countdown',
+      'music',
+      'map',
+      'subscribe',
+      'nft',
+      'podcast',
+      'text',
+      'divider',
+      'image',
+      'video',
+      'contact_form',
+    ],
     default: 'link',
   })
-  type: 'link' | 'header' | 'embed' | 'product' | 'collection';
+  type:
+    | 'link'
+    | 'header'
+    | 'embed'
+    | 'product'
+    | 'collection'
+    | 'carousel'
+    | 'countdown'
+    | 'music'
+    | 'map'
+    | 'subscribe'
+    | 'nft'
+    | 'podcast'
+    | 'text'
+    | 'divider'
+    | 'image'
+    | 'video'
+    | 'contact_form';
 
   @Column('jsonb', { default: {} })
   style: {
@@ -224,6 +259,12 @@ export class BioLinkItem {
     iconUrl?: string;
     animation?: string;
     featured?: boolean;
+    borderColor?: string;
+    borderWidth?: number;
+    borderRadius?: string;
+    padding?: string;
+    margin?: string;
+    shadow?: string;
   };
 
   @Column('jsonb', { default: {} })
@@ -236,13 +277,29 @@ export class BioLinkItem {
     password?: string;
     geoRestrictions?: string[];  // Country codes
     ageGate?: boolean;
+    // 轮播设置
+    autoScroll?: boolean;
+    scrollInterval?: number;
+    showIndicators?: boolean;
+    // 倒计时设置
+    countdownAction?: 'hide' | 'show_message' | 'redirect';
+    countdownMessage?: string;
+    countdownRedirectUrl?: string;
+    // 订阅设置
+    subscribeProvider?: 'mailchimp' | 'convertkit' | 'custom';
+    subscribeApiKey?: string;
+    subscribeListId?: string;
+    subscribeWebhookUrl?: string;
   };
 
   @Column('jsonb', { nullable: true })
   embed?: {
-    type: 'youtube' | 'spotify' | 'soundcloud' | 'tiktok' | 'instagram' | 'twitter';
+    type: 'youtube' | 'spotify' | 'soundcloud' | 'tiktok' | 'instagram' | 'twitter' | 'vimeo' | 'twitch' | 'bilibili';
     embedId: string;
     autoplay?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+    aspectRatio?: string;
   };
 
   @Column('jsonb', { nullable: true })
@@ -253,6 +310,140 @@ export class BioLinkItem {
     badge?: string;
     inventory?: number;
     paymentUrl?: string;
+    variants?: Array<{
+      name: string;
+      options: string[];
+    }>;
+    images?: string[];
+  };
+
+  @Column('jsonb', { nullable: true })
+  carousel?: {
+    images: Array<{
+      url: string;
+      alt?: string;
+      link?: string;
+      caption?: string;
+    }>;
+    height?: number;
+    transitionType?: 'slide' | 'fade' | 'flip';
+  };
+
+  @Column('jsonb', { nullable: true })
+  countdown?: {
+    targetDate: string;
+    timezone?: string;
+    showDays?: boolean;
+    showHours?: boolean;
+    showMinutes?: boolean;
+    showSeconds?: boolean;
+    labelStyle?: 'full' | 'short' | 'hidden';
+  };
+
+  @Column('jsonb', { nullable: true })
+  music?: {
+    provider: 'spotify' | 'apple_music' | 'soundcloud' | 'custom';
+    trackUrl?: string;
+    playlistUrl?: string;
+    albumUrl?: string;
+    artistUrl?: string;
+    customAudioUrl?: string;
+    showArtwork?: boolean;
+    compact?: boolean;
+  };
+
+  @Column('jsonb', { nullable: true })
+  map?: {
+    provider: 'google' | 'mapbox' | 'openstreetmap';
+    latitude: number;
+    longitude: number;
+    zoom?: number;
+    markerTitle?: string;
+    address?: string;
+    height?: number;
+    showDirectionsLink?: boolean;
+  };
+
+  @Column('jsonb', { nullable: true })
+  subscribe?: {
+    placeholder?: string;
+    buttonText?: string;
+    successMessage?: string;
+    collectName?: boolean;
+    collectPhone?: boolean;
+    privacyPolicyUrl?: string;
+    doubleOptIn?: boolean;
+  };
+
+  @Column('jsonb', { nullable: true })
+  nft?: {
+    platform: 'opensea' | 'rarible' | 'foundation' | 'custom';
+    contractAddress?: string;
+    tokenId?: string;
+    collectionUrl?: string;
+    imageUrl?: string;
+    name?: string;
+    price?: string;
+    currency?: string;
+    showPrice?: boolean;
+    showOwner?: boolean;
+    linkToPlatform?: boolean;
+  };
+
+  @Column('jsonb', { nullable: true })
+  podcast?: {
+    provider: 'spotify' | 'apple_podcasts' | 'google_podcasts' | 'anchor' | 'custom';
+    showUrl?: string;
+    episodeUrl?: string;
+    embedCode?: string;
+    showName?: string;
+    episodeName?: string;
+    artwork?: string;
+    showAllEpisodes?: boolean;
+    episodeCount?: number;
+  };
+
+  @Column('jsonb', { nullable: true })
+  text?: {
+    content: string;
+    format?: 'plain' | 'markdown' | 'html';
+    alignment?: 'left' | 'center' | 'right';
+    fontSize?: 'small' | 'medium' | 'large';
+  };
+
+  @Column('jsonb', { nullable: true })
+  image?: {
+    url: string;
+    alt?: string;
+    linkUrl?: string;
+    width?: number;
+    height?: number;
+    objectFit?: 'cover' | 'contain' | 'fill';
+  };
+
+  @Column('jsonb', { nullable: true })
+  video?: {
+    url: string;
+    poster?: string;
+    autoplay?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+    controls?: boolean;
+  };
+
+  @Column('jsonb', { nullable: true })
+  contactForm?: {
+    fields: Array<{
+      name: string;
+      type: 'text' | 'email' | 'phone' | 'textarea' | 'select';
+      label: string;
+      required?: boolean;
+      options?: string[]; // For select type
+    }>;
+    submitButtonText?: string;
+    successMessage?: string;
+    notificationEmail?: string;
+    webhookUrl?: string;
   };
 
   @Column({ default: 0 })

@@ -403,7 +403,7 @@ export class BioLinkService {
     // Calculate views by day
     const viewsByDayMap = new Map<string, { views: number; clicks: number }>();
     clicks.forEach((click) => {
-      const date = click.timestamp.toISOString().split('T')[0];
+      const date = click.timestamp.toISOString().split('T')[0] || '';
       const current = viewsByDayMap.get(date) || { views: 0, clicks: 0 };
       if (click.eventType === 'page_view') {
         current.views++;

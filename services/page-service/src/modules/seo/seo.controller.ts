@@ -45,7 +45,7 @@ export class SeoController {
     const baseUrl = process.env.BASE_URL || 'https://lnk.day';
 
     // Get all published pages
-    const { items: pages } = await this.pageService.findAll({}, { status: 'published' });
+    const { items: pages } = await this.pageService.findAll(undefined, { status: 'published' });
     const { items: bioLinks } = await this.bioLinkService.findAll('', {
       status: 'published' as any,
       limit: 10000,

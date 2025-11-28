@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Page, PageStatus, PageBlock } from './entities/page.entity';
+import { Page, PageStatus, PageBlock, ABTestConfig, ABTestVariant } from './entities/page.entity';
 
 @Injectable()
 export class PageService {
@@ -130,9 +130,134 @@ export class PageService {
     await this.pageRepository.increment({ id }, 'uniqueViews', 1);
   }
 
-  async renderPage(slug: string): Promise<string> {
+  async renderPage(slug: string, variantId?: string): Promise<{ html: string; variantId?: string }> {
     const page = await this.findBySlug(slug);
-    return this.generateHtml(page);
+
+    // Check for A/B test
+    const abTest = page.settings?.abTest;
+    let selectedVariant: ABTestVariant | null = null;
+
+    if (abTest?.isEnabled && abTest.variants?.length > 0) {
+      // If specific variant requested, use it
+      if (variantId) {
+        selectedVariant = abTest.variants.find(v => v.id === variantId) || null;
+      } else {
+        // Select variant based on traffic percentage
+        selectedVariant = this.selectABTestVariant(abTest);
+      }
+    }
+
+    return {
+      html: this.generateHtml(page, selectedVariant),
+      variantId: selectedVariant?.id,
+    };
+  }
+
+  // A/B Test: Select variant based on traffic distribution
+  private selectABTestVariant(abTest: ABTestConfig): ABTestVariant | null {
+    const variants = abTest.variants || [];
+    if (variants.length === 0) return null;
+
+    const random = Math.random() * 100;
+    let cumulative = 0;
+
+    for (const variant of variants) {
+      cumulative += variant.trafficPercentage;
+      if (random <= cumulative) {
+        return variant;
+      }
+    }
+
+    // Fallback to control variant or first variant
+    return variants.find(v => v.isControl) || variants[0] || null;
+  }
+
+  // A/B Test: Update test configuration
+  async updateABTest(id: string, abTestConfig: ABTestConfig): Promise<Page> {
+    const page = await this.findOne(id);
+
+    // Validate traffic percentages sum to 100%
+    const totalPercentage = abTestConfig.variants.reduce(
+      (sum, v) => sum + v.trafficPercentage,
+      0
+    );
+    if (Math.abs(totalPercentage - 100) > 0.01) {
+      throw new ConflictException('Traffic percentages must sum to 100%');
+    }
+
+    page.settings = {
+      ...page.settings,
+      abTest: abTestConfig,
+    };
+
+    return this.pageRepository.save(page);
+  }
+
+  // A/B Test: Get test results
+  async getABTestResults(id: string): Promise<{
+    variants: Array<{
+      id: string;
+      name: string;
+      trafficPercentage: number;
+      views: number;
+      clicks: number;
+      conversionRate: number;
+    }>;
+  }> {
+    const page = await this.findOne(id);
+    const abTest = page.settings?.abTest;
+
+    if (!abTest?.isEnabled) {
+      return { variants: [] };
+    }
+
+    // In a real implementation, this would fetch data from analytics service
+    // For now, return mock data structure
+    return {
+      variants: abTest.variants.map(v => ({
+        id: v.id,
+        name: v.name,
+        trafficPercentage: v.trafficPercentage,
+        views: 0,  // Would come from analytics
+        clicks: 0,  // Would come from analytics
+        conversionRate: 0,  // Would be calculated
+      })),
+    };
+  }
+
+  // A/B Test: Declare winner and apply variant
+  async declareABTestWinner(id: string, winnerVariantId: string): Promise<Page> {
+    const page = await this.findOne(id);
+    const abTest = page.settings?.abTest;
+
+    if (!abTest?.isEnabled) {
+      throw new ConflictException('No active A/B test');
+    }
+
+    const winner = abTest.variants.find(v => v.id === winnerVariantId);
+    if (!winner) {
+      throw new NotFoundException('Variant not found');
+    }
+
+    // Apply winner's changes to main page
+    if (winner.theme) {
+      page.theme = { ...page.theme, ...winner.theme };
+    }
+    if (winner.blocks) {
+      page.blocks = winner.blocks;
+    }
+
+    // Disable A/B test and record winner
+    page.settings = {
+      ...page.settings,
+      abTest: {
+        ...abTest,
+        isEnabled: false,
+        winnerVariantId,
+      },
+    };
+
+    return this.pageRepository.save(page);
   }
 
   private async generateUniqueSlug(name: string): Promise<string> {
@@ -152,8 +277,12 @@ export class PageService {
     return slug;
   }
 
-  private generateHtml(page: Page): string {
-    const theme = page.theme || {};
+  private generateHtml(page: Page, variant?: ABTestVariant | null): string {
+    // Apply variant theme/blocks if present
+    const theme = variant?.theme
+      ? { ...page.theme, ...variant.theme }
+      : page.theme || {};
+    const blocks = variant?.blocks || page.blocks;
     const seo = page.seo || {};
 
     const styles = `
@@ -195,7 +324,7 @@ export class PageService {
       ${page.settings?.customCss || ''}
     `;
 
-    const blocksHtml = (page.blocks || [])
+    const blocksHtml = (blocks || [])
       .sort((a, b) => a.order - b.order)
       .map((block) => this.renderBlock(block, theme))
       .join('\n');

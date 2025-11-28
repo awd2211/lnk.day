@@ -140,6 +140,69 @@ export interface PageTheme {
   buttonStyle?: 'filled' | 'outlined' | 'minimal';
 }
 
+// Guestbook/Comments settings
+export interface GuestbookSettings {
+  enabled: boolean;
+  requireApproval: boolean;
+  requireEmail: boolean;
+  allowAnonymous: boolean;
+  allowReplies: boolean;
+  maxLength: number;
+  placeholder?: string;
+  title?: string;
+  emptyMessage?: string;
+  successMessage?: string;
+  enableLikes: boolean;
+  enableEmojis: boolean;
+  sortOrder: 'newest' | 'oldest' | 'popular';
+  displayCount: number;
+  showAvatars: boolean;
+  enableNotifications: boolean;
+  notificationEmail?: string;
+  blockedWords?: string[];
+  blockedIps?: string[];
+}
+
+// Calendly integration settings
+export interface CalendlySettings {
+  enabled: boolean;
+  url: string;  // Calendly scheduling link
+  embedType: 'inline' | 'popup' | 'button';
+  buttonText?: string;
+  buttonColor?: string;
+  hideDetails?: boolean;
+  hideEventType?: boolean;
+  hideLandingPage?: boolean;
+  hideCookieBanner?: boolean;
+  height?: number;  // For inline embed
+}
+
+// A/B Testing types
+export interface ABTestVariant {
+  id: string;
+  name: string;
+  description?: string;
+  trafficPercentage: number;  // 0-100
+  theme?: Partial<PageTheme>;
+  blocks?: PageBlock[];
+  isControl?: boolean;  // Original version
+}
+
+export interface ABTestConfig {
+  isEnabled: boolean;
+  name?: string;
+  variants: ABTestVariant[];
+  startDate?: string;
+  endDate?: string;
+  winnerVariantId?: string;  // Set when test concludes
+  metrics: {
+    clicks?: boolean;
+    conversions?: boolean;
+    timeOnPage?: boolean;
+    bounceRate?: boolean;
+  };
+}
+
 @Entity('pages')
 export class Page {
   @PrimaryGeneratedColumn('uuid')
@@ -193,7 +256,14 @@ export class Page {
     analytics?: {
       googleAnalyticsId?: string;
       facebookPixelId?: string;
+      tiktokPixelId?: string;
+      linkedinInsightTag?: string;
+      pinterestTag?: string;
+      snapchatPixelId?: string;
     };
+    abTest?: ABTestConfig;
+    guestbook?: GuestbookSettings;
+    calendly?: CalendlySettings;
   };
 
   @Column({ nullable: true })
