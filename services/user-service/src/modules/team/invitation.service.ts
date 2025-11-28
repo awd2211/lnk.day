@@ -397,12 +397,15 @@ export class InvitationService {
       where.status = query.status;
     }
 
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
     const [data, total] = await this.invitationRepository.findAndCount({
       where,
       relations: ['invitedBy'],
       order: { createdAt: 'DESC' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return { data, total };
@@ -423,12 +426,15 @@ export class InvitationService {
       where.status = query.status;
     }
 
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
     const [data, total] = await this.invitationRepository.findAndCount({
       where,
       relations: ['team', 'invitedBy'],
       order: { createdAt: 'DESC' },
-      skip: (query.page - 1) * query.limit,
-      take: query.limit,
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     return { data, total };

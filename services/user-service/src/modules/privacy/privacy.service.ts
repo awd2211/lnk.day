@@ -71,13 +71,13 @@ export class PrivacyService {
     }
 
     consent.granted = dto.granted;
-    consent.ipAddress = ipAddress;
-    consent.userAgent = userAgent;
+    consent.ipAddress = ipAddress || '';
+    consent.userAgent = userAgent || '';
     consent.version = this.configService.get('PRIVACY_POLICY_VERSION', '1.0');
 
     if (dto.granted) {
       consent.grantedAt = new Date();
-      consent.revokedAt = null;
+      consent.revokedAt = null as any;
     } else {
       consent.revokedAt = new Date();
     }
@@ -354,7 +354,7 @@ export class PrivacyService {
     await this.userRepository.update(userId, {
       email: anonymizedEmail,
       name: anonymizedName,
-      passwordHash: '',
+      password: '',
     });
 
     // 删除同意记录
@@ -442,7 +442,7 @@ export class PrivacyService {
     });
 
     for (const request of expiredExports) {
-      request.downloadUrl = null;
+      request.downloadUrl = null as any;
       await this.dataRequestRepository.save(request);
     }
 

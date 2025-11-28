@@ -63,13 +63,13 @@ export class LdapConfig {
     },
   })
   attributeMapping: {
+    [key: string]: string | undefined;
     username: string;
     email: string;
     firstName?: string;
     lastName?: string;
     displayName?: string;
     memberOf?: string;
-    [key: string]: string;
   };
 
   // Group settings

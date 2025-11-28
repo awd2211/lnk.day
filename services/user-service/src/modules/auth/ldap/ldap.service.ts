@@ -84,7 +84,7 @@ export class LdapService {
 
   async deleteConfig(teamId: string): Promise<boolean> {
     const result = await this.ldapConfigRepo.delete({ teamId });
-    return result.affected > 0;
+    return (result.affected ?? 0) > 0;
   }
 
   // ========== LDAP Operations ==========
@@ -130,7 +130,7 @@ export class LdapService {
         message: `Connection successful. Found ${users.length} sample users.`,
         details,
       };
-    } catch (error) {
+    } catch (error: any) {
       details.error = error.message;
 
       // Update config with test result
@@ -192,7 +192,7 @@ export class LdapService {
 
       client.unbind();
       return ldapUser;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`LDAP authentication error: ${error.message}`);
       return null;
     }
@@ -232,7 +232,7 @@ export class LdapService {
           // Check if user exists, create or update
           // This would integrate with UserService
           result.usersUpdated++;
-        } catch (error) {
+        } catch (error: any) {
           result.errors.push(`Failed to sync user ${user.username}: ${error.message}`);
         }
       }
@@ -243,7 +243,7 @@ export class LdapService {
       config.lastSyncAt = new Date();
       config.syncedUsersCount = result.usersFound;
       await this.ldapConfigRepo.save(config);
-    } catch (error) {
+    } catch (error: any) {
       result.success = false;
       result.errors.push(error.message);
     }
@@ -335,7 +335,7 @@ export class LdapService {
       const opts: ldap.SearchOptions = {
         filter,
         scope: config.searchScope,
-        attributes: Object.values(config.attributeMapping),
+        attributes: Object.values(config.attributeMapping).filter((v): v is string => v !== undefined),
         sizeLimit: limit || 0,
       };
 
@@ -378,7 +378,7 @@ export class LdapService {
       const filter = config.groupSearchFilter.replace('{{userDn}}', this.escapeLdapFilter(userDn));
       const entries = await this.searchWithFilter(client, config.groupBaseDn, filter, config);
       return entries.map((e) => e.dn);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to get user groups: ${error.message}`);
       return [];
     }

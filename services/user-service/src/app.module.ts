@@ -14,6 +14,7 @@ import { EmailModule } from './modules/email/email.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { LdapModule } from './modules/auth/ldap/ldap.module';
+import { NotificationModule } from './common/notification/notification.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { LdapModule } from './modules/auth/ldap/ldap.module';
     }),
     RedisModule,
     EmailModule,
+    NotificationModule,
     UserModule,
     AuthModule,
     TeamModule,

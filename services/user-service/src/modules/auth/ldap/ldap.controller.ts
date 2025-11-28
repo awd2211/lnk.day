@@ -30,7 +30,15 @@ class CreateLdapConfigDto {
   bindPassword: string;
   baseDn: string;
   userSearchFilter?: string;
-  attributeMapping?: Record<string, string>;
+  attributeMapping?: {
+    [key: string]: string | undefined;
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    memberOf?: string;
+  };
   groupBaseDn?: string;
   groupSearchFilter?: string;
   groupMapping?: Record<string, string>;
@@ -47,7 +55,15 @@ class UpdateLdapConfigDto {
   bindPassword?: string;
   baseDn?: string;
   userSearchFilter?: string;
-  attributeMapping?: Record<string, string>;
+  attributeMapping?: {
+    [key: string]: string | undefined;
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    memberOf?: string;
+  };
   groupBaseDn?: string;
   groupSearchFilter?: string;
   groupMapping?: Record<string, string>;

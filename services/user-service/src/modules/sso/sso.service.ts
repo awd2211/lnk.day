@@ -209,7 +209,7 @@ export class SSOService {
 
     try {
       return await this.samlService.createLoginRequest(teamId, idpConfig, relayState);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to create SAML login request: ${error.message}`);
       throw new BadRequestException(`Failed to initiate SAML login: ${error.message}`);
     }
@@ -234,7 +234,7 @@ export class SSOService {
 
     try {
       return await this.samlService.createLogoutRequest(teamId, idpConfig, nameId, sessionIndex);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to create SAML logout request: ${error.message}`);
       throw new BadRequestException(`Failed to initiate SAML logout: ${error.message}`);
     }
@@ -435,7 +435,7 @@ export class SSOService {
           userInfoEndpoint: discovery.userinfo_endpoint,
         },
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         message: `Failed to validate OIDC configuration: ${error.message}`,
@@ -509,7 +509,7 @@ export class SSOService {
 
       // Validate allowed domains if configured
       if (config.allowedDomains.length > 0 && result.user.email) {
-        const domain = result.user.email.split('@')[1];
+        const domain = result.user.email.split('@')[1] || '';
         if (!config.allowedDomains.includes(domain)) {
           throw new BadRequestException(`Email domain ${domain} is not allowed for SSO`);
         }
@@ -526,7 +526,7 @@ export class SSOService {
         },
         sessionIndex: result.sessionIndex,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SAML response processing failed: ${error.message}`);
       if (error instanceof BadRequestException) {
         throw error;
@@ -751,7 +751,10 @@ export class SSOService {
     teamId?: string;
     loginUrl?: string;
   }> {
-    const domain = email.split('@')[1];
+    const domain = email.split('@')[1] || '';
+    if (!domain) {
+      return { hasSSO: false };
+    }
 
     // Find SSO config with this domain
     const configs = await this.ssoConfigRepository.find({

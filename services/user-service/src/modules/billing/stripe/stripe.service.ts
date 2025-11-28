@@ -14,6 +14,7 @@ import {
 } from '../entities/subscription.entity';
 import { PlanType } from '../../quota/quota.entity';
 import { QuotaService } from '../../quota/quota.service';
+import { NotificationClientService } from '../../../common/notification/notification-client.service';
 
 // Price IDs from Stripe Dashboard (should be configured in env)
 interface StripePriceConfig {
@@ -40,11 +41,12 @@ export class StripeService {
     private readonly paymentMethodRepository: Repository<PaymentMethod>,
     private readonly quotaService: QuotaService,
     private readonly configService: ConfigService,
+    private readonly notificationService: NotificationClientService,
   ) {
     const stripeSecretKey = this.configService.get('STRIPE_SECRET_KEY');
     if (stripeSecretKey) {
       this.stripe = new Stripe(stripeSecretKey, {
-        apiVersion: '2024-11-20.acacia',
+        apiVersion: '2023-10-16',
       });
     }
 
@@ -223,7 +225,7 @@ export class StripeService {
     return this.stripe.subscriptions.update(subscriptionId, {
       items: [
         {
-          id: subscription.items.data[0].id,
+          id: subscription.items.data[0]?.id || '',
           price: priceId,
         },
       ],
@@ -516,7 +518,46 @@ export class StripeService {
 
     this.logger.warn(`Invoice payment failed: ${stripeInvoice.id}`);
 
-    // TODO: Send notification to team owner
+    // Send notification to team owner
+    if (subscription) {
+      await this.sendPaymentFailedNotification(subscription, stripeInvoice);
+    }
+  }
+
+  private async sendPaymentFailedNotification(
+    subscription: Subscription,
+    stripeInvoice: Stripe.Invoice,
+  ): Promise<void> {
+    try {
+      // Get customer email from Stripe
+      const customer = await this.stripe.customers.retrieve(
+        stripeInvoice.customer as string,
+      );
+
+      if (customer.deleted || !('email' in customer) || !customer.email) {
+        this.logger.warn('Cannot send notification: customer email not found');
+        return;
+      }
+
+      const amount = (stripeInvoice.amount_due / 100).toFixed(2);
+      const currency = stripeInvoice.currency.toUpperCase();
+
+      // Calculate next retry date (Stripe typically retries in 3-7 days)
+      const retryDate = new Date();
+      retryDate.setDate(retryDate.getDate() + 3);
+
+      await this.notificationService.sendPaymentFailedEmail(customer.email, {
+        teamName: subscription.teamId,
+        amount,
+        currency,
+        invoiceId: stripeInvoice.id,
+        retryDate: retryDate.toLocaleDateString('zh-CN'),
+      });
+
+      this.logger.log(`Payment failed notification sent to ${customer.email}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to send payment failed notification: ${error.message}`);
+    }
   }
 
   private async handleTrialWillEnd(stripeSubscription: Stripe.Subscription): Promise<void> {
@@ -526,8 +567,68 @@ export class StripeService {
 
     if (subscription) {
       this.logger.log(`Trial ending soon for team ${subscription.teamId}`);
-      // TODO: Send notification to team owner
+
+      // Send notification to team owner
+      await this.sendTrialEndingNotification(subscription, stripeSubscription);
     }
+  }
+
+  private async sendTrialEndingNotification(
+    subscription: Subscription,
+    stripeSubscription: Stripe.Subscription,
+  ): Promise<void> {
+    try {
+      // Get customer email from Stripe
+      const customer = await this.stripe.customers.retrieve(
+        stripeSubscription.customer as string,
+      );
+
+      if (customer.deleted || !('email' in customer) || !customer.email) {
+        this.logger.warn('Cannot send notification: customer email not found');
+        return;
+      }
+
+      // Calculate days remaining
+      const trialEnd = stripeSubscription.trial_end
+        ? new Date(stripeSubscription.trial_end * 1000)
+        : new Date();
+      const now = new Date();
+      const daysRemaining = Math.ceil(
+        (trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      // Get plan name
+      const planName = this.getPlanNameFromPriceId(
+        stripeSubscription.items.data[0]?.price?.id,
+      );
+
+      await this.notificationService.sendTrialEndingEmail(customer.email, {
+        teamName: subscription.teamId,
+        daysRemaining: Math.max(0, daysRemaining),
+        planName,
+      });
+
+      this.logger.log(`Trial ending notification sent to ${customer.email}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to send trial ending notification: ${error.message}`);
+    }
+  }
+
+  private getPlanNameFromPriceId(priceId?: string): string {
+    if (!priceId) return 'Free';
+
+    for (const [planType, config] of Object.entries(this.priceIds)) {
+      if (config.monthly === priceId || config.yearly === priceId) {
+        const planNames: Record<string, string> = {
+          [PlanType.FREE]: 'Free',
+          [PlanType.STARTER]: 'Starter',
+          [PlanType.PRO]: 'Pro',
+          [PlanType.ENTERPRISE]: 'Enterprise',
+        };
+        return planNames[planType] || planType;
+      }
+    }
+    return 'Unknown';
   }
 
   // ========== Helper Methods ==========

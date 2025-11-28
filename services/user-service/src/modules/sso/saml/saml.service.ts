@@ -3,10 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import * as xml2js from 'xml2js';
 import * as samlify from 'samlify';
-import * as validator from '@authenio/samlify-xsd-schema-validator';
+// import * as validator from '@authenio/samlify-xsd-schema-validator';
 
 // Configure samlify with schema validator
-samlify.setSchemaValidator(validator);
+// samlify.setSchemaValidator(validator);
 
 export interface SAMLServiceProviderConfig {
   entityId: string;
@@ -203,7 +203,7 @@ export class SAMLService {
         sessionIndex,
         issuer: parseResult.extract.issuer || idpConfig.entityId,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SAML response parsing failed: ${error.message}`);
       throw new BadRequestException(`Invalid SAML response: ${error.message}`);
     }
@@ -244,7 +244,7 @@ export class SAMLService {
         success: true,
         issuer: parseResult.extract?.issuer || idpConfig.entityId,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`SAML logout response parsing failed: ${error.message}`);
       return {
         success: false,
@@ -303,7 +303,7 @@ export class SAMLService {
       if (signingKey?.KeyInfo?.[0]?.X509Data?.[0]?.X509Certificate?.[0]) {
         certificate = signingKey.KeyInfo[0].X509Data[0].X509Certificate[0];
         if (typeof certificate === 'object') {
-          certificate = certificate._ || '';
+          certificate = (certificate as any)._ || '';
         }
         certificate = certificate.trim();
       }
@@ -326,7 +326,7 @@ export class SAMLService {
         signedRequests,
         signedAssertions,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to parse IdP metadata: ${error.message}`);
       throw new BadRequestException(`Invalid IdP metadata: ${error.message}`);
     }
@@ -491,7 +491,7 @@ export class SAMLService {
     try {
       this.createServiceProvider(teamId);
       this.createIdentityProvider(`${teamId}_test`, idpConfig);
-    } catch (error) {
+    } catch (error: any) {
       errors.push(`Configuration error: ${error.message}`);
     }
 

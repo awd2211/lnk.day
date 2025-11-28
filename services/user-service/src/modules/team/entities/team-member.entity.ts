@@ -6,9 +6,11 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  Index,
 } from 'typeorm';
 import { Team } from './team.entity';
 import { User } from '../../user/entities/user.entity';
+import { CustomRole } from './custom-role.entity';
 
 export enum TeamMemberRole {
   OWNER = 'OWNER',
@@ -31,6 +33,14 @@ export class TeamMember {
 
   @Column({ type: 'enum', enum: TeamMemberRole, default: TeamMemberRole.MEMBER })
   role: TeamMemberRole;
+
+  @Column({ type: 'uuid', nullable: true })
+  @Index()
+  customRoleId?: string;
+
+  @ManyToOne(() => CustomRole, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'customRoleId' })
+  customRole?: CustomRole;
 
   @CreateDateColumn()
   joinedAt: Date;
