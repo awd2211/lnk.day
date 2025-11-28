@@ -37,6 +37,9 @@ func main() {
 	analyticsService := service.NewAnalyticsService(cfg)
 	defer analyticsService.Close()
 
+	// Initialize rule service
+	ruleService := service.NewRuleService()
+
 	// Initialize cache invalidation service (RabbitMQ consumer)
 	cacheInvalidationService, err := service.NewCacheInvalidationService(cfg, linkService)
 	if err != nil {
@@ -65,7 +68,7 @@ func main() {
 	app.Use(cors.New())
 
 	// Initialize handlers
-	redirectHandler := handler.NewRedirectHandler(linkService, analyticsService)
+	redirectHandler := handler.NewRedirectHandler(linkService, analyticsService, ruleService)
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,12 +13,14 @@ import (
 type RedirectHandler struct {
 	linkService      *service.LinkService
 	analyticsService *service.AnalyticsService
+	ruleService      *service.RuleService
 }
 
-func NewRedirectHandler(ls *service.LinkService, as *service.AnalyticsService) *RedirectHandler {
+func NewRedirectHandler(ls *service.LinkService, as *service.AnalyticsService, rs *service.RuleService) *RedirectHandler {
 	return &RedirectHandler{
 		linkService:      ls,
 		analyticsService: as,
+		ruleService:      rs,
 	}
 }
 
@@ -73,21 +74,55 @@ func (h *RedirectHandler) Redirect(c *fiber.Ctx) error {
 		}
 	}
 
+	// Build visitor context for rule matching
+	queryParams := make(map[string]string)
+	c.Request().URI().QueryArgs().VisitAll(func(key, value []byte) {
+		queryParams[string(key)] = string(value)
+	})
+
+	// Parse geo and device info
+	country, region, city := h.analyticsService.ParseGeoIP(c.IP())
+	geoInfo := &service.GeoInfo{
+		Country: country,
+		Region:  region,
+		City:    city,
+	}
+	deviceInfo := service.ParseUserAgent(c.Get("User-Agent"))
+
+	visitorCtx := h.ruleService.BuildVisitorContext(
+		c.IP(),
+		c.Get("User-Agent"),
+		c.Get("Referer"),
+		c.Get("Accept-Language"),
+		queryParams,
+		geoInfo,
+		deviceInfo,
+	)
+
 	// Determine redirect URL based on targeting rules
-	redirectURL := h.resolveTargetURL(c, link)
+	redirectURL := h.ruleService.ResolveTargetURL(c.Context(), link, visitorCtx)
 
 	// Track click asynchronously
 	go func() {
 		event := &model.ClickEvent{
-			LinkID:    link.ID,
-			ShortCode: code,
-			IP:        c.IP(),
-			UserAgent: c.Get("User-Agent"),
-			Referer:   c.Get("Referer"),
+			LinkID:       link.ID,
+			ShortCode:    code,
+			IP:           c.IP(),
+			UserAgent:    c.Get("User-Agent"),
+			Referer:      c.Get("Referer"),
+			Country:      geoInfo.Country,
+			Region:       geoInfo.Region,
+			City:         geoInfo.City,
+			DeviceType:   deviceInfo.DeviceType,
+			OS:           deviceInfo.OS,
+			Browser:      deviceInfo.Browser,
+			Language:     visitorCtx.Language,
+			UTMSource:    visitorCtx.UTMSource,
+			UTMMedium:    visitorCtx.UTMMedium,
+			UTMCampaign:  visitorCtx.UTMCampaign,
+			TargetURL:    redirectURL,
+			RuleMatched:  redirectURL != link.OriginalURL,
 		}
-
-		// Get geo info
-		event.Country, event.Region, event.City = h.analyticsService.ParseGeoIP(c.IP())
 
 		h.analyticsService.TrackClick(event)
 		h.linkService.IncrementClicks(c.Context(), link.ID)
@@ -192,106 +227,4 @@ func (h *RedirectHandler) renderPasswordPage(c *fiber.Ctx, code string) error {
 
 	c.Set("Content-Type", "text/html")
 	return c.Status(fiber.StatusOK).SendString(html)
-}
-
-func (h *RedirectHandler) resolveTargetURL(c *fiber.Ctx, link *model.Link) string {
-	// Check time targeting first (highest priority for time-sensitive campaigns)
-	if len(link.Settings.TimeTargeting) > 0 {
-		for _, target := range link.Settings.TimeTargeting {
-			if h.isTimeTargetActive(target) {
-				return target.TargetURL
-			}
-		}
-	}
-
-	// Check device targeting
-	ua := c.Get("User-Agent")
-	if len(link.Settings.DeviceTargeting) > 0 {
-		deviceType := h.detectDevice(ua)
-		for _, target := range link.Settings.DeviceTargeting {
-			if strings.EqualFold(target.DeviceType, deviceType) {
-				return target.TargetURL
-			}
-		}
-	}
-
-	// Check geo targeting
-	if len(link.Settings.GeoTargeting) > 0 {
-		country, region, city := h.analyticsService.ParseGeoIP(c.IP())
-		for _, target := range link.Settings.GeoTargeting {
-			// Match country (required)
-			if !strings.EqualFold(target.Country, country) {
-				continue
-			}
-			// Match region (optional)
-			if target.Region != "" && !strings.EqualFold(target.Region, region) {
-				continue
-			}
-			// Match city (optional)
-			if target.City != "" && !strings.EqualFold(target.City, city) {
-				continue
-			}
-			return target.TargetURL
-		}
-	}
-
-	return link.OriginalURL
-}
-
-func (h *RedirectHandler) detectDevice(userAgent string) string {
-	ua := strings.ToLower(userAgent)
-
-	if strings.Contains(ua, "iphone") || strings.Contains(ua, "ipad") {
-		return "IOS"
-	}
-	if strings.Contains(ua, "android") {
-		return "ANDROID"
-	}
-	if strings.Contains(ua, "mobile") {
-		return "MOBILE"
-	}
-	if strings.Contains(ua, "tablet") {
-		return "TABLET"
-	}
-	return "DESKTOP"
-}
-
-func (h *RedirectHandler) isTimeTargetActive(target model.TimeTarget) bool {
-	// Get current time in target timezone
-	loc := time.UTC
-	if target.Timezone != "" {
-		if tz, err := time.LoadLocation(target.Timezone); err == nil {
-			loc = tz
-		}
-	}
-	now := time.Now().In(loc)
-
-	// Check date range
-	if target.StartDate != "" {
-		startDate, err := time.ParseInLocation("2006-01-02", target.StartDate, loc)
-		if err == nil && now.Before(startDate) {
-			return false
-		}
-	}
-
-	if target.EndDate != "" {
-		endDate, err := time.ParseInLocation("2006-01-02", target.EndDate, loc)
-		if err == nil {
-			// End date is inclusive, so add one day
-			endDate = endDate.Add(24 * time.Hour)
-			if now.After(endDate) {
-				return false
-			}
-		}
-	}
-
-	// Check daily time range (optional)
-	if target.StartTime != "" && target.EndTime != "" {
-		currentTime := now.Format("15:04")
-		if currentTime < target.StartTime || currentTime > target.EndTime {
-			return false
-		}
-	}
-
-	return true
 }

@@ -45,17 +45,24 @@ type TimeTarget struct {
 }
 
 type ClickEvent struct {
-	ID        string    `json:"id"`
-	LinkID    string    `json:"linkId"`
-	ShortCode string    `json:"shortCode"`
-	Timestamp time.Time `json:"timestamp"`
-	IP        string    `json:"ip"`
-	UserAgent string    `json:"userAgent"`
-	Referer   string    `json:"referer"`
-	Country   string    `json:"country"`
-	Region    string    `json:"region"`
-	City      string    `json:"city"`
-	Device    string    `json:"device"`
-	Browser   string    `json:"browser"`
-	OS        string    `json:"os"`
+	ID           string    `json:"id"`
+	LinkID       string    `json:"linkId"`
+	ShortCode    string    `json:"shortCode"`
+	Timestamp    time.Time `json:"timestamp"`
+	IP           string    `json:"ip"`
+	UserAgent    string    `json:"userAgent"`
+	Referer      string    `json:"referer"`
+	Country      string    `json:"country"`
+	Region       string    `json:"region"`
+	City         string    `json:"city"`
+	DeviceType   string    `json:"deviceType"`
+	Device       string    `json:"device"`
+	Browser      string    `json:"browser"`
+	OS           string    `json:"os"`
+	Language     string    `json:"language"`
+	UTMSource    string    `json:"utmSource"`
+	UTMMedium    string    `json:"utmMedium"`
+	UTMCampaign  string    `json:"utmCampaign"`
+	TargetURL    string    `json:"targetUrl"`
+	RuleMatched  bool      `json:"ruleMatched"`
 }
