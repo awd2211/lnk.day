@@ -3,6 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PageModule } from './modules/page/page.module';
 import { TemplateModule } from './modules/template/template.module';
+import { BioLinkModule } from './modules/bio-link/bio-link.module';
+import { SeoModule } from './modules/seo/seo.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { TemplateModule } from './modules/template/template.module';
     }),
     PageModule,
     TemplateModule,
+    BioLinkModule,
+    SeoModule,
   ],
 })
 export class AppModule {}

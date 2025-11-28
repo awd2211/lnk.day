@@ -20,12 +20,114 @@ export enum PageType {
   CUSTOM = 'custom',
 }
 
+export type PageBlockType =
+  | 'header'
+  | 'text'
+  | 'image'
+  | 'button'
+  | 'links'
+  | 'social'
+  | 'form'
+  | 'video'
+  | 'divider'
+  | 'html'
+  // 新增组件类型
+  | 'carousel'
+  | 'countdown'
+  | 'music'
+  | 'map'
+  | 'subscribe'
+  | 'nft'
+  | 'podcast'
+  | 'product';
+
 export interface PageBlock {
   id: string;
-  type: 'header' | 'text' | 'image' | 'button' | 'links' | 'social' | 'form' | 'video' | 'divider' | 'html';
+  type: PageBlockType;
   content: Record<string, any>;
   style?: Record<string, any>;
   order: number;
+}
+
+// 组件内容类型定义
+export interface CarouselContent {
+  images: Array<{ url: string; alt?: string; link?: string }>;
+  autoPlay?: boolean;
+  interval?: number; // 毫秒
+  showDots?: boolean;
+  showArrows?: boolean;
+}
+
+export interface CountdownContent {
+  targetDate: string; // ISO 日期
+  title?: string;
+  expiredMessage?: string;
+  showDays?: boolean;
+  showHours?: boolean;
+  showMinutes?: boolean;
+  showSeconds?: boolean;
+}
+
+export interface MusicContent {
+  platform: 'spotify' | 'apple' | 'soundcloud' | 'custom';
+  embedUrl?: string;
+  trackId?: string;
+  playlistId?: string;
+  showArtwork?: boolean;
+  compact?: boolean;
+}
+
+export interface MapContent {
+  platform: 'google' | 'mapbox' | 'openstreetmap';
+  latitude: number;
+  longitude: number;
+  zoom?: number;
+  address?: string;
+  marker?: boolean;
+  height?: number;
+}
+
+export interface SubscribeContent {
+  provider: 'mailchimp' | 'convertkit' | 'klaviyo' | 'custom';
+  listId?: string;
+  webhookUrl?: string;
+  title?: string;
+  description?: string;
+  buttonText?: string;
+  successMessage?: string;
+  collectName?: boolean;
+  collectPhone?: boolean;
+}
+
+export interface NftContent {
+  platform: 'opensea' | 'rarible' | 'foundation' | 'custom';
+  contractAddress?: string;
+  tokenId?: string;
+  collectionSlug?: string;
+  showPrice?: boolean;
+  showOwner?: boolean;
+  displayMode?: 'single' | 'collection' | 'gallery';
+}
+
+export interface PodcastContent {
+  platform: 'spotify' | 'apple' | 'google' | 'anchor' | 'custom';
+  showId?: string;
+  episodeId?: string;
+  embedUrl?: string;
+  showLatest?: boolean;
+  episodeCount?: number;
+}
+
+export interface ProductContent {
+  name: string;
+  description?: string;
+  price: number;
+  currency?: string;
+  imageUrl?: string;
+  buyUrl?: string;
+  originalPrice?: number; // 原价，用于显示折扣
+  badge?: string; // "NEW", "SALE", etc.
+  variants?: Array<{ name: string; price?: number }>;
 }
 
 export interface PageTheme {
