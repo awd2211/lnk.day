@@ -2,6 +2,7 @@ packages:
   # 前端应用
   - "frontend/*"
   # 后端服务（仅 Node.js 服务）
+  - "services/api-gateway"
   - "services/user-service"
   - "services/link-service"
   - "services/campaign-service"
@@ -10,5 +11,6 @@ packages:
   - "services/deeplink-service"
   - "services/notification-service"
   - "services/console-service"
+  - "services/domain-service"
   # 共享包
   - "packages/*"
