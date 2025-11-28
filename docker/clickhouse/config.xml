@@ -7,8 +7,8 @@
     </logger>
 
     <!-- HTTP 接口 -->
-    <http_port>8123</http_port>
-    <tcp_port>9000</tcp_port>
+    <http_port>60032</http_port>
+    <tcp_port>60034</tcp_port>
 
     <!-- 监听所有地址 (开发环境) -->
     <listen_host>0.0.0.0</listen_host>
@@ -26,10 +26,16 @@
     <!-- 查询设置 -->
     <max_concurrent_queries>100</max_concurrent_queries>
 
-    <!-- 内存限制 (开发环境适当降低) -->
-    <max_memory_usage>2000000000</max_memory_usage>
+    <!-- 用户配置 -->
+    <profiles>
+        <default>
+            <!-- 内存限制 (开发环境适当降低) -->
+            <max_memory_usage>2000000000</max_memory_usage>
+            <!-- 异步插入设置 -->
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>1</wait_for_async_insert>
+        </default>
+    </profiles>
 
-    <!-- 异步插入设置 -->
-    <async_insert>1</async_insert>
-    <wait_for_async_insert>1</wait_for_async_insert>
+    <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings>
 </clickhouse>
