@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeepLinkModule } from './modules/deeplink/deeplink.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DeepLinkModule } from './modules/deeplink/deeplink.module';
       }),
     }),
     DeepLinkModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

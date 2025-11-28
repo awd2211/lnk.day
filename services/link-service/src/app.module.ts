@@ -18,6 +18,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SecurityModule } from './modules/security/security.module';
 import { RedirectRulesModule } from './modules/redirect-rules/redirect-rules.module';
 import { LinkTemplateModule } from './modules/link-template/link-template.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { LinkTemplateModule } from './modules/link-template/link-template.module
     SecurityModule,
     RedirectRulesModule,
     LinkTemplateModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

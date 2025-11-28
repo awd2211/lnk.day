@@ -15,6 +15,7 @@ import { RedisModule } from './modules/redis/redis.module';
 import { PrivacyModule } from './modules/privacy/privacy.module';
 import { LdapModule } from './modules/auth/ldap/ldap.module';
 import { NotificationModule } from './common/notification/notification.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { NotificationModule } from './common/notification/notification.module';
     SSOModule,
     PrivacyModule,
     LdapModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

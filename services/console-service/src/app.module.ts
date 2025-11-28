@@ -5,6 +5,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SystemModule } from './modules/system/system.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ProxyModule } from './modules/proxy/proxy.module';
     DashboardModule,
     SystemModule,
     ProxyModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
