@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { TemplateModule } from './modules/template/template.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
+import { GoalsModule } from './modules/goals/goals.module';
+import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { CollaborationModule } from './modules/collaboration/collaboration.modul
     CampaignModule,
     TemplateModule,
     CollaborationModule,
+    GoalsModule,
+    CampaignAnalyticsModule,
   ],
 })
 export class AppModule {}
