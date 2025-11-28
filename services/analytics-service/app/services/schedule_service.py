@@ -194,7 +194,14 @@ class ScheduleService:
 
         return due_schedules
 
-    def mark_schedule_executed(self, schedule_id: str, success: bool, report_id: Optional[str] = None, error: Optional[str] = None):
+    def mark_schedule_executed(
+        self,
+        schedule_id: str,
+        success: bool,
+        report_id: Optional[str] = None,
+        error: Optional[str] = None,
+        emails_sent: int = 0
+    ):
         """标记定时报告已执行"""
         now = datetime.now()
 
@@ -215,7 +222,7 @@ class ScheduleService:
             "status": "success" if success else "failed",
             "report_id": report_id or "",
             "error_message": error or "",
-            "emails_sent": 0,
+            "emails_sent": emails_sent,
         }
         self.redis.hset(f"{self.execution_log_prefix}{log_id}", mapping=log_data)
         self.redis.lpush(f"schedule_logs:{schedule_id}", log_id)

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import analytics, reports, export, schedules, tasks
 from app.funnels import router as funnels
+from app.cohorts import router as cohorts
 from app.core.config import settings
 from app.services.realtime_service import realtime_service
 from app.services.kafka_consumer import KafkaClickConsumer
@@ -84,6 +85,7 @@ app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(funnels.router, prefix="/api/funnels", tags=["funnels"])
+app.include_router(cohorts.router, prefix="/api/cohorts", tags=["cohorts"])
 
 
 @app.get("/health")

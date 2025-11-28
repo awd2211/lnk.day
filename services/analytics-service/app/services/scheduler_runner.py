@@ -4,7 +4,9 @@ import uuid
 from datetime import datetime
 
 from app.services.schedule_service import schedule_service
+from app.services.notification_client import notification_client
 from app.api.reports import ReportRequest, ReportFormat, ReportType, generate_report_task
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -79,17 +81,35 @@ class SchedulerRunner:
         try:
             await generate_report_task(report_id, request)
 
-            # TODO: Send email notifications to schedule.email_recipients
-            # This would integrate with notification-service
+            # Send email notifications to recipients
+            emails_sent = 0
+            if schedule.email_recipients:
+                download_url = f"{settings.NOTIFICATION_SERVICE_URL}/reports/{report_id}/download"
+                emails_sent = await notification_client.send_scheduled_report_email(
+                    recipients=schedule.email_recipients,
+                    report_name=schedule.name,
+                    report_id=report_id,
+                    report_format=schedule.format,
+                    download_url=download_url,
+                )
 
             schedule_service.mark_schedule_executed(
                 schedule.id,
                 success=True,
-                report_id=report_id
+                report_id=report_id,
+                emails_sent=emails_sent
             )
-            logger.info(f"Schedule {schedule.id} executed successfully, report: {report_id}")
+            logger.info(f"Schedule {schedule.id} executed successfully, report: {report_id}, emails: {emails_sent}")
 
         except Exception as e:
+            # Notify recipients of failure
+            if schedule.email_recipients:
+                await notification_client.send_report_failed_email(
+                    recipients=schedule.email_recipients,
+                    report_name=schedule.name,
+                    error_message=str(e),
+                )
+
             schedule_service.mark_schedule_executed(
                 schedule.id,
                 success=False,
