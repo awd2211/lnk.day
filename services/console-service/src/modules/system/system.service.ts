@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import * as os from 'os';
 
-interface ServiceInfo {
+export interface ServiceInfo {
   name: string;
   url: string;
   port: number;

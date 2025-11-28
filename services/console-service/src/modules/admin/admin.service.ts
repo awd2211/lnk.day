@@ -45,6 +45,9 @@ export class AdminService {
   }
 
   async create(data: Partial<Admin>): Promise<Admin> {
+    if (!data.password) {
+      throw new Error('Password is required');
+    }
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const admin = this.adminRepository.create({ ...data, password: hashedPassword });
     return this.adminRepository.save(admin);
