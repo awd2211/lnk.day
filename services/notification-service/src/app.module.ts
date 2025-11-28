@@ -8,10 +8,13 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
 import { SlackModule } from './modules/slack/slack.module';
 import { TeamsModule } from './modules/teams/teams.module';
 import { SmsModule } from './modules/sms/sms.module';
+import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RabbitMQModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -44,6 +47,7 @@ import { SmsModule } from './modules/sms/sms.module';
     SlackModule,
     TeamsModule,
     SmsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
