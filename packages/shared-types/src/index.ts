@@ -12,3 +12,6 @@ export * from './campaign';
 
 // Common types
 export * from './common';
+
+// Event types
+export * from './events';
