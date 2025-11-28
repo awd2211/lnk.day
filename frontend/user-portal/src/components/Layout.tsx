@@ -11,8 +11,17 @@ import {
   Menu,
   X,
   Users,
+  FileText,
+  FileBarChart,
+  Palette,
+  Globe,
+  Shield,
+  Webhook,
+  Megaphone,
+  Search,
 } from 'lucide-react';
 import { useState } from 'react';
+import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,8 +30,15 @@ interface LayoutProps {
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: LayoutDashboard },
   { path: '/links', label: '链接管理', icon: Link2 },
+  { path: '/templates', label: '模板', icon: FileText },
+  { path: '/bio-links', label: 'Bio Link', icon: Palette },
   { path: '/analytics', label: '数据分析', icon: BarChart3 },
+  { path: '/reports', label: '报告', icon: FileBarChart },
+  { path: '/campaigns', label: '活动', icon: Megaphone },
   { path: '/qr', label: '二维码', icon: QrCode },
+  { path: '/domains', label: '域名', icon: Globe },
+  { path: '/sso', label: 'SSO', icon: Shield },
+  { path: '/webhooks', label: 'Webhooks', icon: Webhook },
   { path: '/team', label: '团队', icon: Users },
   { path: '/settings', label: '设置', icon: Settings },
 ];
@@ -32,6 +48,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
 
   const handleLogout = () => {
     logout();

@@ -7,6 +7,7 @@ interface User {
   name: string;
   avatar?: string;
   teamId: string;
+  role?: 'owner' | 'admin' | 'member' | 'viewer';
 }
 
 interface AuthContextType {

@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Copy,
   ExternalLink,
@@ -11,6 +12,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  PanelLeftClose,
+  PanelLeft,
+  Folder,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -40,6 +44,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LinkEditDialog } from '@/components/LinkEditDialog';
 import { BulkOperationsBar } from '@/components/BulkOperationsBar';
+import { FolderSidebar } from '@/components/links/FolderSidebar';
+import { EmptyState, NoSearchResultsEmptyState } from '@/components/EmptyState';
+import { ResponsiveTable } from '@/components/ui/responsive-table';
+import { Link2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   useLinks,
@@ -49,10 +57,14 @@ import {
   useBulkOperation,
   Link as LinkType,
 } from '@/hooks/useLinks';
+import { useFolders } from '@/hooks/useFolders';
+import { cn } from '@/lib/utils';
 
 type StatusFilter = 'all' | 'active' | 'inactive' | 'archived';
 
 export default function LinksPage() {
+  const navigate = useNavigate();
+
   // Form state
   const [url, setUrl] = useState('');
   const [customCode, setCustomCode] = useState('');
@@ -65,6 +77,10 @@ export default function LinksPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
 
+  // Folder state
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showFolderSidebar, setShowFolderSidebar] = useState(true);
+
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -75,12 +91,19 @@ export default function LinksPage() {
   const { toast } = useToast();
 
   // Queries
+  const { data: folders } = useFolders();
   const { data: linksData, isLoading } = useLinks({
     page,
     limit,
     status: statusFilter === 'all' ? undefined : statusFilter,
     search: search || undefined,
+    folderId: selectedFolderId || undefined,
   });
+
+  // Get current folder name
+  const currentFolderName = selectedFolderId
+    ? folders?.find((f) => f.id === selectedFolderId)?.name
+    : null;
 
   // Mutations
   const createLink = useCreateLink();
@@ -222,323 +245,389 @@ export default function LinksPage() {
 
   return (
     <Layout>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">链接管理</h1>
-        <p className="text-muted-foreground">创建和管理您的短链接</p>
-      </div>
+      <div className="flex h-full">
+        {/* Folder Sidebar */}
+        <div
+          className={cn(
+            'hidden shrink-0 transition-all duration-300 md:block',
+            showFolderSidebar ? 'w-64' : 'w-0 overflow-hidden'
+          )}
+        >
+          <FolderSidebar
+            selectedFolderId={selectedFolderId}
+            onSelectFolder={(id) => {
+              setSelectedFolderId(id);
+              setPage(1);
+            }}
+            className="h-full"
+          />
+        </div>
 
-      {/* Create Link Form */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Plus className="h-5 w-5" />
-            创建新链接
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCreateLink} className="space-y-4">
-            <div className="flex gap-4">
-              <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="输入长链接 URL，例如 https://example.com/very-long-url"
-                className="flex-1"
-              />
-              <Button type="submit" disabled={createLink.isPending || !url}>
-                {createLink.isPending ? '创建中...' : '创建短链接'}
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden h-8 w-8 md:flex"
+                onClick={() => setShowFolderSidebar(!showFolderSidebar)}
+                title={showFolderSidebar ? '隐藏文件夹' : '显示文件夹'}
+              >
+                {showFolderSidebar ? (
+                  <PanelLeftClose className="h-4 w-4" />
+                ) : (
+                  <PanelLeft className="h-4 w-4" />
+                )}
               </Button>
+              <div>
+                <h1 className="flex items-center gap-2 text-2xl font-bold">
+                  {currentFolderName ? (
+                    <>
+                      <Folder className="h-6 w-6" style={{ color: folders?.find(f => f.id === selectedFolderId)?.color }} />
+                      {currentFolderName}
+                    </>
+                  ) : (
+                    '链接管理'
+                  )}
+                </h1>
+                <p className="text-muted-foreground">
+                  {currentFolderName ? `文件夹内的链接` : '创建和管理您的短链接'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Create Link Form */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Plus className="h-5 w-5" />
+                创建新链接
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreateLink} className="space-y-4">
+                <div className="flex gap-4">
+                  <Input
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="输入长链接 URL，例如 https://example.com/very-long-url"
+                    className="flex-1"
+                  />
+                  <Button type="submit" disabled={createLink.isPending || !url}>
+                    {createLink.isPending ? '创建中...' : '创建短链接'}
+                  </Button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  {showAdvanced ? '隐藏高级选项' : '显示高级选项'}
+                </button>
+
+                {showAdvanced && (
+                  <div className="grid gap-4 rounded-lg border bg-muted/50 p-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="customCode">自定义短码（可选）</Label>
+                      <div className="mt-1 flex items-center">
+                        <span className="rounded-l border border-r-0 bg-muted px-3 py-2 text-sm text-muted-foreground">
+                          lnk.day/
+                        </span>
+                        <Input
+                          id="customCode"
+                          value={customCode}
+                          onChange={(e) => setCustomCode(e.target.value)}
+                          placeholder="my-link"
+                          className="rounded-l-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="title">标题（可选）</Label>
+                      <Input
+                        id="title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="链接标题"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                )}
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Filters & Bulk Operations */}
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 md:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="搜索链接..."
+                  className="pl-9"
+                />
+              </div>
+
+              <Select
+                value={statusFilter}
+                onValueChange={(value: StatusFilter) => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="active">活跃</SelectItem>
+                  <SelectItem value="inactive">禁用</SelectItem>
+                  <SelectItem value="archived">已归档</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-primary hover:underline"
-            >
-              {showAdvanced ? '隐藏高级选项' : '显示高级选项'}
-            </button>
+            {selectedIds.size > 0 && (
+              <BulkOperationsBar
+                selectedCount={selectedIds.size}
+                onClearSelection={() => setSelectedIds(new Set())}
+                onDelete={handleBulkDelete}
+                onAddTags={handleBulkAddTags}
+                onExport={handleExport}
+                isOperating={bulkOperation.isPending}
+              />
+            )}
+          </div>
 
-            {showAdvanced && (
-              <div className="grid gap-4 rounded-lg border bg-muted/50 p-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="customCode">自定义短码（可选）</Label>
-                  <div className="mt-1 flex items-center">
-                    <span className="rounded-l border border-r-0 bg-muted px-3 py-2 text-sm text-muted-foreground">
-                      lnk.day/
-                    </span>
-                    <Input
-                      id="customCode"
-                      value={customCode}
-                      onChange={(e) => setCustomCode(e.target.value)}
-                      placeholder="my-link"
-                      className="rounded-l-none"
+          {/* Links Table */}
+          <Card>
+            <ResponsiveTable>
+              <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="全选"
                     />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="title">标题（可选）</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="链接标题"
-                    className="mt-1"
-                  />
+                  </TableHead>
+                  <TableHead>短链接</TableHead>
+                  <TableHead className="hidden md:table-cell">原链接</TableHead>
+                  <TableHead className="text-center">点击</TableHead>
+                  <TableHead className="hidden sm:table-cell">创建时间</TableHead>
+                  <TableHead className="w-32">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-4" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Skeleton className="h-4 w-48" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="mx-auto h-4 w-12" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-8 w-24" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : links.length > 0 ? (
+                  links.map((link) => (
+                    <TableRow key={link.id} className={selectedIds.has(link.id) ? 'bg-muted/50' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(link.id)}
+                          onCheckedChange={() => toggleSelect(link.id)}
+                          aria-label={`选择 ${link.shortCode}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`https://lnk.day/${link.shortCode}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-primary hover:underline"
+                            >
+                              lnk.day/{link.shortCode}
+                            </a>
+                            <button
+                              onClick={() => copyToClipboard(link)}
+                              className="rounded p-1 hover:bg-muted"
+                              title="复制"
+                            >
+                              {copiedId === link.id ? (
+                                <Check className="h-3.5 w-3.5 text-green-500" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                          {link.title && (
+                            <p className="text-sm text-muted-foreground">{link.title}</p>
+                          )}
+                          {link.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {link.tags.slice(0, 3).map((tag) => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {link.tags.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{link.tags.length - 3}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden max-w-xs truncate md:table-cell">
+                        <a
+                          href={link.originalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                        >
+                          <span className="truncate">{link.originalUrl}</span>
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold">{link.clicks.toLocaleString()}</span>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(link.createdAt), 'MM/dd/yyyy', { locale: zhCN })}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="查看统计"
+                            onClick={() => navigate(`/links/${link.id}`)}
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="生成二维码"
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="编辑"
+                            onClick={() => setEditingLink(link)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            title="删除"
+                            onClick={() => handleDelete(link.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-48">
+                      {search ? (
+                        <NoSearchResultsEmptyState
+                          searchTerm={search}
+                          onClear={() => setSearch('')}
+                          size="sm"
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Link2}
+                          title="暂无链接"
+                          description="在上方表单创建你的第一个短链接，开始追踪点击数据"
+                          size="sm"
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            </ResponsiveTable>
+
+            {/* Pagination */}
+            {linksData && linksData.total > 0 && (
+              <div className="flex items-center justify-between border-t px-4 py-3">
+                <p className="text-sm text-muted-foreground">
+                  共 {linksData.total} 条记录，第 {page} / {totalPages} 页
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    上一页
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    下一页
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             )}
-          </form>
-        </CardContent>
-      </Card>
+          </Card>
 
-      {/* Filters & Bulk Operations */}
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 md:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="搜索链接..."
-              className="pl-9"
-            />
-          </div>
-
-          <Select
-            value={statusFilter}
-            onValueChange={(value: StatusFilter) => {
-              setStatusFilter(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="状态" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部状态</SelectItem>
-              <SelectItem value="active">活跃</SelectItem>
-              <SelectItem value="inactive">禁用</SelectItem>
-              <SelectItem value="archived">已归档</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {selectedIds.size > 0 && (
-          <BulkOperationsBar
-            selectedCount={selectedIds.size}
-            onClearSelection={() => setSelectedIds(new Set())}
-            onDelete={handleBulkDelete}
-            onAddTags={handleBulkAddTags}
-            onExport={handleExport}
-            isOperating={bulkOperation.isPending}
+          {/* Edit Dialog */}
+          <LinkEditDialog
+            link={editingLink}
+            open={!!editingLink}
+            onOpenChange={(open) => !open && setEditingLink(null)}
+            onSave={handleEditSave}
+            saving={updateLink.isPending}
           />
-        )}
+        </div>
       </div>
-
-      {/* Links Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleSelectAll}
-                  aria-label="全选"
-                />
-              </TableHead>
-              <TableHead>短链接</TableHead>
-              <TableHead className="hidden md:table-cell">原链接</TableHead>
-              <TableHead className="text-center">点击</TableHead>
-              <TableHead className="hidden sm:table-cell">创建时间</TableHead>
-              <TableHead className="w-32">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Skeleton className="h-4 w-4" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Skeleton className="h-4 w-48" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="mx-auto h-4 w-12" />
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-8 w-24" />
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : links.length > 0 ? (
-              links.map((link) => (
-                <TableRow key={link.id} className={selectedIds.has(link.id) ? 'bg-muted/50' : ''}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(link.id)}
-                      onCheckedChange={() => toggleSelect(link.id)}
-                      aria-label={`选择 ${link.shortCode}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={`https://lnk.day/${link.shortCode}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-primary hover:underline"
-                        >
-                          lnk.day/{link.shortCode}
-                        </a>
-                        <button
-                          onClick={() => copyToClipboard(link)}
-                          className="rounded p-1 hover:bg-muted"
-                          title="复制"
-                        >
-                          {copiedId === link.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-500" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                          )}
-                        </button>
-                      </div>
-                      {link.title && (
-                        <p className="text-sm text-muted-foreground">{link.title}</p>
-                      )}
-                      {link.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {link.tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
-                          {link.tags.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{link.tags.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden max-w-xs truncate md:table-cell">
-                    <a
-                      href={link.originalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                    >
-                      <span className="truncate">{link.originalUrl}</span>
-                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                    </a>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="font-semibold">{link.clicks.toLocaleString()}</span>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <span className="text-sm text-muted-foreground">
-                      {format(new Date(link.createdAt), 'MM/dd/yyyy', { locale: zhCN })}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="查看统计"
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="生成二维码"
-                      >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="编辑"
-                        onClick={() => setEditingLink(link)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        title="删除"
-                        onClick={() => handleDelete(link.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center">
-                  {search ? '没有找到匹配的链接' : '暂无链接，创建第一个短链接吧'}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-
-        {/* Pagination */}
-        {linksData && linksData.total > 0 && (
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-muted-foreground">
-              共 {linksData.total} 条记录，第 {page} / {totalPages} 页
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                上一页
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                下一页
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Edit Dialog */}
-      <LinkEditDialog
-        link={editingLink}
-        open={!!editingLink}
-        onOpenChange={(open) => !open && setEditingLink(null)}
-        onSave={handleEditSave}
-        saving={updateLink.isPending}
-      />
     </Layout>
   );
 }

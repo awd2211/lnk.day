@@ -9,11 +9,20 @@ export interface Link {
   tags: string[];
   clicks: number;
   status: 'active' | 'inactive' | 'archived';
+  folderId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export function useLinks(params?: { page?: number; limit?: number; status?: string; search?: string }) {
+export interface LinkQueryParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  folderId?: string;
+}
+
+export function useLinks(params?: LinkQueryParams) {
   return useQuery({
     queryKey: ['links', params],
     queryFn: async () => {

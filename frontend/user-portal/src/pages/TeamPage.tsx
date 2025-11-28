@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, UserPlus, Settings, CreditCard, Building } from 'lucide-react';
 
 import Layout from '@/components/Layout';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -56,9 +57,10 @@ export default function TeamPage() {
   const resendInvitation = useResendInvitation();
   const updateTeam = useUpdateTeam();
 
-  // Current user check (simplified - in real app, get from auth context)
-  const currentUserId = 'current-user-id'; // TODO: Get from auth context
-  const isAdmin = true; // TODO: Check user role
+  // Get current user from auth context
+  const { user } = useAuth();
+  const currentUserId = user?.id || '';
+  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
   // Handlers
   const handleInvite = async (email: string, role: string) => {
