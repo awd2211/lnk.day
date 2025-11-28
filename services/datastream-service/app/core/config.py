@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -22,6 +23,26 @@ class Settings(BaseSettings):
 
     # GeoIP
     GEOIP_PATH: str = "./GeoLite2-City.mmdb"
+
+    # BigQuery
+    BIGQUERY_PROJECT_ID: Optional[str] = None
+    BIGQUERY_DATASET: str = "lnk_analytics"
+    BIGQUERY_CREDENTIALS_PATH: Optional[str] = None  # Path to service account JSON
+
+    # Snowflake
+    SNOWFLAKE_ACCOUNT: Optional[str] = None
+    SNOWFLAKE_USER: Optional[str] = None
+    SNOWFLAKE_PASSWORD: Optional[str] = None
+    SNOWFLAKE_DATABASE: str = "LNK_ANALYTICS"
+    SNOWFLAKE_SCHEMA: str = "PUBLIC"
+    SNOWFLAKE_WAREHOUSE: str = "COMPUTE_WH"
+
+    # S3 / MinIO
+    S3_ENDPOINT_URL: Optional[str] = None  # For MinIO or S3-compatible
+    S3_ACCESS_KEY: Optional[str] = None
+    S3_SECRET_KEY: Optional[str] = None
+    S3_BUCKET: str = "lnk-exports"
+    S3_REGION: str = "us-east-1"
 
     class Config:
         env_file = ".env"

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.consumers.click_consumer import ClickConsumer
 from app.producers.click_producer import ClickProducer
-from app.api import stream
+from app.api import stream, export, streams
+from app.services.stream_service import stream_service
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 click_consumer = None
 click_producer = None
@@ -15,6 +20,11 @@ click_producer = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global click_consumer, click_producer
+
+    # Initialize stream service
+    await stream_service.initialize()
+    logger.info("Stream service initialized")
+
     # Start Kafka producer
     click_producer = ClickProducer()
     await click_producer.start()
@@ -24,7 +34,13 @@ async def lifespan(app: FastAPI):
     # Start Kafka consumer
     click_consumer = ClickConsumer()
     asyncio.create_task(click_consumer.start())
+
     yield
+
+    # Shutdown stream service
+    await stream_service.shutdown()
+    logger.info("Stream service shutdown")
+
     # Stop consumer and producer
     if click_consumer:
         await click_consumer.stop()
@@ -48,6 +64,8 @@ app.add_middleware(
 )
 
 app.include_router(stream.router, prefix="/api/stream", tags=["stream"])
+app.include_router(export.router, prefix="/api/export", tags=["export"])
+app.include_router(streams.router, prefix="/api", tags=["data-streams"])
 
 
 @app.get("/health")
