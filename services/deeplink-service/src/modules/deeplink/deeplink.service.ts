@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as UAParser from 'ua-parser-js';
+import UAParser from 'ua-parser-js';
 import { DeepLink } from './entities/deeplink.entity';
 
 export interface RedirectResult {
@@ -190,8 +190,8 @@ export class DeepLinkService {
     const details = deepLinks
       .filter((dl) => dl.iosConfig?.bundleId)
       .map((dl) => ({
-        appID: `${dl.iosConfig.teamId || 'TEAM_ID'}.${dl.iosConfig.bundleId}`,
-        paths: [dl.iosConfig.universalLinkPath || '*'],
+        appID: `${dl.iosConfig?.teamId || 'TEAM_ID'}.${dl.iosConfig?.bundleId}`,
+        paths: [dl.iosConfig?.universalLinkPath || '*'],
       }));
 
     return {
@@ -209,8 +209,8 @@ export class DeepLinkService {
         relation: ['delegate_permission/common.handle_all_urls'],
         target: {
           namespace: 'android_app',
-          package_name: dl.androidConfig.packageName,
-          sha256_cert_fingerprints: dl.androidConfig.sha256CertFingerprints || [],
+          package_name: dl.androidConfig?.packageName || '',
+          sha256_cert_fingerprints: dl.androidConfig?.sha256CertFingerprints || [],
         },
       }));
   }

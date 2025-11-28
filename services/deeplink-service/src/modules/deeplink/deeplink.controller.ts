@@ -30,7 +30,8 @@ export class DeepLinkController {
     if (!deepLink) {
       return { url: null };
     }
-    const url = this.deepLinkService.resolveRedirectUrl(deepLink, userAgent);
+    const result = this.deepLinkService.resolveRedirect(deepLink, userAgent);
+    const url = result.url;
     return { url };
   }
 
