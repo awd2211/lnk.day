@@ -33,5 +33,12 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "^3.940.0",
+    "@nestjs/axios": "^4.0.1",
+    "@nestjs/websockets": "^11.1.9",
+    "socket.io": "^4.8.1",
+    "twilio": "^5.10.6"
   }
 }
