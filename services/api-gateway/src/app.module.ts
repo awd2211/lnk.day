@@ -15,6 +15,7 @@ import { HubSpotModule } from './modules/hubspot/hubspot.module';
 import { SalesforceModule } from './modules/salesforce/salesforce.module';
 import { ShopifyModule } from './modules/shopify/shopify.module';
 import { SecurityModule } from './modules/security/security.module';
+import { AutomationModule } from './modules/automation/automation.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -67,6 +68,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     SalesforceModule,
     ShopifyModule,
     SecurityModule,
+    AutomationModule,
   ],
   providers: [
     {
