@@ -79,7 +79,7 @@ export class CustomDomain {
   @Column({ nullable: true })
   lastCheckAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'text', nullable: true })
   lastCheckError: string | null;
 
   @Column({ default: 0 })
