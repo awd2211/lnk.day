@@ -367,7 +367,7 @@ export class CampaignAnalyticsService {
       const clicks = Math.floor(avgDaily * variance);
 
       data.push({
-        date: date.toISOString().split('T')[0],
+        date: date.toISOString().split('T')[0] || '',
         clicks,
         uniqueClicks: Math.floor(clicks * 0.75),
         conversions: Math.floor(clicks * 0.03),

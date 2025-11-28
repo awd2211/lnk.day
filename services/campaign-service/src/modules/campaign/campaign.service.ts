@@ -164,12 +164,17 @@ export class CampaignService {
     const original = await this.findOne(id);
 
     const duplicate = this.campaignRepository.create({
-      ...original,
-      id: undefined,
       name: `${original.name} (Copy)`,
+      description: original.description,
       userId,
       teamId,
+      type: original.type,
       status: CampaignStatus.DRAFT,
+      channels: original.channels || [],
+      utmParams: original.utmParams || {},
+      goal: original.goal,
+      budget: original.budget,
+      tags: original.tags || [],
       linkIds: [],
       totalLinks: 0,
       totalClicks: 0,
@@ -177,11 +182,8 @@ export class CampaignService {
       conversions: 0,
       revenue: 0,
       spent: 0,
-      startDate: null,
-      endDate: null,
-      createdAt: undefined,
-      updatedAt: undefined,
-    });
+      settings: original.settings || {},
+    } as unknown as Campaign);
 
     return this.campaignRepository.save(duplicate);
   }

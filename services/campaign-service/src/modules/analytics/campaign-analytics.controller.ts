@@ -43,9 +43,9 @@ export class CampaignAnalyticsController {
   @ApiQuery({ name: 'range', required: false })
   async exportAnalytics(
     @Param('id') campaignId: string,
+    @Res() res: Response,
     @Query('format') format: 'json' | 'csv' = 'json',
     @Query('range') range?: string,
-    @Res() res: Response,
   ) {
     const data = await this.analyticsService.exportAnalytics(campaignId, format, { range });
 
