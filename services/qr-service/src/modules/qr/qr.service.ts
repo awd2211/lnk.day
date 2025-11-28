@@ -263,7 +263,7 @@ grestore
     ctx.fillRect(0, 0, actualSize, actualSize);
 
     // 创建渐变 (如果启用)
-    let fillStyle: string | CanvasGradient = foregroundColor;
+    let fillStyle: string | CanvasGradientType = foregroundColor;
     if (gradient?.enabled) {
       const grad = this.createGradient(ctx, gradient, actualSize);
       fillStyle = grad;
@@ -299,8 +299,8 @@ grestore
   }
 
   // 创建渐变
-  private createGradient(ctx: any, gradient: GradientConfig, size: number): CanvasGradient {
-    let grad: CanvasGradient;
+  private createGradient(ctx: any, gradient: GradientConfig, size: number): CanvasGradientType {
+    let grad: CanvasGradientType;
 
     switch (gradient.direction) {
       case 'horizontal':
@@ -432,11 +432,13 @@ grestore
 
   async generateWithStyle(url: string, styleId: string, size: number = 300): Promise<Buffer> {
     const style = DEFAULT_STYLES.find((s) => s.id === styleId) || DEFAULT_STYLES[0];
+    const fg = style?.foregroundColor || '#000000';
+    const bg = style?.backgroundColor || '#ffffff';
 
     return this.generate(url, {
       size,
-      foregroundColor: style.foregroundColor,
-      backgroundColor: style.backgroundColor,
+      foregroundColor: fg,
+      backgroundColor: bg,
       errorCorrectionLevel: 'H',
     }) as Promise<Buffer>;
   }
@@ -448,7 +450,9 @@ grestore
     const results = [];
 
     for (let i = 0; i < urls.length; i++) {
-      const { url, filename } = urls[i];
+      const item = urls[i];
+      if (!item) continue;
+      const { url, filename } = item;
       const dataUrl = await this.generateDataUrl(url, options);
       results.push({
         url,

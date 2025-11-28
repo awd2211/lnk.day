@@ -2,6 +2,17 @@ import { Controller, Post, Body, Res, Get, Query, Param, Headers, UseGuards } fr
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { QrService, QrOptions, GradientConfig, EyeStyle, TextLabelConfig } from './qr.service';
+import {
+  QRContentType,
+  QRContentEncoder,
+  PhoneContent,
+  SMSContent,
+  EmailContent,
+  WiFiContent,
+  VCardContent,
+  CalendarContent,
+  GeoContent,
+} from './qr-content.types';
 
 class GradientConfigDto implements GradientConfig {
   @ApiProperty() enabled: boolean;
@@ -61,6 +72,89 @@ class BatchGenerateDto {
   @ApiProperty({ required: false, type: QrOptionsDto }) options?: QrOptions;
 }
 
+// ========== 多类型内容 DTO ==========
+
+class PhoneContentDto implements PhoneContent {
+  @ApiProperty({ description: '电话号码' }) phone: string;
+}
+
+class SMSContentDto implements SMSContent {
+  @ApiProperty({ description: '电话号码' }) phone: string;
+  @ApiProperty({ required: false, description: '短信内容' }) message?: string;
+}
+
+class EmailContentDto implements EmailContent {
+  @ApiProperty({ description: '收件人邮箱' }) to: string;
+  @ApiProperty({ required: false, description: '邮件主题' }) subject?: string;
+  @ApiProperty({ required: false, description: '邮件正文' }) body?: string;
+  @ApiProperty({ required: false, description: '抄送' }) cc?: string;
+  @ApiProperty({ required: false, description: '密送' }) bcc?: string;
+}
+
+class WiFiContentDto implements WiFiContent {
+  @ApiProperty({ description: 'WiFi 名称' }) ssid: string;
+  @ApiProperty({ required: false, description: 'WiFi 密码' }) password?: string;
+  @ApiProperty({ enum: ['WPA', 'WEP', 'nopass'], description: '加密类型' })
+  encryption: 'WPA' | 'WEP' | 'nopass';
+  @ApiProperty({ required: false, description: '是否隐藏网络' }) hidden?: boolean;
+}
+
+class VCardContentDto implements VCardContent {
+  @ApiProperty({ description: '名' }) firstName: string;
+  @ApiProperty({ required: false, description: '姓' }) lastName?: string;
+  @ApiProperty({ required: false, description: '公司/组织' }) organization?: string;
+  @ApiProperty({ required: false, description: '职位' }) title?: string;
+  @ApiProperty({ required: false, description: '工作电话' }) phone?: string;
+  @ApiProperty({ required: false, description: '手机' }) mobile?: string;
+  @ApiProperty({ required: false, description: '传真' }) fax?: string;
+  @ApiProperty({ required: false, description: '邮箱' }) email?: string;
+  @ApiProperty({ required: false, description: '网站' }) website?: string;
+  @ApiProperty({ required: false, description: '街道地址' }) street?: string;
+  @ApiProperty({ required: false, description: '城市' }) city?: string;
+  @ApiProperty({ required: false, description: '省/州' }) state?: string;
+  @ApiProperty({ required: false, description: '邮编' }) zip?: string;
+  @ApiProperty({ required: false, description: '国家' }) country?: string;
+  @ApiProperty({ required: false, description: '备注' }) note?: string;
+}
+
+class CalendarContentDto implements CalendarContent {
+  @ApiProperty({ description: '事件标题' }) title: string;
+  @ApiProperty({ required: false, description: '事件描述' }) description?: string;
+  @ApiProperty({ required: false, description: '地点' }) location?: string;
+  @ApiProperty({ description: '开始时间 (ISO 8601)' }) startTime: string;
+  @ApiProperty({ description: '结束时间 (ISO 8601)' }) endTime: string;
+  @ApiProperty({ required: false, description: '全天事件' }) allDay?: boolean;
+}
+
+class GeoContentDto implements GeoContent {
+  @ApiProperty({ description: '纬度' }) latitude: number;
+  @ApiProperty({ description: '经度' }) longitude: number;
+  @ApiProperty({ required: false, description: '地点名称' }) query?: string;
+}
+
+class GenerateTypedQrDto {
+  @ApiProperty({ enum: QRContentType, description: '内容类型' })
+  contentType: QRContentType;
+
+  @ApiProperty({
+    description: '内容数据，根据 contentType 不同有不同结构',
+    oneOf: [
+      { type: 'object', properties: { url: { type: 'string' } } },
+      { $ref: '#/components/schemas/PhoneContentDto' },
+      { $ref: '#/components/schemas/SMSContentDto' },
+      { $ref: '#/components/schemas/EmailContentDto' },
+      { $ref: '#/components/schemas/WiFiContentDto' },
+      { $ref: '#/components/schemas/VCardContentDto' },
+      { $ref: '#/components/schemas/CalendarContentDto' },
+      { $ref: '#/components/schemas/GeoContentDto' },
+    ],
+  })
+  content: any;
+
+  @ApiProperty({ required: false, type: QrOptionsDto })
+  options?: QrOptions;
+}
+
 import { QrLimitService } from './qr-limit.service';
 
 @ApiTags('qr')
@@ -112,11 +206,11 @@ export class QrController {
   @ApiQuery({ name: 'bg', required: false, description: '背景色 (十六进制)' })
   async generateGet(
     @Query('url') url: string,
+    @Res() res: Response,
     @Query('size') size?: string,
     @Query('format') format?: 'png' | 'svg',
     @Query('fg') foregroundColor?: string,
     @Query('bg') backgroundColor?: string,
-    @Res() res?: Response,
   ) {
     const options: QrOptions = {
       size: size ? parseInt(size) : 300,
@@ -158,8 +252,8 @@ export class QrController {
   async generateWithStyle(
     @Query('url') url: string,
     @Query('styleId') styleId: string,
+    @Res() res: Response,
     @Query('size') size?: string,
-    @Res() res?: Response,
   ) {
     const buffer = await this.qrService.generateWithStyle(url, styleId, size ? parseInt(size) : 300);
     res.setHeader('Content-Type', 'image/png');
@@ -262,6 +356,264 @@ export class QrController {
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(buffer);
+  }
+
+  // ============ 多类型内容 API ============
+
+  @Post('generate/typed')
+  @ApiOperation({ summary: '生成多类型内容二维码 (URL/电话/短信/邮件/WiFi/vCard/日历/地理位置)' })
+  @ApiBody({ type: GenerateTypedQrDto })
+  async generateTyped(@Body() body: GenerateTypedQrDto, @Res() res: Response) {
+    const { contentType, content, options = {} } = body;
+    const format = options.format || 'png';
+
+    // 编码内容
+    const encodedContent = QRContentEncoder.encode({
+      type: contentType,
+      data: content,
+    } as any);
+
+    const result = await this.qrService.generate(encodedContent, options);
+
+    switch (format) {
+      case 'svg':
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.setHeader('Content-Disposition', 'attachment; filename=qrcode.svg');
+        break;
+      case 'pdf':
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=qrcode.pdf');
+        break;
+      case 'eps':
+        res.setHeader('Content-Type', 'application/postscript');
+        res.setHeader('Content-Disposition', 'attachment; filename=qrcode.eps');
+        break;
+      default:
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', 'inline; filename=qrcode.png');
+        break;
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('X-QR-Content-Type', contentType);
+    return res.send(result);
+  }
+
+  @Post('generate/phone')
+  @ApiOperation({ summary: '生成电话二维码' })
+  @ApiBody({ type: PhoneContentDto })
+  async generatePhone(
+    @Body() body: PhoneContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.PHONE,
+      data: { phone: body.phone },
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('generate/sms')
+  @ApiOperation({ summary: '生成短信二维码' })
+  @ApiBody({ type: SMSContentDto })
+  async generateSMS(
+    @Body() body: SMSContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.SMS,
+      data: { phone: body.phone, message: body.message },
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('generate/email')
+  @ApiOperation({ summary: '生成邮件二维码' })
+  @ApiBody({ type: EmailContentDto })
+  async generateEmail(
+    @Body() body: EmailContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.EMAIL,
+      data: body,
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('generate/wifi')
+  @ApiOperation({ summary: '生成 WiFi 二维码' })
+  @ApiBody({ type: WiFiContentDto })
+  async generateWiFi(
+    @Body() body: WiFiContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.WIFI,
+      data: body,
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('generate/vcard')
+  @ApiOperation({ summary: '生成电子名片二维码' })
+  @ApiBody({ type: VCardContentDto })
+  async generateVCard(
+    @Body() body: VCardContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.VCARD,
+      data: body,
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('export/vcard')
+  @ApiOperation({ summary: '导出 vCard 文件 (.vcf)' })
+  @ApiBody({ type: VCardContentDto })
+  async exportVCard(
+    @Body() body: VCardContentDto & { filename?: string },
+    @Res() res: Response,
+  ) {
+    const vcardContent = QRContentEncoder.encode({
+      type: QRContentType.VCARD,
+      data: body,
+    });
+
+    const filename = body.filename ||
+      `${body.firstName}${body.lastName ? '_' + body.lastName : ''}.vcf`;
+
+    res.setHeader('Content-Type', 'text/vcard; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    return res.send(vcardContent);
+  }
+
+  @Post('export/calendar')
+  @ApiOperation({ summary: '导出日历文件 (.ics)' })
+  @ApiBody({ type: CalendarContentDto })
+  async exportCalendar(
+    @Body() body: CalendarContentDto & { filename?: string },
+    @Res() res: Response,
+  ) {
+    // 生成完整的 iCalendar 格式
+    const icsContent = this.generateICS(body);
+
+    const filename = body.filename ||
+      `${body.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.ics`;
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    return res.send(icsContent);
+  }
+
+  private generateICS(data: CalendarContent): string {
+    const formatDate = (dateStr: string, allDay?: boolean) => {
+      const date = new Date(dateStr);
+      if (allDay) {
+        return date.toISOString().slice(0, 10).replace(/-/g, '');
+      }
+      return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+
+    const uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@lnk.day`;
+    const now = formatDate(new Date().toISOString());
+
+    const lines: string[] = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//lnk.day//QR Service//CN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${now}`,
+    ];
+
+    if (data.allDay) {
+      lines.push(`DTSTART;VALUE=DATE:${formatDate(data.startTime, true)}`);
+      lines.push(`DTEND;VALUE=DATE:${formatDate(data.endTime, true)}`);
+    } else {
+      lines.push(`DTSTART:${formatDate(data.startTime)}`);
+      lines.push(`DTEND:${formatDate(data.endTime)}`);
+    }
+
+    lines.push(`SUMMARY:${data.title}`);
+    if (data.description) lines.push(`DESCRIPTION:${data.description.replace(/\n/g, '\\n')}`);
+    if (data.location) lines.push(`LOCATION:${data.location}`);
+
+    lines.push('END:VEVENT');
+    lines.push('END:VCALENDAR');
+
+    return lines.join('\r\n');
+  }
+
+  @Post('generate/calendar')
+  @ApiOperation({ summary: '生成日历事件二维码' })
+  @ApiBody({ type: CalendarContentDto })
+  async generateCalendar(
+    @Body() body: CalendarContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.CALENDAR,
+      data: body,
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Post('generate/geo')
+  @ApiOperation({ summary: '生成地理位置二维码' })
+  @ApiBody({ type: GeoContentDto })
+  async generateGeo(
+    @Body() body: GeoContentDto & { options?: QrOptions },
+    @Res() res: Response,
+  ) {
+    const content = QRContentEncoder.encode({
+      type: QRContentType.GEO,
+      data: body,
+    });
+    const buffer = await this.qrService.generate(content, body.options);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  }
+
+  @Get('content-types')
+  @ApiOperation({ summary: '获取支持的内容类型列表' })
+  getContentTypes() {
+    return {
+      types: Object.values(QRContentType),
+      descriptions: {
+        [QRContentType.URL]: 'URL 链接',
+        [QRContentType.PHONE]: '电话号码 - 扫码后拨打电话',
+        [QRContentType.SMS]: '短信 - 扫码后发送短信',
+        [QRContentType.EMAIL]: '邮件 - 扫码后发送邮件',
+        [QRContentType.WIFI]: 'WiFi - 扫码后连接 WiFi',
+        [QRContentType.VCARD]: '电子名片 - 扫码后添加联系人',
+        [QRContentType.CALENDAR]: '日历事件 - 扫码后添加日程',
+        [QRContentType.GEO]: '地理位置 - 扫码后打开地图',
+        [QRContentType.TEXT]: '纯文本',
+      },
+    };
   }
 
   // ============ QR 限制 API ============

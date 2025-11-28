@@ -175,7 +175,7 @@ export class TrackingService {
       deviceMap.set(device, (deviceMap.get(device) || 0) + 1);
 
       // Day
-      const day = scan.scannedAt.toISOString().split('T')[0];
+      const day = scan.scannedAt.toISOString().split('T')[0] || 'unknown';
       dayMap.set(day, (dayMap.get(day) || 0) + 1);
 
       // Unique
