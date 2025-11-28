@@ -44,7 +44,7 @@ export class SlackService {
     @InjectQueue('slack')
     private readonly slackQueue: Queue,
   ) {
-    this.botToken = this.configService.get<string>('SLACK_BOT_TOKEN');
+    this.botToken = this.configService.get<string>('SLACK_BOT_TOKEN') || '';
   }
 
   async sendMessage(message: SlackMessage): Promise<void> {
@@ -68,7 +68,7 @@ export class SlackService {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Slack webhook error: ${error.message}`);
       return false;
     }

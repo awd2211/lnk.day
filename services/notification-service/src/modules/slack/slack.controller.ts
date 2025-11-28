@@ -112,13 +112,13 @@ export class SlackController {
 
     try {
       const { installation, redirectUrl } = await this.oauthService.handleCallback(
-        query.code,
-        query.state,
+        query.code!,
+        query.state!,
       );
 
       const successUrl = redirectUrl || `/integrations/slack?success=true&workspace=${encodeURIComponent(installation.slackTeamName)}`;
       return res.redirect(successUrl);
-    } catch (error) {
+    } catch (error: any) {
       return res.redirect(`/integrations/slack?error=${encodeURIComponent(error.message)}`);
     }
   }

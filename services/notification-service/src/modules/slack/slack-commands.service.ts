@@ -154,7 +154,7 @@ export class SlackCommandsService {
           },
         ],
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to create link: ${error.message}`);
       return {
         response_type: 'ephemeral',
@@ -245,7 +245,7 @@ export class SlackCommandsService {
           },
         ],
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to get stats: ${error.message}`);
       return {
         response_type: 'ephemeral',
@@ -318,7 +318,7 @@ export class SlackCommandsService {
           },
         ],
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to search: ${error.message}`);
       return {
         response_type: 'ephemeral',
@@ -385,7 +385,7 @@ export class SlackCommandsService {
           },
         ],
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to list links: ${error.message}`);
       return {
         response_type: 'ephemeral',
@@ -448,18 +448,19 @@ export class SlackCommandsService {
 
     if (payload.type === 'block_actions' && payload.actions) {
       const action = payload.actions[0];
+      if (!action) return { text: 'No action found' };
 
       switch (action.action_id) {
         case 'view_stats':
           // Respond with stats for the link
-          return this.handleStatsCommand(installation, action.value, {
+          return this.handleStatsCommand(installation, action.value || '', {
             user_id: payload.user.id,
           } as SlashCommandPayload);
 
         case 'copy_link':
           return {
             response_type: 'ephemeral',
-            text: `📋 Link copied: ${action.value}`,
+            text: `📋 Link copied: ${action.value || ''}`,
             replace_original: false,
           };
 
@@ -560,7 +561,7 @@ export class SlackCommandsService {
       const title = values.title_block?.title?.value;
       const customAlias = values.alias_block?.custom_alias?.value;
       const tagsStr = values.tags_block?.tags?.value;
-      const tags = tagsStr?.split(',').map((t) => t.trim()).filter(Boolean);
+      const tags = tagsStr?.split(',').map((t: string) => t.trim()).filter(Boolean);
 
       try {
         const response = await axios.post(
@@ -603,7 +604,7 @@ export class SlackCommandsService {
         );
 
         return { response_action: 'clear' };
-      } catch (error) {
+      } catch (error: any) {
         return {
           response_action: 'errors',
           errors: {

@@ -23,7 +23,7 @@ export class SmsProcessor {
 
       this.logger.log(`SMS sent successfully: ${result.messageId}`);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to send SMS: ${error.message}`);
       throw error;
     }

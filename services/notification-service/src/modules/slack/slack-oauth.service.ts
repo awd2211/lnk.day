@@ -40,10 +40,10 @@ interface OAuthAccessResponse {
 @Injectable()
 export class SlackOAuthService {
   private readonly logger = new Logger(SlackOAuthService.name);
-  private readonly clientId: string;
-  private readonly clientSecret: string;
-  private readonly signingSecret: string;
-  private readonly redirectUri: string;
+  private readonly clientId: string = '';
+  private readonly clientSecret: string = '';
+  private readonly signingSecret: string = '';
+  private readonly redirectUri: string = '';
   private readonly baseUrl = 'https://slack.com/api';
 
   // In-memory state storage (use Redis in production)
@@ -54,10 +54,10 @@ export class SlackOAuthService {
     @InjectRepository(SlackInstallation)
     private readonly installationRepo: Repository<SlackInstallation>,
   ) {
-    this.clientId = this.configService.get<string>('SLACK_CLIENT_ID');
-    this.clientSecret = this.configService.get<string>('SLACK_CLIENT_SECRET');
-    this.signingSecret = this.configService.get<string>('SLACK_SIGNING_SECRET');
-    this.redirectUri = this.configService.get<string>('SLACK_REDIRECT_URI', 'https://app.lnk.day/api/slack/oauth/callback');
+    this.clientId = this.configService.get<string>('SLACK_CLIENT_ID') || '';
+    this.clientSecret = this.configService.get<string>('SLACK_CLIENT_SECRET') || '';
+    this.signingSecret = this.configService.get<string>('SLACK_SIGNING_SECRET') || '';
+    this.redirectUri = this.configService.get<string>('SLACK_REDIRECT_URI', 'https://app.lnk.day/api/slack/oauth/callback') || '';
   }
 
   // Generate OAuth authorization URL
@@ -144,7 +144,7 @@ export class SlackOAuthService {
       }),
     });
 
-    return response.json();
+    return response.json() as Promise<OAuthAccessResponse>;
   }
 
   // Save installation to database
@@ -254,8 +254,8 @@ export class SlackOAuthService {
 
     installation.settings = { ...installation.settings, ...settings };
 
-    if (settings.defaultChannelId !== undefined) {
-      installation.defaultChannelId = settings.defaultChannelId;
+    if ((settings as any).defaultChannelId !== undefined) {
+      installation.defaultChannelId = (settings as any).defaultChannelId;
     }
 
     return this.installationRepo.save(installation);
@@ -276,7 +276,7 @@ export class SlackOAuthService {
       },
     });
 
-    const data: SlackApiResponse<{ channels: SlackChannel[] }> = await response.json();
+    const data = await response.json() as SlackApiResponse<{ channels: SlackChannel[] }>;
 
     if (!data.ok) {
       throw new BadRequestException(`Failed to list channels: ${data.error}`);
@@ -306,7 +306,7 @@ export class SlackOAuthService {
         }),
       });
 
-      const data: SlackApiResponse = await response.json();
+      const data = await response.json() as SlackApiResponse;
 
       if (!data.ok) {
         this.logger.error(`Failed to send Slack message: ${data.error}`);
@@ -314,7 +314,7 @@ export class SlackOAuthService {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Slack API error: ${error.message}`);
       return false;
     }

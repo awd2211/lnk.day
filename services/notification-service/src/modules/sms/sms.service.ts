@@ -26,13 +26,13 @@ export class SmsService {
   private snsClient: any;
 
   // Provider configurations
-  private readonly twilioAccountSid: string;
-  private readonly twilioAuthToken: string;
-  private readonly twilioFromNumber: string;
+  private readonly twilioAccountSid: string | undefined;
+  private readonly twilioAuthToken: string | undefined;
+  private readonly twilioFromNumber: string | undefined;
 
   private readonly awsRegion: string;
-  private readonly awsAccessKey: string;
-  private readonly awsSecretKey: string;
+  private readonly awsAccessKey: string | undefined;
+  private readonly awsSecretKey: string | undefined;
 
   private readonly defaultProvider: SmsProvider;
 
@@ -63,9 +63,9 @@ export class SmsService {
     if (this.twilioAccountSid && this.twilioAuthToken) {
       try {
         const twilio = await import('twilio');
-        this.twilioClient = twilio.default(this.twilioAccountSid, this.twilioAuthToken);
+        this.twilioClient = twilio.default(this.twilioAccountSid!, this.twilioAuthToken!);
         this.logger.log('Twilio client initialized');
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn('Failed to initialize Twilio client');
       }
     }
@@ -77,12 +77,12 @@ export class SmsService {
         this.snsClient = new SNSClient({
           region: this.awsRegion,
           credentials: {
-            accessKeyId: this.awsAccessKey,
-            secretAccessKey: this.awsSecretKey,
+            accessKeyId: this.awsAccessKey!,
+            secretAccessKey: this.awsSecretKey!,
           },
         });
         this.logger.log('AWS SNS client initialized');
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn('Failed to initialize AWS SNS client');
       }
     }
@@ -122,7 +122,7 @@ export class SmsService {
 
       this.logger.log(`SMS sent via Twilio: ${result.sid}`);
       return { success: true, messageId: result.sid, provider: 'twilio' };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Twilio SMS failed: ${error.message}`);
       return { success: false, provider: 'twilio', error: error.message };
     }
@@ -143,7 +143,7 @@ export class SmsService {
       const result = await this.snsClient.send(command);
       this.logger.log(`SMS sent via AWS SNS: ${result.MessageId}`);
       return { success: true, messageId: result.MessageId, provider: 'aws_sns' };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`AWS SNS SMS failed: ${error.message}`);
       return { success: false, provider: 'aws_sns', error: error.message };
     }

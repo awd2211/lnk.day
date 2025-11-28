@@ -1,6 +1,24 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { TeamsService, TeamsCard } from './teams.service';
+import { TeamsInstallationService, CreateTeamsInstallationDto, UpdateTeamsSettingsDto } from './teams-installation.service';
+
+// Simple auth guard placeholder
+class JwtAuthGuard {
+  canActivate() {
+    return true;
+  }
+}
 
 class SendTeamsCardDto {
   webhookUrl: string;
@@ -41,9 +59,12 @@ class WeeklyReportDto {
 }
 
 @ApiTags('teams')
-@Controller('teams')
+@Controller('teams-notifications')
 export class TeamsController {
-  constructor(private readonly teamsService: TeamsService) {}
+  constructor(
+    private readonly teamsService: TeamsService,
+    private readonly installationService: TeamsInstallationService,
+  ) {}
 
   @Post('send')
   @ApiOperation({ summary: 'Send a custom Teams card' })
@@ -99,5 +120,115 @@ export class TeamsController {
       period: dto.period,
     });
     return { success };
+  }
+
+  // ========== Installation Management ==========
+
+  @Get('installations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all Teams installations for a team' })
+  async getInstallations(@Query('teamId') teamId: string) {
+    const installations = await this.installationService.findAllByTeam(teamId);
+    return { installations };
+  }
+
+  @Post('installations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new Teams installation' })
+  async createInstallation(@Body() dto: CreateTeamsInstallationDto) {
+    const installation = await this.installationService.create(dto);
+    return { installation };
+  }
+
+  @Get('installations/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a specific Teams installation' })
+  async getInstallation(
+    @Param('id') id: string,
+    @Query('teamId') teamId: string,
+  ) {
+    const installation = await this.installationService.findOne(id, teamId);
+    return { installation };
+  }
+
+  @Put('installations/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a Teams installation' })
+  async updateInstallation(
+    @Param('id') id: string,
+    @Query('teamId') teamId: string,
+    @Body() dto: UpdateTeamsSettingsDto,
+  ) {
+    const installation = await this.installationService.update(id, teamId, dto);
+    return { installation };
+  }
+
+  @Delete('installations/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a Teams installation' })
+  async deleteInstallation(
+    @Param('id') id: string,
+    @Query('teamId') teamId: string,
+  ) {
+    await this.installationService.delete(id, teamId);
+    return { success: true };
+  }
+
+  @Post('installations/:id/test')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send a test notification' })
+  async testInstallation(
+    @Param('id') id: string,
+    @Query('teamId') teamId: string,
+  ) {
+    const success = await this.installationService.testNotification(id, teamId);
+    return { success };
+  }
+
+  @Post('validate-webhook')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Validate a Teams webhook URL' })
+  async validateWebhook(@Body() body: { webhookUrl: string }) {
+    const valid = await this.installationService.validateWebhook(body.webhookUrl);
+    return { valid };
+  }
+
+  // ========== Team-based Notifications ==========
+
+  @Post('notify/team/:teamId/link-created')
+  @ApiOperation({ summary: 'Notify all configured Teams channels of link creation' })
+  async notifyTeamLinkCreated(
+    @Param('teamId') teamId: string,
+    @Body() dto: Omit<LinkCreatedNotificationDto, 'webhookUrl'>,
+  ) {
+    await this.installationService.notifyLinkCreated(teamId, dto);
+    return { success: true };
+  }
+
+  @Post('notify/team/:teamId/milestone')
+  @ApiOperation({ summary: 'Notify all configured Teams channels of milestone' })
+  async notifyTeamMilestone(
+    @Param('teamId') teamId: string,
+    @Body() dto: Omit<MilestoneNotificationDto, 'webhookUrl'>,
+  ) {
+    await this.installationService.notifyMilestone(teamId, dto);
+    return { success: true };
+  }
+
+  @Post('notify/team/:teamId/alert')
+  @ApiOperation({ summary: 'Notify all configured Teams channels of alert' })
+  async notifyTeamAlert(
+    @Param('teamId') teamId: string,
+    @Body() dto: Omit<AlertNotificationDto, 'webhookUrl'>,
+  ) {
+    await this.installationService.notifyAlert(teamId, dto);
+    return { success: true };
   }
 }

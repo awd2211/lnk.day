@@ -7,10 +7,10 @@ import { SlackMessage } from './slack.service';
 @Processor('slack')
 export class SlackProcessor {
   private readonly logger = new Logger(SlackProcessor.name);
-  private readonly botToken: string;
+  private readonly botToken: string = '';
 
   constructor(private readonly configService: ConfigService) {
-    this.botToken = this.configService.get<string>('SLACK_BOT_TOKEN');
+    this.botToken = this.configService.get<string>('SLACK_BOT_TOKEN') || '';
   }
 
   @Process('send')
@@ -50,7 +50,7 @@ export class SlackProcessor {
           }),
         });
 
-        const result = await response.json();
+        const result = await response.json() as any;
         if (!result.ok) {
           throw new Error(`Slack API error: ${result.error}`);
         }
@@ -59,7 +59,7 @@ export class SlackProcessor {
       }
 
       this.logger.log(`Slack message sent successfully`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to send Slack message: ${error.message}`);
       throw error;
     }

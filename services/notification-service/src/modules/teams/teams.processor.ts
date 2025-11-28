@@ -24,7 +24,7 @@ export class TeamsProcessor {
       }
 
       this.logger.log(`Teams message sent successfully`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to send Teams message: ${error.message}`);
       throw error;
     }

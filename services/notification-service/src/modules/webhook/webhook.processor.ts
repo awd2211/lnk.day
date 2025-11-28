@@ -32,7 +32,7 @@ export class WebhookProcessor {
       });
 
       this.logger.log(`Webhook ${webhookId} delivered successfully: ${response.status}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Webhook ${webhookId} delivery failed: ${error.message}`);
       throw error;
     }

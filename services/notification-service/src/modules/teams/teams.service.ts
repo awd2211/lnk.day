@@ -58,7 +58,7 @@ export class TeamsService {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Teams webhook error: ${error.message}`);
       return false;
     }
