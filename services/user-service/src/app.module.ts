@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -11,6 +12,8 @@ import { BillingModule } from './modules/billing/billing.module';
 import { SSOModule } from './modules/sso/sso.module';
 import { EmailModule } from './modules/email/email.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
+import { LdapModule } from './modules/auth/ldap/ldap.module';
 
 @Module({
   imports: [
@@ -18,6 +21,7 @@ import { RedisModule } from './modules/redis/redis.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -43,6 +47,8 @@ import { RedisModule } from './modules/redis/redis.module';
     QuotaModule,
     BillingModule,
     SSOModule,
+    PrivacyModule,
+    LdapModule,
   ],
 })
 export class AppModule {}

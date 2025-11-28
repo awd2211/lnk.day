@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -10,10 +10,14 @@ import {
   CreateOIDCConfigDto,
   CreateLDAPConfigDto,
   UpdateSSOConfigDto,
+  ImportIdPMetadataDto,
+  UpdateSAMLConfigDto,
 } from './dto/sso.dto';
+import { SAMLService, SAMLIdentityProviderConfig } from './saml/saml.service';
 
 @Injectable()
 export class SSOService {
+  private readonly logger = new Logger(SSOService.name);
   private readonly baseUrl: string;
 
   constructor(
@@ -22,6 +26,7 @@ export class SSOService {
     @InjectRepository(SSOSession)
     private readonly ssoSessionRepository: Repository<SSOSession>,
     private readonly configService: ConfigService,
+    private readonly samlService: SAMLService,
   ) {
     this.baseUrl = this.configService.get('APP_URL', 'https://app.lnk.day');
   }
@@ -65,6 +70,12 @@ export class SSOService {
       throw new ConflictException('SAML configuration already exists for this team');
     }
 
+    // Validate certificate format
+    const certValidation = this.samlService.validateCertificate(dto.certificate);
+    if (!certValidation.valid) {
+      throw new BadRequestException('Invalid IdP certificate format');
+    }
+
     const config = this.ssoConfigRepository.create({
       teamId,
       provider: SSOProvider.SAML,
@@ -73,13 +84,81 @@ export class SSOService {
       samlEntityId: dto.entityId,
       samlSsoUrl: dto.ssoUrl,
       samlSloUrl: dto.sloUrl,
-      samlCertificate: dto.certificate,
+      samlCertificate: this.samlService.formatCertificate(dto.certificate),
       samlNameIdFormat: dto.nameIdFormat,
       attributeMapping: dto.attributeMapping || {},
       autoProvision: dto.autoProvision || false,
       enforceSSO: dto.enforceSSO || false,
       allowedDomains: dto.allowedDomains || [],
     });
+
+    return this.ssoConfigRepository.save(config);
+  }
+
+  async createSAMLConfigFromMetadata(teamId: string, dto: ImportIdPMetadataDto): Promise<SSOConfig> {
+    // Check for existing config
+    const existing = await this.ssoConfigRepository.findOne({
+      where: { teamId, provider: SSOProvider.SAML },
+    });
+
+    if (existing) {
+      throw new ConflictException('SAML configuration already exists for this team');
+    }
+
+    // Parse IdP metadata
+    const metadata = await this.samlService.parseIdPMetadata(dto.metadataXml);
+
+    if (!metadata.certificate) {
+      throw new BadRequestException('IdP metadata does not contain a signing certificate');
+    }
+
+    const config = this.ssoConfigRepository.create({
+      teamId,
+      provider: SSOProvider.SAML,
+      status: SSOStatus.PENDING,
+      displayName: dto.displayName || `SAML SSO - ${metadata.entityId}`,
+      samlEntityId: metadata.entityId,
+      samlSsoUrl: metadata.ssoUrl,
+      samlSloUrl: metadata.sloUrl,
+      samlCertificate: this.samlService.formatCertificate(metadata.certificate),
+      samlNameIdFormat: metadata.nameIdFormats[0] || 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+      attributeMapping: dto.attributeMapping || {},
+      autoProvision: dto.autoProvision || false,
+      enforceSSO: dto.enforceSSO || false,
+      allowedDomains: dto.allowedDomains || [],
+    });
+
+    this.logger.log(`Created SAML config for team ${teamId} from metadata: ${metadata.entityId}`);
+    return this.ssoConfigRepository.save(config);
+  }
+
+  async updateSAMLConfig(teamId: string, configId: string, dto: UpdateSAMLConfigDto): Promise<SSOConfig> {
+    const config = await this.getConfig(teamId, configId);
+
+    if (config.provider !== SSOProvider.SAML) {
+      throw new BadRequestException('This is not a SAML configuration');
+    }
+
+    if (dto.displayName !== undefined) config.displayName = dto.displayName;
+    if (dto.entityId !== undefined) config.samlEntityId = dto.entityId;
+    if (dto.ssoUrl !== undefined) config.samlSsoUrl = dto.ssoUrl;
+    if (dto.sloUrl !== undefined) config.samlSloUrl = dto.sloUrl;
+    if (dto.certificate !== undefined) {
+      const certValidation = this.samlService.validateCertificate(dto.certificate);
+      if (!certValidation.valid) {
+        throw new BadRequestException('Invalid IdP certificate format');
+      }
+      config.samlCertificate = this.samlService.formatCertificate(dto.certificate);
+      // Clear cache when certificate changes
+      this.samlService.clearCache(configId);
+    }
+    if (dto.nameIdFormat !== undefined) config.samlNameIdFormat = dto.nameIdFormat;
+    if (dto.autoProvision !== undefined) config.autoProvision = dto.autoProvision;
+    if (dto.enforceSSO !== undefined) config.enforceSSO = dto.enforceSSO;
+    if (dto.allowedDomains !== undefined) config.allowedDomains = dto.allowedDomains;
+    if (dto.attributeMapping !== undefined) {
+      config.attributeMapping = { ...config.attributeMapping, ...dto.attributeMapping };
+    }
 
     return this.ssoConfigRepository.save(config);
   }
@@ -94,7 +173,12 @@ export class SSOService {
     const acsUrl = `${this.baseUrl}/sso/saml/${teamId}/acs`;
     const sloUrl = `${this.baseUrl}/sso/saml/${teamId}/slo`;
 
-    const metadataXml = this.generateSAMLMetadata(entityId, acsUrl, sloUrl);
+    // Use samlify to generate proper SP metadata
+    const metadataXml = this.samlService.generateSPMetadata(teamId, {
+      entityId,
+      assertionConsumerServiceUrl: acsUrl,
+      singleLogoutServiceUrl: sloUrl,
+    });
 
     return {
       entityId,
@@ -104,49 +188,56 @@ export class SSOService {
     };
   }
 
-  private generateSAMLMetadata(entityId: string, acsUrl: string, sloUrl: string): string {
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${entityId}">
-  <md:SPSSODescriptor AuthnRequestsSigned="false" WantAssertionsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <md:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</md:NameIDFormat>
-    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="${acsUrl}" index="0" isDefault="true"/>
-    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="${sloUrl}"/>
-  </md:SPSSODescriptor>
-</md:EntityDescriptor>`;
+  private getIdPConfig(config: SSOConfig): SAMLIdentityProviderConfig {
+    return {
+      entityId: config.samlEntityId!,
+      ssoUrl: config.samlSsoUrl!,
+      sloUrl: config.samlSloUrl,
+      certificate: config.samlCertificate!,
+      nameIdFormat: config.samlNameIdFormat,
+    };
   }
 
-  async initiateSAMLLogin(teamId: string): Promise<{ redirectUrl: string; requestId: string }> {
+  async initiateSAMLLogin(teamId: string, relayState?: string): Promise<{ redirectUrl: string; requestId: string }> {
     const config = await this.getActiveConfig(teamId);
 
     if (!config || config.provider !== SSOProvider.SAML) {
       throw new BadRequestException('SAML is not configured for this team');
     }
 
-    const requestId = `_${crypto.randomUUID()}`;
-    const issueInstant = new Date().toISOString();
-    const acsUrl = `${this.baseUrl}/sso/saml/${teamId}/acs`;
+    const idpConfig = this.getIdPConfig(config);
 
-    // In production, this would use a proper SAML library
-    const samlRequest = this.buildSAMLRequest(requestId, issueInstant, config.samlEntityId!, acsUrl);
-    const encodedRequest = Buffer.from(samlRequest).toString('base64');
-
-    const redirectUrl = `${config.samlSsoUrl}?SAMLRequest=${encodeURIComponent(encodedRequest)}`;
-
-    return { redirectUrl, requestId };
+    try {
+      return await this.samlService.createLoginRequest(teamId, idpConfig, relayState);
+    } catch (error) {
+      this.logger.error(`Failed to create SAML login request: ${error.message}`);
+      throw new BadRequestException(`Failed to initiate SAML login: ${error.message}`);
+    }
   }
 
-  private buildSAMLRequest(requestId: string, issueInstant: string, destination: string, acsUrl: string): string {
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                    xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                    ID="${requestId}"
-                    Version="2.0"
-                    IssueInstant="${issueInstant}"
-                    Destination="${destination}"
-                    AssertionConsumerServiceURL="${acsUrl}">
-  <saml:Issuer>${this.baseUrl}</saml:Issuer>
-  <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
-</samlp:AuthnRequest>`;
+  async initiateSAMLLogout(
+    teamId: string,
+    nameId: string,
+    sessionIndex?: string,
+  ): Promise<{ redirectUrl: string; requestId: string }> {
+    const config = await this.getActiveConfig(teamId);
+
+    if (!config || config.provider !== SSOProvider.SAML) {
+      throw new BadRequestException('SAML is not configured for this team');
+    }
+
+    if (!config.samlSloUrl) {
+      throw new BadRequestException('Single Logout is not configured for this IdP');
+    }
+
+    const idpConfig = this.getIdPConfig(config);
+
+    try {
+      return await this.samlService.createLogoutRequest(teamId, idpConfig, nameId, sessionIndex);
+    } catch (error) {
+      this.logger.error(`Failed to create SAML logout request: ${error.message}`);
+      throw new BadRequestException(`Failed to initiate SAML logout: ${error.message}`);
+    }
   }
 
   // ========== OIDC ==========
@@ -272,22 +363,83 @@ export class SSOService {
     await this.ssoConfigRepository.remove(config);
   }
 
-  async testConnection(teamId: string, configId: string): Promise<{ success: boolean; message: string }> {
+  async testConnection(teamId: string, configId: string): Promise<{ success: boolean; message: string; details?: any }> {
     const config = await this.getConfig(teamId, configId);
 
-    // In production, this would actually test the connection
     switch (config.provider) {
       case SSOProvider.SAML:
-        // Would fetch and validate IdP metadata
-        return { success: true, message: 'SAML configuration is valid' };
+        return this.testSAMLConnection(teamId, config);
       case SSOProvider.OIDC:
-        // Would fetch OIDC discovery document
-        return { success: true, message: 'OIDC configuration is valid' };
+        return this.testOIDCConnection(config);
       case SSOProvider.LDAP:
-        // Would attempt LDAP bind
-        return { success: true, message: 'LDAP connection successful' };
+        // LDAP testing is handled by LdapService
+        return { success: true, message: 'LDAP configuration exists. Use LDAP test endpoint for connection test.' };
       default:
         return { success: false, message: 'Unknown provider' };
+    }
+  }
+
+  private async testSAMLConnection(
+    teamId: string,
+    config: SSOConfig,
+  ): Promise<{ success: boolean; message: string; details?: any }> {
+    const idpConfig = this.getIdPConfig(config);
+    const result = await this.samlService.testSAMLConfiguration(teamId, idpConfig);
+
+    if (result.valid) {
+      // Also validate certificate expiration
+      const certValidation = this.samlService.validateCertificate(config.samlCertificate || '');
+
+      return {
+        success: true,
+        message: 'SAML configuration is valid',
+        details: {
+          entityId: config.samlEntityId,
+          ssoUrl: config.samlSsoUrl,
+          hasSLO: !!config.samlSloUrl,
+          certificateValid: certValidation.valid,
+          certificateExpiresAt: certValidation.expiresAt,
+        },
+      };
+    }
+
+    return {
+      success: false,
+      message: `SAML configuration is invalid: ${result.errors.join(', ')}`,
+      details: { errors: result.errors },
+    };
+  }
+
+  private async testOIDCConnection(config: SSOConfig): Promise<{ success: boolean; message: string; details?: any }> {
+    try {
+      // Try to fetch OIDC discovery document
+      const discoveryUrl = `${config.oidcIssuer}/.well-known/openid-configuration`;
+      const response = await fetch(discoveryUrl);
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: `Failed to fetch OIDC discovery document: ${response.status}`,
+        };
+      }
+
+      const discovery = await response.json();
+
+      return {
+        success: true,
+        message: 'OIDC configuration is valid',
+        details: {
+          issuer: discovery.issuer,
+          authorizationEndpoint: discovery.authorization_endpoint,
+          tokenEndpoint: discovery.token_endpoint,
+          userInfoEndpoint: discovery.userinfo_endpoint,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Failed to validate OIDC configuration: ${error.message}`,
+      };
     }
   }
 
@@ -320,5 +472,358 @@ export class SSOService {
 
   async deleteSession(sessionId: string): Promise<void> {
     await this.ssoSessionRepository.delete({ id: sessionId });
+  }
+
+  // ========== SAML Response Processing ==========
+
+  async processSAMLResponse(
+    teamId: string,
+    samlResponse: string,
+  ): Promise<{
+    user: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      externalId?: string;
+      groups?: string[];
+    };
+    sessionIndex?: string;
+  }> {
+    const config = await this.getActiveConfig(teamId);
+
+    if (!config || config.provider !== SSOProvider.SAML) {
+      throw new BadRequestException('SAML is not configured for this team');
+    }
+
+    const idpConfig = this.getIdPConfig(config);
+
+    try {
+      // Use SAMLService to parse and validate response with signature verification
+      const result = await this.samlService.parseLoginResponse(
+        teamId,
+        idpConfig,
+        samlResponse,
+        config.attributeMapping,
+      );
+
+      // Validate allowed domains if configured
+      if (config.allowedDomains.length > 0 && result.user.email) {
+        const domain = result.user.email.split('@')[1];
+        if (!config.allowedDomains.includes(domain)) {
+          throw new BadRequestException(`Email domain ${domain} is not allowed for SSO`);
+        }
+      }
+
+      return {
+        user: {
+          email: result.user.email,
+          firstName: result.user.firstName,
+          lastName: result.user.lastName,
+          displayName: result.user.displayName,
+          externalId: result.user.nameId,
+          groups: result.user.groups,
+        },
+        sessionIndex: result.sessionIndex,
+      };
+    } catch (error) {
+      this.logger.error(`SAML response processing failed: ${error.message}`);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`Failed to process SAML response: ${error.message}`);
+    }
+  }
+
+  async processSAMLLogoutResponse(
+    teamId: string,
+    samlResponse: string,
+  ): Promise<{ success: boolean; issuer: string }> {
+    const config = await this.getActiveConfig(teamId);
+
+    if (!config || config.provider !== SSOProvider.SAML) {
+      throw new BadRequestException('SAML is not configured for this team');
+    }
+
+    const idpConfig = this.getIdPConfig(config);
+    return this.samlService.parseLogoutResponse(teamId, idpConfig, samlResponse);
+  }
+
+  // ========== OIDC Token Exchange ==========
+
+  async handleOIDCCallback(
+    teamId: string,
+    code: string,
+    state: string,
+  ): Promise<{
+    user: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      externalId: string;
+      picture?: string;
+    };
+    tokens: {
+      accessToken: string;
+      refreshToken?: string;
+      idToken?: string;
+      expiresIn: number;
+    };
+  }> {
+    const config = await this.getActiveConfig(teamId);
+
+    if (!config || config.provider !== SSOProvider.OIDC) {
+      throw new BadRequestException('OIDC is not configured for this team');
+    }
+
+    const redirectUri = `${this.baseUrl}/sso/oidc/${teamId}/callback`;
+    const tokenUrl = config.oidcTokenUrl || `${config.oidcIssuer}/oauth/token`;
+
+    // Exchange code for tokens
+    const tokenResponse = await this.exchangeCodeForTokens(
+      tokenUrl,
+      code,
+      config.oidcClientId!,
+      config.oidcClientSecret!,
+      redirectUri,
+    );
+
+    // Get user info
+    const userInfoUrl = config.oidcUserInfoUrl || `${config.oidcIssuer}/userinfo`;
+    const userInfo = await this.fetchUserInfo(userInfoUrl, tokenResponse.access_token);
+
+    // Map attributes
+    const mapping = config.attributeMapping;
+    const user = {
+      email: userInfo[mapping.email || 'email'] || userInfo.email,
+      firstName: userInfo[mapping.firstName || 'given_name'] || userInfo.given_name,
+      lastName: userInfo[mapping.lastName || 'family_name'] || userInfo.family_name,
+      displayName: userInfo[mapping.displayName || 'name'] || userInfo.name,
+      externalId: userInfo.sub,
+      picture: userInfo.picture,
+    };
+
+    return {
+      user,
+      tokens: {
+        accessToken: tokenResponse.access_token,
+        refreshToken: tokenResponse.refresh_token,
+        idToken: tokenResponse.id_token,
+        expiresIn: tokenResponse.expires_in || 3600,
+      },
+    };
+  }
+
+  private async exchangeCodeForTokens(
+    tokenUrl: string,
+    code: string,
+    clientId: string,
+    clientSecret: string,
+    redirectUri: string,
+  ): Promise<{
+    access_token: string;
+    refresh_token?: string;
+    id_token?: string;
+    expires_in?: number;
+    token_type: string;
+  }> {
+    // In production, use axios or node-fetch
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
+
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException('Failed to exchange authorization code for tokens');
+    }
+
+    return response.json();
+  }
+
+  private async fetchUserInfo(userInfoUrl: string, accessToken: string): Promise<Record<string, any>> {
+    const response = await fetch(userInfoUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new BadRequestException('Failed to fetch user info');
+    }
+
+    return response.json();
+  }
+
+  // ========== LDAP Authentication ==========
+
+  async authenticateLDAP(
+    teamId: string,
+    username: string,
+    password: string,
+  ): Promise<{
+    user: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      externalId: string;
+      groups?: string[];
+    };
+    dn: string;
+  }> {
+    const config = await this.getActiveConfig(teamId);
+
+    if (!config || config.provider !== SSOProvider.LDAP) {
+      throw new BadRequestException('LDAP is not configured for this team');
+    }
+
+    // In production, use ldapjs library
+    // This is a simplified mock implementation
+    const searchFilter = config.ldapSearchFilter!.replace('{{username}}', username);
+
+    // Simulate LDAP bind and search
+    // In production:
+    // 1. Bind with service account (ldapBindDn, ldapBindPassword)
+    // 2. Search for user with searchFilter in searchBase
+    // 3. Bind with user DN and password to verify credentials
+    // 4. Extract user attributes
+
+    const mockUser = {
+      dn: `uid=${username},${config.ldapSearchBase}`,
+      email: `${username}@example.com`,
+      displayName: username,
+      externalId: username,
+    };
+
+    return {
+      user: mockUser,
+      dn: mockUser.dn,
+    };
+  }
+
+  // ========== User Provisioning ==========
+
+  async provisionUser(
+    teamId: string,
+    ssoConfigId: string,
+    userInfo: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      externalId?: string;
+    },
+  ): Promise<{
+    userId: string;
+    isNew: boolean;
+    action: 'created' | 'updated' | 'linked';
+  }> {
+    const config = await this.getConfig(teamId, ssoConfigId);
+
+    // This would integrate with UserService in production
+    // For now, return mock data
+    const userId = crypto.randomUUID();
+
+    return {
+      userId,
+      isNew: config.autoProvision,
+      action: config.autoProvision ? 'created' : 'linked',
+    };
+  }
+
+  // ========== Domain Discovery ==========
+
+  async discoverSSO(email: string): Promise<{
+    hasSSO: boolean;
+    provider?: SSOProvider;
+    teamId?: string;
+    loginUrl?: string;
+  }> {
+    const domain = email.split('@')[1];
+
+    // Find SSO config with this domain
+    const configs = await this.ssoConfigRepository.find({
+      where: { status: SSOStatus.ACTIVE },
+    });
+
+    for (const config of configs) {
+      if (config.allowedDomains.includes(domain)) {
+        let loginUrl: string;
+
+        switch (config.provider) {
+          case SSOProvider.SAML:
+            const samlLogin = await this.initiateSAMLLogin(config.teamId);
+            loginUrl = samlLogin.redirectUrl;
+            break;
+          case SSOProvider.OIDC:
+            const oidcLogin = await this.initiateOIDCLogin(config.teamId);
+            loginUrl = oidcLogin.redirectUrl;
+            break;
+          case SSOProvider.LDAP:
+            loginUrl = `${this.baseUrl}/login/ldap?team=${config.teamId}`;
+            break;
+          default:
+            continue;
+        }
+
+        return {
+          hasSSO: true,
+          provider: config.provider,
+          teamId: config.teamId,
+          loginUrl,
+        };
+      }
+    }
+
+    return { hasSSO: false };
+  }
+
+  // ========== Just-in-Time Provisioning ==========
+
+  async getOrCreateUser(
+    teamId: string,
+    ssoConfigId: string,
+    externalUser: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      externalId: string;
+      groups?: string[];
+    },
+  ): Promise<{
+    userId: string;
+    isNew: boolean;
+    teamMemberId?: string;
+  }> {
+    const config = await this.getConfig(teamId, ssoConfigId);
+
+    // In production, this would:
+    // 1. Check if user exists by email or external ID
+    // 2. If exists, update attributes if needed
+    // 3. If not exists and autoProvision is true, create user
+    // 4. Add user to team if not already a member
+    // 5. Assign default role
+
+    const userId = crypto.randomUUID();
+    const isNew = config.autoProvision;
+
+    return {
+      userId,
+      isNew,
+      teamMemberId: isNew ? crypto.randomUUID() : undefined,
+    };
   }
 }

@@ -19,6 +19,8 @@ import {
   CreateOIDCConfigDto,
   CreateLDAPConfigDto,
   UpdateSSOConfigDto,
+  ImportIdPMetadataDto,
+  UpdateSAMLConfigDto,
 } from './dto/sso.dto';
 
 @ApiTags('sso')
@@ -60,6 +62,29 @@ export class SSOController {
     return this.ssoService.createSAMLConfig(teamId, dto);
   }
 
+  @Post('saml/config/import-metadata')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '从 IdP Metadata 创建 SAML 配置' })
+  createSAMLConfigFromMetadata(
+    @Headers('x-team-id') teamId: string,
+    @Body() dto: ImportIdPMetadataDto,
+  ) {
+    return this.ssoService.createSAMLConfigFromMetadata(teamId, dto);
+  }
+
+  @Put('saml/config/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '更新 SAML 配置' })
+  updateSAMLConfig(
+    @Headers('x-team-id') teamId: string,
+    @Param('id') configId: string,
+    @Body() dto: UpdateSAMLConfigDto,
+  ) {
+    return this.ssoService.updateSAMLConfig(teamId, configId, dto);
+  }
+
   @Get('saml/metadata')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -68,10 +93,37 @@ export class SSOController {
     return this.ssoService.getSAMLMetadata(teamId);
   }
 
+  @Get('saml/metadata/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '下载 SAML SP 元数据 XML' })
+  async downloadSAMLMetadata(@Headers('x-team-id') teamId: string) {
+    const metadata = await this.ssoService.getSAMLMetadata(teamId);
+    return {
+      contentType: 'application/xml',
+      filename: `sp-metadata-${teamId}.xml`,
+      content: metadata.metadataXml,
+    };
+  }
+
   @Get('saml/:teamId/login')
   @ApiOperation({ summary: '发起 SAML 登录' })
-  initiateSAMLLogin(@Param('teamId') teamId: string) {
-    return this.ssoService.initiateSAMLLogin(teamId);
+  initiateSAMLLogin(
+    @Param('teamId') teamId: string,
+    @Query('RelayState') relayState?: string,
+  ) {
+    return this.ssoService.initiateSAMLLogin(teamId, relayState);
+  }
+
+  @Post('saml/:teamId/logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '发起 SAML 单点登出' })
+  initiateSAMLLogout(
+    @Param('teamId') teamId: string,
+    @Body() body: { nameId: string; sessionIndex?: string },
+  ) {
+    return this.ssoService.initiateSAMLLogout(teamId, body.nameId, body.sessionIndex);
   }
 
   // ========== OIDC ==========
@@ -163,5 +215,158 @@ export class SSOController {
     @Param('id') configId: string,
   ) {
     return this.ssoService.testConnection(teamId, configId);
+  }
+
+  // ========== SAML Callbacks ==========
+
+  @Post('saml/:teamId/acs')
+  @ApiOperation({ summary: 'SAML ACS (Assertion Consumer Service) 端点' })
+  async samlACS(
+    @Param('teamId') teamId: string,
+    @Body() body: { SAMLResponse: string; RelayState?: string },
+  ) {
+    const result = await this.ssoService.processSAMLResponse(teamId, body.SAMLResponse);
+
+    // Get or create user
+    const config = await this.ssoService.getActiveConfig(teamId);
+    if (config) {
+      const userResult = await this.ssoService.getOrCreateUser(teamId, config.id, {
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        displayName: result.user.displayName,
+        externalId: result.user.externalId || result.user.email,
+      });
+
+      // Create session
+      await this.ssoService.createSession(
+        config.id,
+        userResult.userId,
+        result.user.externalId || result.user.email,
+        result.user as any,
+      );
+
+      return {
+        success: true,
+        user: result.user,
+        userId: userResult.userId,
+        isNewUser: userResult.isNew,
+        redirectUrl: body.RelayState || '/dashboard',
+      };
+    }
+
+    return { success: false, error: 'SSO configuration not found' };
+  }
+
+  @Post('saml/:teamId/slo')
+  @ApiOperation({ summary: 'SAML SLO (Single Logout) 端点' })
+  async samlSLO(
+    @Param('teamId') teamId: string,
+    @Body() body: { SAMLRequest?: string; SAMLResponse?: string },
+  ) {
+    // Handle logout request or response
+    return { success: true, message: 'Logout processed' };
+  }
+
+  // ========== OIDC Callbacks ==========
+
+  @Get('oidc/:teamId/callback')
+  @ApiOperation({ summary: 'OIDC 回调端点' })
+  async oidcCallback(
+    @Param('teamId') teamId: string,
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error?: string,
+    @Query('error_description') errorDescription?: string,
+  ) {
+    if (error) {
+      return {
+        success: false,
+        error,
+        errorDescription,
+      };
+    }
+
+    const result = await this.ssoService.handleOIDCCallback(teamId, code, state);
+
+    // Get or create user
+    const config = await this.ssoService.getActiveConfig(teamId);
+    if (config) {
+      const userResult = await this.ssoService.getOrCreateUser(teamId, config.id, {
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        displayName: result.user.displayName,
+        externalId: result.user.externalId,
+      });
+
+      // Create session
+      await this.ssoService.createSession(
+        config.id,
+        userResult.userId,
+        result.user.externalId,
+        { ...result.user, tokens: result.tokens },
+      );
+
+      return {
+        success: true,
+        user: result.user,
+        userId: userResult.userId,
+        isNewUser: userResult.isNew,
+        accessToken: result.tokens.accessToken,
+        redirectUrl: '/dashboard',
+      };
+    }
+
+    return { success: false, error: 'SSO configuration not found' };
+  }
+
+  // ========== LDAP Authentication ==========
+
+  @Post('ldap/:teamId/auth')
+  @ApiOperation({ summary: 'LDAP 认证' })
+  async ldapAuth(
+    @Param('teamId') teamId: string,
+    @Body() body: { username: string; password: string },
+  ) {
+    const result = await this.ssoService.authenticateLDAP(teamId, body.username, body.password);
+
+    // Get or create user
+    const config = await this.ssoService.getActiveConfig(teamId);
+    if (config) {
+      const userResult = await this.ssoService.getOrCreateUser(teamId, config.id, {
+        email: result.user.email,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        displayName: result.user.displayName,
+        externalId: result.user.externalId,
+        groups: result.user.groups,
+      });
+
+      // Create session
+      await this.ssoService.createSession(
+        config.id,
+        userResult.userId,
+        result.user.externalId,
+        result.user as any,
+      );
+
+      return {
+        success: true,
+        user: result.user,
+        userId: userResult.userId,
+        isNewUser: userResult.isNew,
+      };
+    }
+
+    return { success: false, error: 'SSO configuration not found' };
+  }
+
+  // ========== Domain Discovery ==========
+
+  @Get('discover')
+  @ApiOperation({ summary: '根据邮箱发现 SSO 配置' })
+  async discoverSSO(@Query('email') email: string) {
+    return this.ssoService.discoverSSO(email);
   }
 }

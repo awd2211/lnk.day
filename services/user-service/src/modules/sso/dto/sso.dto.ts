@@ -230,6 +230,103 @@ export class TestConnectionDto {
   password?: string;
 }
 
+export class ImportIdPMetadataDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @ApiProperty({ description: 'IdP Metadata XML content' })
+  @IsString()
+  metadataXml: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  attributeMapping?: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    groups?: string;
+  };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  autoProvision?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  enforceSSO?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedDomains?: string[];
+}
+
+export class UpdateSAMLConfigDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @ApiPropertyOptional({ description: 'IdP Entity ID' })
+  @IsOptional()
+  @IsString()
+  entityId?: string;
+
+  @ApiPropertyOptional({ description: 'IdP SSO URL' })
+  @IsOptional()
+  @IsString()
+  ssoUrl?: string;
+
+  @ApiPropertyOptional({ description: 'IdP SLO URL' })
+  @IsOptional()
+  @IsString()
+  sloUrl?: string;
+
+  @ApiPropertyOptional({ description: 'IdP Certificate (PEM format)' })
+  @IsOptional()
+  @IsString()
+  certificate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  nameIdFormat?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  attributeMapping?: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    displayName?: string;
+    groups?: string;
+  };
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  autoProvision?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  enforceSSO?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedDomains?: string[];
+}
+
 // Response DTOs
 
 export class SSOConfigResponseDto {
