@@ -17,6 +17,7 @@ from .models import (
     FunnelEvent,
 )
 from .service import funnel_service
+from .router import router
 
 __all__ = [
     "Funnel",
@@ -31,4 +32,5 @@ __all__ = [
     "FunnelAlert",
     "FunnelEvent",
     "funnel_service",
+    "router",
 ]

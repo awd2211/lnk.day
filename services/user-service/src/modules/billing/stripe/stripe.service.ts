@@ -631,6 +631,358 @@ export class StripeService {
     return 'Unknown';
   }
 
+  // ========== Usage-Based Billing ==========
+
+  /**
+   * Report usage for metered billing (e.g., API calls, clicks)
+   */
+  async reportUsage(
+    subscriptionItemId: string,
+    quantity: number,
+    timestamp?: Date,
+    action: 'set' | 'increment' = 'increment',
+  ): Promise<Stripe.UsageRecord> {
+    return this.stripe.subscriptionItems.createUsageRecord(subscriptionItemId, {
+      quantity,
+      timestamp: timestamp ? Math.floor(timestamp.getTime() / 1000) : 'now',
+      action,
+    });
+  }
+
+  /**
+   * Get usage summary for a subscription item
+   */
+  async getUsageSummary(
+    subscriptionItemId: string,
+  ): Promise<Stripe.ApiList<Stripe.UsageRecordSummary>> {
+    return this.stripe.subscriptionItems.listUsageRecordSummaries(subscriptionItemId);
+  }
+
+  /**
+   * Get metered usage for current billing period
+   */
+  async getCurrentPeriodUsage(teamId: string): Promise<{
+    apiCalls: number;
+    clicks: number;
+    linksCreated: number;
+  }> {
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { teamId, paymentProvider: PaymentProvider.STRIPE },
+    });
+
+    if (!subscription?.externalSubscriptionId) {
+      return { apiCalls: 0, clicks: 0, linksCreated: 0 };
+    }
+
+    const stripeSubscription = await this.stripe.subscriptions.retrieve(
+      subscription.externalSubscriptionId,
+      { expand: ['items.data'] },
+    );
+
+    const result = { apiCalls: 0, clicks: 0, linksCreated: 0 };
+
+    for (const item of stripeSubscription.items.data) {
+      const summaries = await this.getUsageSummary(item.id);
+      const totalUsage = summaries.data.reduce((sum, s) => sum + s.total_usage, 0);
+
+      // Map by price metadata or lookup_key
+      const lookupKey = item.price.lookup_key;
+      if (lookupKey?.includes('api_calls')) {
+        result.apiCalls = totalUsage;
+      } else if (lookupKey?.includes('clicks')) {
+        result.clicks = totalUsage;
+      } else if (lookupKey?.includes('links')) {
+        result.linksCreated = totalUsage;
+      }
+    }
+
+    return result;
+  }
+
+  // ========== Subscription Pause/Resume ==========
+
+  /**
+   * Pause a subscription (available on compatible plans)
+   */
+  async pauseSubscription(
+    subscriptionId: string,
+    resumeAt?: Date,
+  ): Promise<Stripe.Subscription> {
+    const pauseCollection: Stripe.SubscriptionUpdateParams.PauseCollection = {
+      behavior: 'void',
+    };
+
+    if (resumeAt) {
+      pauseCollection.resumes_at = Math.floor(resumeAt.getTime() / 1000);
+    }
+
+    const stripeSubscription = await this.stripe.subscriptions.update(subscriptionId, {
+      pause_collection: pauseCollection,
+    });
+
+    // Update local record
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { externalSubscriptionId: subscriptionId },
+    });
+
+    if (subscription) {
+      subscription.status = SubscriptionStatus.PAUSED;
+      await this.subscriptionRepository.save(subscription);
+    }
+
+    this.logger.log(`Paused subscription ${subscriptionId}`);
+    return stripeSubscription;
+  }
+
+  /**
+   * Resume a paused subscription
+   */
+  async resumeSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+    const stripeSubscription = await this.stripe.subscriptions.update(subscriptionId, {
+      pause_collection: '',
+    });
+
+    // Update local record
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { externalSubscriptionId: subscriptionId },
+    });
+
+    if (subscription) {
+      subscription.status = this.mapStripeStatus(stripeSubscription.status);
+      await this.subscriptionRepository.save(subscription);
+    }
+
+    this.logger.log(`Resumed subscription ${subscriptionId}`);
+    return stripeSubscription;
+  }
+
+  // ========== Quantity/Seats Management ==========
+
+  /**
+   * Update subscription quantity (e.g., team seats)
+   */
+  async updateQuantity(
+    subscriptionId: string,
+    quantity: number,
+    proration: 'create_prorations' | 'none' | 'always_invoice' = 'create_prorations',
+  ): Promise<Stripe.Subscription> {
+    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const mainItem = subscription.items.data[0];
+
+    if (!mainItem) {
+      throw new BadRequestException('No subscription item found');
+    }
+
+    return this.stripe.subscriptions.update(subscriptionId, {
+      items: [
+        {
+          id: mainItem.id,
+          quantity,
+        },
+      ],
+      proration_behavior: proration,
+    });
+  }
+
+  /**
+   * Add extra seats to subscription
+   */
+  async addSeats(subscriptionId: string, additionalSeats: number): Promise<Stripe.Subscription> {
+    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const currentQuantity = subscription.items.data[0]?.quantity || 1;
+
+    return this.updateQuantity(subscriptionId, currentQuantity + additionalSeats);
+  }
+
+  /**
+   * Remove seats from subscription
+   */
+  async removeSeats(subscriptionId: string, seatsToRemove: number): Promise<Stripe.Subscription> {
+    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const currentQuantity = subscription.items.data[0]?.quantity || 1;
+    const newQuantity = Math.max(1, currentQuantity - seatsToRemove);
+
+    return this.updateQuantity(subscriptionId, newQuantity);
+  }
+
+  // ========== Invoice Preview ==========
+
+  /**
+   * Preview upcoming invoice
+   */
+  async previewUpcomingInvoice(
+    customerId: string,
+    subscriptionId?: string,
+    newPriceId?: string,
+    quantity?: number,
+  ): Promise<{
+    subtotal: number;
+    tax: number;
+    total: number;
+    currency: string;
+    lineItems: Array<{
+      description: string;
+      amount: number;
+      quantity: number;
+    }>;
+    prorationDate?: Date;
+  }> {
+    const params: Stripe.InvoiceRetrieveUpcomingParams = {
+      customer: customerId,
+    };
+
+    if (subscriptionId) {
+      params.subscription = subscriptionId;
+
+      if (newPriceId) {
+        const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+        params.subscription_items = [
+          {
+            id: subscription.items.data[0]?.id,
+            price: newPriceId,
+            quantity: quantity || 1,
+          },
+        ];
+        params.subscription_proration_behavior = 'create_prorations';
+      }
+    }
+
+    const invoice = await this.stripe.invoices.retrieveUpcoming(params);
+
+    return {
+      subtotal: invoice.subtotal / 100,
+      tax: (invoice.tax || 0) / 100,
+      total: invoice.total / 100,
+      currency: invoice.currency.toUpperCase(),
+      lineItems: invoice.lines.data.map(line => ({
+        description: line.description || 'Subscription',
+        amount: line.amount / 100,
+        quantity: line.quantity || 1,
+      })),
+      prorationDate: invoice.subscription_proration_date
+        ? new Date(invoice.subscription_proration_date * 1000)
+        : undefined,
+    };
+  }
+
+  /**
+   * Preview price change before upgrading/downgrading
+   */
+  async previewPlanChange(
+    teamId: string,
+    newPlan: PlanType,
+    billingCycle: BillingCycle,
+  ): Promise<{
+    currentAmount: number;
+    newAmount: number;
+    prorationAmount: number;
+    effectiveDate: Date;
+  }> {
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { teamId, paymentProvider: PaymentProvider.STRIPE },
+    });
+
+    if (!subscription?.externalSubscriptionId || !subscription.externalCustomerId) {
+      throw new NotFoundException('No active subscription found');
+    }
+
+    const newPriceId = billingCycle === BillingCycle.YEARLY
+      ? this.priceIds[newPlan].yearly
+      : this.priceIds[newPlan].monthly;
+
+    const preview = await this.previewUpcomingInvoice(
+      subscription.externalCustomerId,
+      subscription.externalSubscriptionId,
+      newPriceId,
+    );
+
+    const stripeSubscription = await this.stripe.subscriptions.retrieve(
+      subscription.externalSubscriptionId,
+    );
+    const currentAmount = (stripeSubscription.items.data[0]?.price?.unit_amount || 0) / 100;
+
+    // Calculate proration (sum of proration line items)
+    const prorationAmount = preview.lineItems
+      .filter(item => item.description?.toLowerCase().includes('proration'))
+      .reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+      currentAmount,
+      newAmount: preview.total - prorationAmount,
+      prorationAmount,
+      effectiveDate: preview.prorationDate || new Date(),
+    };
+  }
+
+  // ========== Tax & Billing Info ==========
+
+  /**
+   * Update customer tax information
+   */
+  async updateTaxInfo(
+    customerId: string,
+    taxId: {
+      type: Stripe.TaxIdCreateParams.Type;
+      value: string;
+    },
+  ): Promise<Stripe.TaxId> {
+    return this.stripe.customers.createTaxId(customerId, taxId);
+  }
+
+  /**
+   * Get customer tax IDs
+   */
+  async getTaxIds(customerId: string): Promise<Stripe.TaxId[]> {
+    const taxIds = await this.stripe.customers.listTaxIds(customerId);
+    return taxIds.data;
+  }
+
+  /**
+   * Update billing address
+   */
+  async updateBillingAddress(
+    customerId: string,
+    address: {
+      line1: string;
+      line2?: string;
+      city: string;
+      state?: string;
+      postal_code: string;
+      country: string;
+    },
+  ): Promise<Stripe.Customer> {
+    return this.stripe.customers.update(customerId, {
+      address,
+    }) as Promise<Stripe.Customer>;
+  }
+
+  // ========== Refunds ==========
+
+  /**
+   * Create a refund for a charge
+   */
+  async createRefund(
+    chargeId: string,
+    amount?: number,
+    reason?: 'duplicate' | 'fraudulent' | 'requested_by_customer',
+  ): Promise<Stripe.Refund> {
+    return this.stripe.refunds.create({
+      charge: chargeId,
+      amount: amount ? amount * 100 : undefined, // Convert to cents
+      reason,
+    });
+  }
+
+  /**
+   * List refunds for a charge
+   */
+  async listRefunds(chargeId: string): Promise<Stripe.Refund[]> {
+    const refunds = await this.stripe.refunds.list({
+      charge: chargeId,
+    });
+    return refunds.data;
+  }
+
   // ========== Helper Methods ==========
 
   private mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {

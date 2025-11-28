@@ -14,6 +14,7 @@ import {
   UpdateSAMLConfigDto,
 } from './dto/sso.dto';
 import { SAMLService, SAMLIdentityProviderConfig } from './saml/saml.service';
+import { LdapService } from '../auth/ldap/ldap.service';
 
 @Injectable()
 export class SSOService {
@@ -27,6 +28,7 @@ export class SSOService {
     private readonly ssoSessionRepository: Repository<SSOSession>,
     private readonly configService: ConfigService,
     private readonly samlService: SAMLService,
+    private readonly ldapService: LdapService,
   ) {
     this.baseUrl = this.configService.get('APP_URL', 'https://app.lnk.day');
   }
@@ -689,28 +691,42 @@ export class SSOService {
       throw new BadRequestException('LDAP is not configured for this team');
     }
 
-    // In production, use ldapjs library
-    // This is a simplified mock implementation
-    const searchFilter = config.ldapSearchFilter!.replace('{{username}}', username);
+    // Use LdapService for real LDAP authentication
+    const ldapUser = await this.ldapService.authenticate(teamId, username, password);
 
-    // Simulate LDAP bind and search
-    // In production:
-    // 1. Bind with service account (ldapBindDn, ldapBindPassword)
-    // 2. Search for user with searchFilter in searchBase
-    // 3. Bind with user DN and password to verify credentials
-    // 4. Extract user attributes
+    if (!ldapUser) {
+      throw new BadRequestException('Invalid LDAP credentials or user not found');
+    }
 
-    const mockUser = {
-      dn: `uid=${username},${config.ldapSearchBase}`,
-      email: `${username}@example.com`,
-      displayName: username,
-      externalId: username,
-    };
+    // Get LDAP config for role mapping
+    const ldapConfig = await this.ldapService.getConfig(teamId);
 
+    // Map LDAP user to SSO user format
     return {
-      user: mockUser,
-      dn: mockUser.dn,
+      user: {
+        email: ldapUser.email,
+        firstName: ldapUser.firstName,
+        lastName: ldapUser.lastName,
+        displayName: ldapUser.displayName,
+        externalId: ldapUser.username,
+        groups: ldapUser.groups,
+      },
+      dn: ldapUser.dn,
     };
+  }
+
+  async testLDAPConnection(teamId: string): Promise<{ success: boolean; message: string; details?: any }> {
+    return this.ldapService.testConnection(teamId);
+  }
+
+  async syncLDAPUsers(teamId: string): Promise<{
+    success: boolean;
+    usersFound: number;
+    usersCreated: number;
+    usersUpdated: number;
+    errors: string[];
+  }> {
+    return this.ldapService.syncUsers(teamId);
   }
 
   // ========== User Provisioning ==========

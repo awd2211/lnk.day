@@ -177,16 +177,236 @@ export class ThirdPartyAnalyticsService {
     userAgent?: string;
     fbc?: string;  // Facebook click ID
     fbp?: string;  // Facebook browser ID
+    clientId?: string; // GA4 client ID
+    sessionId?: string; // GA4 session ID
   }): Promise<boolean> {
     switch (pixel.platform) {
+      case 'ga4':
+        return this.sendGA4MeasurementProtocol(pixel.pixelId, event, clientData);
       case 'facebook_pixel':
         return this.sendFacebookConversionsAPI(pixel.pixelId, event, clientData);
       case 'tiktok_pixel':
         return this.sendTikTokEventsAPI(pixel.pixelId, event, clientData);
+      case 'linkedin_insight':
+        return this.sendLinkedInConversionsAPI(pixel.pixelId, event, clientData);
       default:
         this.logger.warn(`Server-side tracking not supported for ${pixel.platform}`);
         return false;
     }
+  }
+
+  /**
+   * Send event to GA4 using Measurement Protocol
+   * @see https://developers.google.com/analytics/devguides/collection/protocol/ga4
+   */
+  private async sendGA4MeasurementProtocol(
+    measurementId: string,
+    event: TrackingEvent,
+    clientData?: { ip?: string; userAgent?: string; clientId?: string; sessionId?: string },
+  ): Promise<boolean> {
+    const apiSecret = this.configService.get<string>('GA4_MEASUREMENT_PROTOCOL_SECRET');
+    if (!apiSecret) {
+      this.logger.warn('GA4 Measurement Protocol API secret not configured');
+      return false;
+    }
+
+    try {
+      // Generate or use provided client_id (required for GA4)
+      const clientId = clientData?.clientId || this.generateClientId();
+
+      const payload = {
+        client_id: clientId,
+        timestamp_micros: Date.now() * 1000,
+        non_personalized_ads: false,
+        events: [
+          {
+            name: this.mapEventToGA4(event.eventName),
+            params: {
+              link_id: event.linkId,
+              short_code: event.shortCode,
+              destination_url: event.url,
+              engagement_time_msec: 100,
+              session_id: clientData?.sessionId || this.generateSessionId(),
+              ...(event.userId && { user_id: event.userId }),
+              ...(event.teamId && { team_id: event.teamId }),
+              ...event.metadata,
+            },
+          },
+        ],
+      };
+
+      // Add user properties if available
+      if (event.userId) {
+        (payload as any).user_id = event.userId;
+      }
+
+      const url = `https://www.google-analytics.com/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(clientData?.userAgent && { 'User-Agent': clientData.userAgent }),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // GA4 MP returns 204 No Content on success
+      if (response.status === 204 || response.status === 200) {
+        this.logger.debug(`GA4 Measurement Protocol: event ${event.eventName} sent successfully`);
+        return true;
+      }
+
+      const responseText = await response.text();
+      this.logger.error(`GA4 Measurement Protocol error: ${response.status} - ${responseText}`);
+      return false;
+    } catch (error: any) {
+      this.logger.error(`GA4 Measurement Protocol failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Validate GA4 events using the debug endpoint
+   */
+  async validateGA4Event(
+    measurementId: string,
+    event: TrackingEvent,
+    clientId?: string,
+  ): Promise<{ valid: boolean; validationMessages: any[] }> {
+    const apiSecret = this.configService.get<string>('GA4_MEASUREMENT_PROTOCOL_SECRET');
+    if (!apiSecret) {
+      return { valid: false, validationMessages: [{ description: 'API secret not configured' }] };
+    }
+
+    try {
+      const payload = {
+        client_id: clientId || this.generateClientId(),
+        events: [
+          {
+            name: this.mapEventToGA4(event.eventName),
+            params: {
+              link_id: event.linkId,
+              short_code: event.shortCode,
+              destination_url: event.url,
+              engagement_time_msec: 100,
+            },
+          },
+        ],
+      };
+
+      const url = `https://www.google-analytics.com/debug/mp/collect?measurement_id=${measurementId}&api_secret=${apiSecret}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const result: any = await response.json();
+
+      return {
+        valid: !result.validationMessages?.length,
+        validationMessages: result.validationMessages || [],
+      };
+    } catch (error: any) {
+      return { valid: false, validationMessages: [{ description: error.message }] };
+    }
+  }
+
+  /**
+   * Send conversion event to LinkedIn Conversions API
+   * @see https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/conversions-api
+   */
+  private async sendLinkedInConversionsAPI(
+    partnerId: string,
+    event: TrackingEvent,
+    clientData?: { ip?: string; userAgent?: string },
+  ): Promise<boolean> {
+    const accessToken = this.configService.get<string>('LINKEDIN_CONVERSIONS_API_TOKEN');
+    const conversionRuleId = this.configService.get<string>('LINKEDIN_CONVERSION_RULE_ID');
+
+    if (!accessToken) {
+      this.logger.warn('LinkedIn Conversions API access token not configured');
+      return false;
+    }
+
+    try {
+      const eventData = {
+        conversion: `urn:lla:llaPartnerConversion:${conversionRuleId || partnerId}`,
+        conversionHappenedAt: Date.now(),
+        conversionValue: {
+          currencyCode: 'USD',
+          amount: event.metadata?.value?.toString() || '0',
+        },
+        eventId: `${event.linkId}_${Date.now()}`,
+        user: {
+          userIds: [] as any[],
+          userInfo: {
+            ...(clientData?.ip && { sourceIp: clientData.ip }),
+            ...(clientData?.userAgent && { userAgent: clientData.userAgent }),
+          },
+        },
+      };
+
+      // Add user identifiers if available
+      if (event.userId) {
+        eventData.user.userIds.push({
+          idType: 'SHA256_EMAIL',
+          idValue: event.userId, // Assume hashed or hash it here
+        });
+      }
+
+      const response = await fetch(
+        'https://api.linkedin.com/rest/conversionEvents',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+            'LinkedIn-Version': '202401',
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
+          body: JSON.stringify({ elements: [eventData] }),
+        },
+      );
+
+      if (response.status === 201 || response.status === 200) {
+        this.logger.debug(`LinkedIn Conversions API: event sent successfully`);
+        return true;
+      }
+
+      const responseText = await response.text();
+      this.logger.error(`LinkedIn Conversions API error: ${response.status} - ${responseText}`);
+      return false;
+    } catch (error: any) {
+      this.logger.error(`LinkedIn Conversions API failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  private generateClientId(): string {
+    // GA4 client_id format: random_number.timestamp
+    return `${Math.floor(Math.random() * 2147483647)}.${Math.floor(Date.now() / 1000)}`;
+  }
+
+  private generateSessionId(): string {
+    return Math.floor(Date.now() / 1000).toString();
+  }
+
+  private mapEventToGA4(eventName: string): string {
+    // GA4 recommended events: https://support.google.com/analytics/answer/9267735
+    const mapping: Record<string, string> = {
+      link_click: 'select_content',
+      link_created: 'generate_lead',
+      qr_scan: 'view_item',
+      page_view: 'page_view',
+      conversion: 'purchase',
+      signup: 'sign_up',
+      login: 'login',
+      share: 'share',
+    };
+    return mapping[eventName] || eventName;
   }
 
   private async sendFacebookConversionsAPI(

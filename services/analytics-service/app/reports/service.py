@@ -1,10 +1,27 @@
 import csv
 import io
 import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
 import asyncio
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
+
+import aiohttp
+import aiosmtplib
+import aioboto3
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
 from .models import (
     ReportConfig,
@@ -526,14 +543,163 @@ class ReportService:
         return b""
 
     def _generate_excel(self, result: ReportResult) -> bytes:
-        """Generate Excel report."""
-        # Placeholder - use openpyxl in production
-        return json.dumps(result.dict(), indent=2, default=str).encode()
+        """Generate Excel report using openpyxl."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = result.name[:31] if result.name else "Report"
+
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style="thin"),
+            right=Side(style="thin"),
+            top=Side(style="thin"),
+            bottom=Side(style="thin"),
+        )
+
+        # Add title
+        ws.merge_cells("A1:F1")
+        ws["A1"] = result.name or "Analytics Report"
+        ws["A1"].font = Font(bold=True, size=16)
+        ws["A1"].alignment = Alignment(horizontal="center")
+
+        # Add metadata
+        ws["A3"] = "Generated:"
+        ws["B3"] = result.generated_at.strftime("%Y-%m-%d %H:%M:%S") if result.generated_at else ""
+        ws["A4"] = "Date Range:"
+        ws["B4"] = f"{result.date_range.get('start', '')} - {result.date_range.get('end', '')}"
+
+        # Add data table starting at row 6
+        if result.data:
+            headers = list(result.data[0].keys())
+
+            # Write headers
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=6, column=col, value=header.replace("_", " ").title())
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = thin_border
+                ws.column_dimensions[get_column_letter(col)].width = max(15, len(header) + 5)
+
+            # Write data rows
+            for row_idx, row_data in enumerate(result.data, 7):
+                for col_idx, header in enumerate(headers, 1):
+                    value = row_data.get(header, "")
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = thin_border
+                    if isinstance(value, (int, float)):
+                        cell.alignment = Alignment(horizontal="right")
+
+        # Add totals if present
+        if result.totals:
+            totals_row = len(result.data) + 8 if result.data else 8
+            ws.cell(row=totals_row, column=1, value="TOTALS").font = Font(bold=True)
+            for col_idx, (key, value) in enumerate(result.totals.items(), 2):
+                ws.cell(row=totals_row, column=col_idx, value=f"{key}: {value}").font = Font(bold=True)
+
+        # Save to bytes
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.read()
 
     def _generate_pdf(self, result: ReportResult) -> bytes:
-        """Generate PDF report."""
-        # Placeholder - use reportlab or weasyprint in production
-        return json.dumps(result.dict(), indent=2, default=str).encode()
+        """Generate PDF report using reportlab."""
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=0.5 * inch, bottomMargin=0.5 * inch)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Title style
+        title_style = ParagraphStyle(
+            "CustomTitle",
+            parent=styles["Heading1"],
+            fontSize=18,
+            spaceAfter=20,
+            alignment=1,  # Center
+        )
+
+        # Add title
+        elements.append(Paragraph(result.name or "Analytics Report", title_style))
+        elements.append(Spacer(1, 12))
+
+        # Add metadata
+        meta_style = styles["Normal"]
+        if result.generated_at:
+            elements.append(Paragraph(
+                f"<b>Generated:</b> {result.generated_at.strftime('%Y-%m-%d %H:%M:%S')}",
+                meta_style
+            ))
+        elements.append(Paragraph(
+            f"<b>Date Range:</b> {result.date_range.get('start', '')} - {result.date_range.get('end', '')}",
+            meta_style
+        ))
+        elements.append(Spacer(1, 20))
+
+        # Add data table
+        if result.data:
+            headers = list(result.data[0].keys())
+            table_data = [[h.replace("_", " ").title() for h in headers]]
+
+            for row in result.data:
+                table_data.append([str(row.get(h, "")) for h in headers])
+
+            # Add totals row if present
+            if result.totals:
+                totals_row = ["TOTAL"]
+                for h in headers[1:]:
+                    totals_row.append(str(result.totals.get(h, "")))
+                table_data.append(totals_row)
+
+            # Calculate column widths
+            col_count = len(headers)
+            available_width = doc.width
+            col_width = available_width / col_count
+
+            table = Table(table_data, colWidths=[col_width] * col_count)
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("TEXTCOLOR", (0, 1), (-1, -1), colors.black),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 1), (-1, -1), 9),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F2F2")]),
+            ]))
+
+            # Bold totals row if present
+            if result.totals:
+                table.setStyle(TableStyle([
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#D9E2F3")),
+                ]))
+
+            elements.append(table)
+
+        # Add comparison section if present
+        if result.comparison:
+            elements.append(Spacer(1, 20))
+            elements.append(Paragraph("<b>Period Comparison</b>", styles["Heading2"]))
+            for metric, data in result.comparison.items():
+                trend_icon = "↑" if data.get("trend") == "up" else "↓"
+                elements.append(Paragraph(
+                    f"{metric.replace('_', ' ').title()}: {trend_icon} {data.get('change_percent', 0)}% "
+                    f"(vs. {data.get('previous', 0)})",
+                    meta_style
+                ))
+
+        doc.build(elements)
+        buffer.seek(0)
+        return buffer.read()
 
     # ========== Delivery ==========
 
@@ -563,18 +729,117 @@ class ReportService:
         result: ReportResult,
         format: ReportFormat,
     ) -> None:
-        """Send report via email."""
-        # In production, use email service
-        print(f"Sending report to {recipients}")
+        """Send report via email using aiosmtplib."""
+        smtp_host = os.getenv("SMTP_HOST", "localhost")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_password = os.getenv("SMTP_PASSWORD", "")
+        smtp_from = os.getenv("SMTP_FROM", "reports@lnk.day")
+        use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
+        # Determine file extension
+        ext_map = {
+            ReportFormat.JSON: "json",
+            ReportFormat.CSV: "csv",
+            ReportFormat.EXCEL: "xlsx",
+            ReportFormat.PDF: "pdf",
+        }
+        ext = ext_map.get(format, "json")
+        filename = f"{result.name or 'report'}_{result.generated_at.strftime('%Y%m%d_%H%M%S')}.{ext}"
+
+        for recipient in recipients:
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = smtp_from
+                msg["To"] = recipient
+                msg["Subject"] = f"Analytics Report: {result.name or 'Report'}"
+
+                # Email body
+                body = f"""
+Your scheduled analytics report is ready.
+
+Report: {result.name}
+Generated: {result.generated_at.strftime('%Y-%m-%d %H:%M:%S') if result.generated_at else 'N/A'}
+Date Range: {result.date_range.get('start', '')} - {result.date_range.get('end', '')}
+Total Records: {len(result.data) if result.data else 0}
+
+Please find the attached report file.
+
+--
+lnk.day Analytics
+"""
+                msg.attach(MIMEText(body, "plain"))
+
+                # Attach report file
+                attachment = MIMEBase("application", "octet-stream")
+                attachment.set_payload(data)
+                encoders.encode_base64(attachment)
+                attachment.add_header("Content-Disposition", f"attachment; filename={filename}")
+                msg.attach(attachment)
+
+                # Send email
+                if smtp_user and smtp_password:
+                    await aiosmtplib.send(
+                        msg,
+                        hostname=smtp_host,
+                        port=smtp_port,
+                        username=smtp_user,
+                        password=smtp_password,
+                        start_tls=use_tls,
+                    )
+                else:
+                    await aiosmtplib.send(
+                        msg,
+                        hostname=smtp_host,
+                        port=smtp_port,
+                    )
+
+                print(f"Report sent to {recipient}")
+
+            except Exception as e:
+                print(f"Failed to send email to {recipient}: {e}")
 
     async def _send_webhook_report(
         self,
         webhook_url: str,
         result: ReportResult,
     ) -> None:
-        """Send report to webhook."""
-        # In production, use aiohttp
-        print(f"Sending report to webhook: {webhook_url}")
+        """Send report to webhook using aiohttp."""
+        try:
+            payload = {
+                "event": "report.generated",
+                "report_id": result.report_id,
+                "report_name": result.name,
+                "generated_at": result.generated_at.isoformat() if result.generated_at else None,
+                "date_range": result.date_range,
+                "metrics": result.metrics,
+                "dimensions": result.dimensions,
+                "row_count": len(result.data) if result.data else 0,
+                "totals": result.totals,
+                "comparison": result.comparison,
+                "metadata": result.metadata,
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    webhook_url,
+                    json=payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "User-Agent": "lnk.day-analytics/1.0",
+                        "X-Report-ID": result.report_id or "",
+                    },
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as response:
+                    if response.status >= 200 and response.status < 300:
+                        print(f"Webhook delivered successfully to {webhook_url}")
+                    else:
+                        print(f"Webhook delivery failed with status {response.status}")
+
+        except asyncio.TimeoutError:
+            print(f"Webhook request timed out: {webhook_url}")
+        except Exception as e:
+            print(f"Failed to send webhook: {e}")
 
     async def _upload_to_s3(
         self,
@@ -583,9 +848,52 @@ class ReportService:
         data: bytes,
         result: ReportResult,
     ) -> None:
-        """Upload report to S3."""
-        # In production, use aioboto3
-        print(f"Uploading report to s3://{bucket}/{prefix}")
+        """Upload report to S3 using aioboto3."""
+        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        aws_region = os.getenv("AWS_REGION", "us-east-1")
+        s3_endpoint = os.getenv("S3_ENDPOINT_URL")  # For MinIO compatibility
+
+        # Determine content type and extension based on metadata
+        format_str = result.metadata.get("format", "json") if result.metadata else "json"
+        content_types = {
+            "json": ("application/json", "json"),
+            "csv": ("text/csv", "csv"),
+            "excel": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"),
+            "pdf": ("application/pdf", "pdf"),
+        }
+        content_type, ext = content_types.get(format_str, ("application/octet-stream", "bin"))
+
+        # Build S3 key
+        timestamp = result.generated_at.strftime("%Y/%m/%d/%H%M%S") if result.generated_at else "unknown"
+        filename = f"{result.name or 'report'}_{result.report_id or 'unknown'}.{ext}"
+        key = f"{prefix}/{timestamp}/{filename}" if prefix else f"{timestamp}/{filename}"
+        key = key.lstrip("/")
+
+        try:
+            session = aioboto3.Session(
+                aws_access_key_id=aws_access_key,
+                aws_secret_access_key=aws_secret_key,
+                region_name=aws_region,
+            )
+
+            async with session.client("s3", endpoint_url=s3_endpoint) as s3:
+                await s3.put_object(
+                    Bucket=bucket,
+                    Key=key,
+                    Body=data,
+                    ContentType=content_type,
+                    Metadata={
+                        "report-id": result.report_id or "",
+                        "report-name": result.name or "",
+                        "generated-at": result.generated_at.isoformat() if result.generated_at else "",
+                    },
+                )
+
+            print(f"Report uploaded to s3://{bucket}/{key}")
+
+        except Exception as e:
+            print(f"Failed to upload to S3: {e}")
 
     # ========== Utilities ==========
 
