@@ -65,6 +65,7 @@ import {
   FORMAT_LABELS,
 } from '@/hooks/useReports';
 import { cn } from '@/lib/utils';
+import ScheduleReportDialog from '@/components/reports/ScheduleReportDialog';
 
 type DateRangePreset = '7d' | '14d' | '30d' | '90d' | 'custom';
 
@@ -74,6 +75,7 @@ export default function ReportsPage() {
   // State
   const [activeTab, setActiveTab] = useState('reports');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   // Form state
@@ -373,6 +375,15 @@ export default function ReportsPage() {
           </TabsContent>
 
           <TabsContent value="scheduled" className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                定时报告会自动生成并发送到指定邮箱
+              </p>
+              <Button onClick={() => setIsScheduleDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                创建定时报告
+              </Button>
+            </div>
             {isLoadingScheduled ? (
               <div className="space-y-3">
                 {[1, 2].map((i) => (
@@ -628,6 +639,12 @@ export default function ReportsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Schedule Report Dialog */}
+        <ScheduleReportDialog
+          open={isScheduleDialogOpen}
+          onOpenChange={setIsScheduleDialogOpen}
+        />
       </div>
     </Layout>
   );

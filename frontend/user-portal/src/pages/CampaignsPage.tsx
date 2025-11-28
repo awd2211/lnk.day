@@ -86,7 +86,9 @@ import {
   Pencil,
   AlertTriangle,
   Eye,
+  MessageSquare,
 } from 'lucide-react';
+import { CampaignCollaboration } from '@/components/CampaignCollaboration';
 
 export default function CampaignsPage() {
   const { toast } = useToast();
@@ -607,103 +609,124 @@ export default function CampaignsPage() {
         >
           <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
             <SheetHeader>
-              <SheetTitle>{viewStatsCampaign?.name} - 统计数据</SheetTitle>
+              <SheetTitle>{viewStatsCampaign?.name}</SheetTitle>
             </SheetHeader>
-            {stats ? (
-              <div className="mt-6 space-y-6">
-                {/* Summary Stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2">
-                        <MousePointer className="h-5 w-5 text-blue-500" />
-                        <div>
-                          <p className="text-2xl font-bold">
-                            {stats.totalClicks.toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500">总点击</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-green-500" />
-                        <div>
-                          <p className="text-2xl font-bold">
-                            {stats.conversions.toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-500">转化</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+            <Tabs defaultValue="stats" className="mt-4">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="stats" className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  统计数据
+                </TabsTrigger>
+                <TabsTrigger value="collaboration" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  协作
+                </TabsTrigger>
+              </TabsList>
 
-                {/* Top Links */}
-                {stats.topLinks?.length > 0 && (
-                  <div>
-                    <h4 className="mb-3 font-medium flex items-center gap-2">
-                      <Link2 className="h-4 w-4" />
-                      热门链接
-                    </h4>
-                    <div className="space-y-2">
-                      {stats.topLinks.map((link, i) => (
-                        <div
-                          key={link.id}
-                          className="flex items-center justify-between rounded bg-gray-50 p-2"
-                        >
-                          <span className="text-sm truncate flex-1">
-                            {i + 1}. {link.shortUrl}
-                          </span>
-                          <span className="text-sm font-medium">
-                            {link.clicks.toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Top Countries */}
-                {stats.topCountries?.length > 0 && (
-                  <div>
-                    <h4 className="mb-3 font-medium flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      地理分布
-                    </h4>
-                    <div className="space-y-2">
-                      {stats.topCountries.map((item) => (
-                        <div
-                          key={item.country}
-                          className="flex items-center justify-between"
-                        >
-                          <span className="text-sm">{item.country}</span>
+              <TabsContent value="stats">
+                {stats ? (
+                  <div className="mt-4 space-y-6">
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card>
+                        <CardContent className="p-4">
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-24 rounded bg-gray-100">
-                              <div
-                                className="h-full rounded bg-primary"
-                                style={{
-                                  width: `${(item.clicks / stats.totalClicks) * 100}%`,
-                                }}
-                              />
+                            <MousePointer className="h-5 w-5 text-blue-500" />
+                            <div>
+                              <p className="text-2xl font-bold">
+                                {stats.totalClicks.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-gray-500">总点击</p>
                             </div>
-                            <span className="text-sm font-medium w-12 text-right">
-                              {item.clicks}
-                            </span>
                           </div>
-                        </div>
-                      ))}
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-green-500" />
+                            <div>
+                              <p className="text-2xl font-bold">
+                                {stats.conversions.toLocaleString()}
+                              </p>
+                              <p className="text-xs text-gray-500">转化</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
+
+                    {/* Top Links */}
+                    {stats.topLinks?.length > 0 && (
+                      <div>
+                        <h4 className="mb-3 font-medium flex items-center gap-2">
+                          <Link2 className="h-4 w-4" />
+                          热门链接
+                        </h4>
+                        <div className="space-y-2">
+                          {stats.topLinks.map((link, i) => (
+                            <div
+                              key={link.id}
+                              className="flex items-center justify-between rounded bg-gray-50 p-2"
+                            >
+                              <span className="text-sm truncate flex-1">
+                                {i + 1}. {link.shortUrl}
+                              </span>
+                              <span className="text-sm font-medium">
+                                {link.clicks.toLocaleString()}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Countries */}
+                    {stats.topCountries?.length > 0 && (
+                      <div>
+                        <h4 className="mb-3 font-medium flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" />
+                          地理分布
+                        </h4>
+                        <div className="space-y-2">
+                          {stats.topCountries.map((item) => (
+                            <div
+                              key={item.country}
+                              className="flex items-center justify-between"
+                            >
+                              <span className="text-sm">{item.country}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 w-24 rounded bg-gray-100">
+                                  <div
+                                    className="h-full rounded bg-primary"
+                                    style={{
+                                      width: `${(item.clicks / stats.totalClicks) * 100}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-sm font-medium w-12 text-right">
+                                  {item.clicks}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex h-64 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="flex h-64 items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            )}
+              </TabsContent>
+
+              <TabsContent value="collaboration">
+                {viewStatsCampaign && (
+                  <CampaignCollaboration campaignId={viewStatsCampaign.id} />
+                )}
+              </TabsContent>
+            </Tabs>
           </SheetContent>
         </Sheet>
 

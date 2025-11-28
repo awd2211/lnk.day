@@ -35,6 +35,10 @@ const FoldersPage = lazy(() => import('@/pages/FoldersPage'));
 const SavedSearchesPage = lazy(() => import('@/pages/SavedSearchesPage'));
 const GoalsPage = lazy(() => import('@/pages/GoalsPage'));
 const IntegrationsPage = lazy(() => import('@/pages/IntegrationsPage'));
+const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
+const DataStreamsPage = lazy(() => import('@/pages/DataStreamsPage'));
+const CampaignTemplatesPage = lazy(() => import('@/pages/CampaignTemplatesPage'));
+const AutomationPage = lazy(() => import('@/pages/AutomationPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -266,6 +270,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <IntegrationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedRoute>
+                <AuditLogPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/data-streams"
+            element={
+              <ProtectedRoute>
+                <DataStreamsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/campaign-templates"
+            element={
+              <ProtectedRoute>
+                <CampaignTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/automation"
+            element={
+              <ProtectedRoute>
+                <AutomationPage />
               </ProtectedRoute>
             }
           />

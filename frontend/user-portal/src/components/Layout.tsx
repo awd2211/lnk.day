@@ -28,6 +28,10 @@ import {
   Target,
   Plug,
   Lock,
+  ClipboardList,
+  Database,
+  Zap,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useState } from 'react';
 import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
@@ -47,7 +51,9 @@ const navItems = [
   { path: '/analytics', label: '数据分析', icon: BarChart3 },
   { path: '/reports', label: '报告', icon: FileBarChart },
   { path: '/campaigns', label: '活动', icon: Megaphone },
+  { path: '/campaign-templates', label: '活动模板', icon: LayoutTemplate },
   { path: '/goals', label: '目标', icon: Target },
+  { path: '/automation', label: '自动化', icon: Zap },
   { path: '/ab-tests', label: 'A/B测试', icon: TestTube2 },
   { path: '/redirect-rules', label: '重定向', icon: GitBranch },
   { path: '/deep-links', label: '深度链接', icon: Smartphone },
@@ -59,10 +65,12 @@ const navItems = [
   { path: '/team', label: '团队', icon: Users },
   { path: '/billing', label: '计费', icon: CreditCard },
   { path: '/privacy', label: '隐私', icon: Lock },
+  { path: '/audit-logs', label: '审计日志', icon: ClipboardList },
+  { path: '/data-streams', label: '数据流', icon: Database },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
-export default function Layout({ children }: LayoutProps) {
+function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -180,3 +188,6 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 }
+
+export { Layout };
+export default Layout;

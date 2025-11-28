@@ -145,9 +145,30 @@ export const qrService = {
     size?: number;
     color?: string;
     backgroundColor?: string;
-    logo?: string;
-  }) => qrApi.post('/qr/generate', data, { responseType: 'blob' }),
+    logo?: File;
+    logoSize?: number;
+    margin?: number;
+    dotStyle?: string;
+    cornerStyle?: string;
+    errorCorrectionLevel?: string;
+  }) => qrApi.post('/qr/generate', { url: data.content, options: data }, { responseType: 'blob' }),
+
+  // 多类型二维码生成
+  generateTyped: (data: {
+    contentType: string;
+    content: any;
+    options?: {
+      size?: number;
+      foregroundColor?: string;
+      backgroundColor?: string;
+      format?: 'png' | 'svg' | 'pdf' | 'eps';
+      margin?: number;
+      errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+    };
+  }) => qrApi.post('/qr/generate/typed', data, { responseType: 'blob' }),
+
   getStyles: () => qrApi.get('/qr/styles'),
+  getContentTypes: () => qrApi.get('/qr/content-types'),
 };
 
 // Deep Link API
@@ -249,6 +270,13 @@ export const securityService = {
   getScanHistory: (url: string, limit?: number) =>
     linkApi.get('/security/history', { params: { url, limit } }),
   getStats: () => linkApi.get('/security/stats'),
+  // Suspended links management
+  getSuspendedLinks: (params?: { limit?: number; offset?: number }) =>
+    linkApi.get('/security/suspended-links', { params }),
+  reinstateLink: (linkId: string, reason: string) =>
+    linkApi.post(`/security/suspended-links/${linkId}/reinstate`, { reason }),
+  checkAndHandle: (url: string) =>
+    linkApi.post('/security/check-and-handle', { url }),
 };
 
 // API Keys API
@@ -333,4 +361,76 @@ export const userService = {
   resendTeamInvitation: (teamId: string, invitationId: string) =>
     api.post(`/teams/${teamId}/invitations/${invitationId}/resend`),
   updateTeam: (teamId: string, data: any) => api.patch(`/teams/${teamId}`, data),
+};
+
+// Campaign Service URL
+const CAMPAIGN_SERVICE_URL = import.meta.env.VITE_CAMPAIGN_SERVICE_URL || 'http://localhost:60004';
+const campaignApi = createApiClient(CAMPAIGN_SERVICE_URL);
+
+// Goals API
+export const goalsService = {
+  getAll: (params?: { campaignId?: string }) =>
+    campaignApi.get('/goals', { params }),
+  getOne: (id: string) => campaignApi.get(`/goals/${id}`),
+  create: (data: any) => campaignApi.post('/goals', data),
+  update: (id: string, data: any) => campaignApi.patch(`/goals/${id}`, data),
+  delete: (id: string) => campaignApi.delete(`/goals/${id}`),
+  getStats: () => campaignApi.get('/goals/stats'),
+  pause: (id: string) => campaignApi.post(`/goals/${id}/pause`),
+  resume: (id: string) => campaignApi.post(`/goals/${id}/resume`),
+  getHistory: (id: string) => campaignApi.get(`/goals/${id}/history`),
+  getProjection: (id: string) => campaignApi.get(`/goals/${id}/projection`),
+  getTrends: (id: string, period?: string) =>
+    campaignApi.get(`/goals/${id}/trends`, { params: { period } }),
+  compareGoals: (goalId1: string, goalId2: string) =>
+    campaignApi.get('/goals/compare', { params: { goal1: goalId1, goal2: goalId2 } }),
+  getTeamStats: (teamId?: string) =>
+    campaignApi.get('/goals/team-stats', { params: { teamId } }),
+  updateProgress: (id: string, value: number, source?: string) =>
+    campaignApi.post(`/goals/${id}/progress`, { value, source }),
+  recalculateProjection: (id: string) =>
+    campaignApi.post(`/goals/${id}/projection/recalculate`),
+};
+
+// Page Service URL
+const PAGE_SERVICE_URL = import.meta.env.VITE_PAGE_SERVICE_URL || 'http://localhost:60007';
+const pageApi = createApiClient(PAGE_SERVICE_URL);
+
+// Bio Links API
+export const bioLinksService = {
+  getAll: (params?: { page?: number; limit?: number; status?: string }) =>
+    pageApi.get('/bio-links', { params }),
+  getOne: (id: string) => pageApi.get(`/bio-links/${id}`),
+  getByUsername: (username: string) => pageApi.get(`/bio-links/username/${username}`),
+  create: (data: any) => pageApi.post('/bio-links', data),
+  update: (id: string, data: any) => pageApi.patch(`/bio-links/${id}`, data),
+  delete: (id: string) => pageApi.delete(`/bio-links/${id}`),
+  publish: (id: string) => pageApi.post(`/bio-links/${id}/publish`),
+  unpublish: (id: string) => pageApi.post(`/bio-links/${id}/unpublish`),
+  checkUsernameAvailability: (username: string) =>
+    pageApi.get('/bio-links/check-username', { params: { username } }),
+  getAnalytics: (id: string, params?: { startDate?: string; endDate?: string }) =>
+    pageApi.get(`/bio-links/${id}/analytics`, { params }),
+  // Block management
+  getBlocks: (bioLinkId: string) => pageApi.get(`/bio-links/${bioLinkId}/blocks`),
+  createBlock: (bioLinkId: string, data: any) =>
+    pageApi.post(`/bio-links/${bioLinkId}/blocks`, data),
+  updateBlock: (bioLinkId: string, blockId: string, data: any) =>
+    pageApi.patch(`/bio-links/${bioLinkId}/blocks/${blockId}`, data),
+  deleteBlock: (bioLinkId: string, blockId: string) =>
+    pageApi.delete(`/bio-links/${bioLinkId}/blocks/${blockId}`),
+  reorderBlocks: (bioLinkId: string, blockIds: string[]) =>
+    pageApi.post(`/bio-links/${bioLinkId}/blocks/reorder`, { blockIds }),
+};
+
+// Saved Search API
+export const savedSearchService = {
+  getAll: () => linkApi.get('/saved-searches'),
+  getOne: (id: string) => linkApi.get(`/saved-searches/${id}`),
+  create: (data: any) => linkApi.post('/saved-searches', data),
+  update: (id: string, data: any) => linkApi.patch(`/saved-searches/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/saved-searches/${id}`),
+  execute: (id: string) => linkApi.post(`/saved-searches/${id}/execute`),
+  testNotification: (id: string) => linkApi.post(`/saved-searches/${id}/test-notification`),
+  getMatchCount: (id: string) => linkApi.get(`/saved-searches/${id}/match-count`),
 };

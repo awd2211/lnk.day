@@ -71,3 +71,17 @@ export function useRealtimeAnalytics(linkId: string) {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 }
+
+export function useClickTrends(period: string = '7d') {
+  return useQuery({
+    queryKey: ['analytics', 'trends', period],
+    queryFn: async () => {
+      const { data } = await analyticsService.getSummary();
+      // Return mock trend data structure based on summary
+      return {
+        period,
+        data: data?.topCountries?.slice(0, 5) || [],
+      };
+    },
+  });
+}

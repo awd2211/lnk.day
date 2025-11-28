@@ -59,11 +59,19 @@ import {
   BioLink,
   BioLinkBlock,
   BioLinkTheme,
+  BioLinkPixelSettings,
+  ABTestConfig as ABTestConfigType,
+  GuestbookSettings,
+  CalendlySettings,
   BlockType,
   BLOCK_TYPE_LABELS,
   DEFAULT_THEMES,
   SOCIAL_PLATFORMS,
 } from '@/hooks/useBioLinks';
+import PixelConfig from '@/components/bio-link/PixelConfig';
+import ABTestConfig from '@/components/bio-link/ABTestConfig';
+import GuestbookConfig from '@/components/bio-link/GuestbookConfig';
+import CalendlyConfig from '@/components/bio-link/CalendlyConfig';
 import { cn } from '@/lib/utils';
 
 const BlockIcon = ({ type }: { type: BlockType }) => {
@@ -148,6 +156,10 @@ export default function BioLinkEditorPage() {
           blocks: localBioLink.blocks,
           theme: localBioLink.theme,
           seo: localBioLink.seo,
+          pixels: localBioLink.pixels,
+          abTest: localBioLink.abTest,
+          guestbook: localBioLink.guestbook,
+          calendly: localBioLink.calendly,
         },
       });
       setHasChanges(false);
@@ -473,6 +485,35 @@ export default function BioLinkEditorPage() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <PixelConfig
+                    pixels={localBioLink.pixels || {}}
+                    onChange={(pixels) => updateLocalBioLink({ pixels })}
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <ABTestConfig
+                    abTest={localBioLink.abTest}
+                    currentTheme={localBioLink.theme}
+                    onChange={(abTest) => updateLocalBioLink({ abTest })}
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <GuestbookConfig
+                    settings={localBioLink.guestbook}
+                    onChange={(guestbook) => updateLocalBioLink({ guestbook })}
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <CalendlyConfig
+                    settings={localBioLink.calendly}
+                    onChange={(calendly) => updateLocalBioLink({ calendly })}
+                  />
                 </div>
               </div>
             </TabsContent>
