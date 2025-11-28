@@ -17,9 +17,10 @@ import (
 )
 
 type AnalyticsService struct {
-	cfg         *config.Config
-	geoipDB     *geoip2.Reader
-	kafkaWriter *kafka.Writer
+	cfg            *config.Config
+	geoipDB        *geoip2.Reader
+	kafkaWriter    *kafka.Writer
+	rabbitmqSvc    *RabbitMQService
 }
 
 func NewAnalyticsService(cfg *config.Config) *AnalyticsService {
@@ -35,7 +36,10 @@ func NewAnalyticsService(cfg *config.Config) *AnalyticsService {
 		}
 	}
 
-	// Initialize Kafka writer
+	// Initialize RabbitMQ (primary messaging)
+	svc.rabbitmqSvc = NewRabbitMQService(cfg)
+
+	// Initialize Kafka writer (fallback/secondary)
 	if cfg.KafkaBrokers != "" {
 		svc.kafkaWriter = &kafka.Writer{
 			Addr:         kafka.TCP(cfg.KafkaBrokers),
@@ -53,6 +57,9 @@ func NewAnalyticsService(cfg *config.Config) *AnalyticsService {
 func (s *AnalyticsService) Close() {
 	if s.geoipDB != nil {
 		s.geoipDB.Close()
+	}
+	if s.rabbitmqSvc != nil {
+		s.rabbitmqSvc.Close()
 	}
 	if s.kafkaWriter != nil {
 		s.kafkaWriter.Close()
@@ -79,11 +86,21 @@ func (s *AnalyticsService) TrackClick(event *model.ClickEvent) {
 	event.ID = uuid.New().String()
 	event.Timestamp = time.Now().UTC()
 
-	// Send to Kafka
+	// Send to RabbitMQ (primary)
+	if s.rabbitmqSvc != nil && s.rabbitmqSvc.IsConnected() {
+		if err := s.rabbitmqSvc.PublishClickEvent(event); err != nil {
+			log.Printf("Failed to publish to RabbitMQ: %v", err)
+		}
+	}
+
+	// Send to Kafka (secondary/fallback)
 	if s.kafkaWriter != nil {
 		s.sendToKafka(event)
-	} else {
-		log.Printf("Click tracked: link=%s, country=%s, device=%s", event.LinkID, event.Country, event.Device)
+	}
+
+	// Log if no messaging available
+	if (s.rabbitmqSvc == nil || !s.rabbitmqSvc.IsConnected()) && s.kafkaWriter == nil {
+		log.Printf("Click tracked (no messaging): link=%s, country=%s, device=%s", event.LinkID, event.Country, event.Device)
 	}
 }
 
