@@ -25,6 +25,16 @@ const DomainsPage = lazy(() => import('@/pages/DomainsPage'));
 const SSOPage = lazy(() => import('@/pages/SSOPage'));
 const WebhooksPage = lazy(() => import('@/pages/WebhooksPage'));
 const CampaignsPage = lazy(() => import('@/pages/CampaignsPage'));
+const BillingPage = lazy(() => import('@/pages/BillingPage'));
+const ABTestPage = lazy(() => import('@/pages/ABTestPage'));
+const ABTestDetailPage = lazy(() => import('@/pages/ABTestDetailPage'));
+const RedirectRulesPage = lazy(() => import('@/pages/RedirectRulesPage'));
+const DeepLinksPage = lazy(() => import('@/pages/DeepLinksPage'));
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
+const FoldersPage = lazy(() => import('@/pages/FoldersPage'));
+const SavedSearchesPage = lazy(() => import('@/pages/SavedSearchesPage'));
+const GoalsPage = lazy(() => import('@/pages/GoalsPage'));
+const IntegrationsPage = lazy(() => import('@/pages/IntegrationsPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -176,6 +186,86 @@ function App() {
             element={
               <ProtectedRoute>
                 <CampaignsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute>
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ab-tests"
+            element={
+              <ProtectedRoute>
+                <ABTestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ab-tests/:id"
+            element={
+              <ProtectedRoute>
+                <ABTestDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/redirect-rules"
+            element={
+              <ProtectedRoute>
+                <RedirectRulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/deep-links"
+            element={
+              <ProtectedRoute>
+                <DeepLinksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/privacy"
+            element={
+              <ProtectedRoute>
+                <PrivacyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/folders"
+            element={
+              <ProtectedRoute>
+                <FoldersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/saved-searches"
+            element={
+              <ProtectedRoute>
+                <SavedSearchesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/goals"
+            element={
+              <ProtectedRoute>
+                <GoalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/integrations"
+            element={
+              <ProtectedRoute>
+                <IntegrationsPage />
               </ProtectedRoute>
             }
           />

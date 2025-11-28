@@ -19,9 +19,19 @@ import {
   Webhook,
   Megaphone,
   Search,
+  CreditCard,
+  TestTube2,
+  GitBranch,
+  Smartphone,
+  Folder,
+  Bookmark,
+  Target,
+  Plug,
+  Lock,
 } from 'lucide-react';
 import { useState } from 'react';
 import { CommandPalette, useCommandPalette } from '@/components/CommandPalette';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -30,16 +40,25 @@ interface LayoutProps {
 const navItems = [
   { path: '/dashboard', label: '仪表盘', icon: LayoutDashboard },
   { path: '/links', label: '链接管理', icon: Link2 },
+  { path: '/folders', label: '文件夹', icon: Folder },
+  { path: '/saved-searches', label: '保存的搜索', icon: Bookmark },
   { path: '/templates', label: '模板', icon: FileText },
   { path: '/bio-links', label: 'Bio Link', icon: Palette },
   { path: '/analytics', label: '数据分析', icon: BarChart3 },
   { path: '/reports', label: '报告', icon: FileBarChart },
   { path: '/campaigns', label: '活动', icon: Megaphone },
+  { path: '/goals', label: '目标', icon: Target },
+  { path: '/ab-tests', label: 'A/B测试', icon: TestTube2 },
+  { path: '/redirect-rules', label: '重定向', icon: GitBranch },
+  { path: '/deep-links', label: '深度链接', icon: Smartphone },
   { path: '/qr', label: '二维码', icon: QrCode },
   { path: '/domains', label: '域名', icon: Globe },
+  { path: '/integrations', label: '集成', icon: Plug },
   { path: '/sso', label: 'SSO', icon: Shield },
   { path: '/webhooks', label: 'Webhooks', icon: Webhook },
   { path: '/team', label: '团队', icon: Users },
+  { path: '/billing', label: '计费', icon: CreditCard },
+  { path: '/privacy', label: '隐私', icon: Lock },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
@@ -56,9 +75,9 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-white">
+      <header className="sticky top-0 z-50 border-b bg-white dark:bg-gray-800 dark:border-gray-700">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
           <Link to="/dashboard" className="text-xl font-bold text-primary">
             lnk.day
@@ -76,7 +95,7 @@ export default function Layout({ children }: LayoutProps) {
                   className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-primary/10 text-primary'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -100,7 +119,8 @@ export default function Layout({ children }: LayoutProps) {
                 <span className="text-xs">⌘</span>K
               </kbd>
             </Button>
-            <span className="text-sm text-gray-600">{user?.name || user?.email}</span>
+            <ThemeToggle />
+            <span className="text-sm text-gray-600 dark:text-gray-300">{user?.name || user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               退出
@@ -118,7 +138,7 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Mobile Nav */}
         {mobileMenuOpen && (
-          <div className="border-t bg-white px-4 py-4 md:hidden">
+          <div className="border-t bg-white dark:bg-gray-800 dark:border-gray-700 px-4 py-4 md:hidden">
             <nav className="flex flex-col gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -131,7 +151,7 @@ export default function Layout({ children }: LayoutProps) {
                     className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
                       isActive
                         ? 'bg-primary/10 text-primary'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
