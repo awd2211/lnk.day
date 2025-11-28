@@ -102,6 +102,14 @@ export const authService = {
   updateProfile: (data: any) => api.put('/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     api.post('/users/me/password', data),
+
+  // 2FA
+  get2FAStatus: () => api.get('/auth/2fa/status'),
+  enable2FA: () => api.post('/auth/2fa/enable'),
+  verify2FA: (code: string) => api.post('/auth/2fa/verify', { code }),
+  disable2FA: (code: string) => api.delete('/auth/2fa/disable', { data: { code } }),
+  regenerateBackupCodes: (code: string) =>
+    api.post('/auth/2fa/regenerate-backup-codes', { code }),
 };
 
 // Link API
@@ -140,6 +148,52 @@ export const qrService = {
     logo?: string;
   }) => qrApi.post('/qr/generate', data, { responseType: 'blob' }),
   getStyles: () => qrApi.get('/qr/styles'),
+};
+
+// Deep Link API
+export const deepLinkService = {
+  get: (linkId: string) => linkApi.get(`/links/${linkId}/deep-link`),
+  create: (linkId: string, data: {
+    iosConfig?: {
+      appStoreId?: string;
+      bundleId?: string;
+      universalLink?: string;
+      customScheme?: string;
+    };
+    androidConfig?: {
+      packageName?: string;
+      sha256Fingerprint?: string;
+      appLink?: string;
+      customScheme?: string;
+    };
+    fallbackUrl?: string;
+    fallbackBehavior?: 'redirect' | 'app_store' | 'custom';
+  }) => linkApi.post(`/links/${linkId}/deep-link`, data),
+  update: (linkId: string, data: any) => linkApi.put(`/links/${linkId}/deep-link`, data),
+  delete: (linkId: string) => linkApi.delete(`/links/${linkId}/deep-link`),
+  resolve: (linkId: string, userAgent?: string) =>
+    linkApi.post(`/links/${linkId}/deep-link/resolve`, { userAgent }),
+};
+
+// A/B Test API
+export const abTestService = {
+  getAll: (params?: { page?: number; limit?: number; status?: string }) =>
+    linkApi.get('/ab-tests', { params }),
+  getOne: (id: string) => linkApi.get(`/ab-tests/${id}`),
+  create: (data: {
+    name: string;
+    linkId: string;
+    variants: Array<{ name: string; url: string; weight: number }>;
+    targetMetric?: string;
+  }) => linkApi.post('/ab-tests', data),
+  update: (id: string, data: any) => linkApi.put(`/ab-tests/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/ab-tests/${id}`),
+  getStats: (id: string) => linkApi.get(`/ab-tests/${id}/stats`),
+  getComparison: (id: string) => linkApi.get(`/ab-tests/${id}/comparison`),
+  start: (id: string) => linkApi.post(`/ab-tests/${id}/start`),
+  pause: (id: string) => linkApi.post(`/ab-tests/${id}/pause`),
+  complete: (id: string, winnerId?: string) =>
+    linkApi.post(`/ab-tests/${id}/complete`, { winnerId }),
 };
 
 // Folder API
@@ -195,6 +249,71 @@ export const securityService = {
   getScanHistory: (url: string, limit?: number) =>
     linkApi.get('/security/history', { params: { url, limit } }),
   getStats: () => linkApi.get('/security/stats'),
+};
+
+// API Keys API
+export const apiKeyService = {
+  getAll: () => api.get('/api-keys'),
+  getOne: (id: string) => api.get(`/api-keys/${id}`),
+  create: (data: {
+    name: string;
+    scopes: string[];
+    expiresAt?: string;
+    ipWhitelist?: string[];
+  }) => api.post('/api-keys', data),
+  update: (id: string, data: { name?: string; scopes?: string[]; ipWhitelist?: string[] }) =>
+    api.put(`/api-keys/${id}`, data),
+  delete: (id: string) => api.delete(`/api-keys/${id}`),
+  revoke: (id: string) => api.post(`/api-keys/${id}/revoke`),
+  regenerate: (id: string) => api.post(`/api-keys/${id}/regenerate`),
+  getScopes: () => api.get('/api-keys/scopes/list'),
+};
+
+// Billing API
+export const billingService = {
+  // Subscription
+  getSubscription: () => api.get('/billing/subscription'),
+  createSubscription: (data: { priceId: string }) => api.post('/billing/subscription', data),
+  updateSubscription: (data: { priceId: string }) => api.put('/billing/subscription', data),
+  cancelSubscription: () => api.delete('/billing/subscription'),
+
+  // Pricing
+  getPricing: () => api.get('/billing/pricing'),
+
+  // Invoices
+  getInvoices: (params?: { limit?: number; starting_after?: string }) =>
+    api.get('/billing/invoices', { params }),
+  downloadInvoice: (invoiceId: string) =>
+    api.get(`/billing/invoices/${invoiceId}/download`, { responseType: 'blob' }),
+
+  // Stripe
+  createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
+    api.post('/stripe/checkout', data),
+  createPortalSession: (data: { returnUrl: string }) => api.post('/stripe/portal', data),
+  getPaymentMethods: () => api.get('/stripe/payment-methods'),
+  setDefaultPaymentMethod: (paymentMethodId: string) =>
+    api.post('/stripe/payment-methods/default', { paymentMethodId }),
+  deletePaymentMethod: (paymentMethodId: string) =>
+    api.delete(`/stripe/payment-methods/${paymentMethodId}`),
+};
+
+// Privacy API
+export const privacyService = {
+  getOverview: () => api.get('/privacy/overview'),
+  getConsents: () => api.get('/privacy/consents'),
+  updateConsents: (data: Record<string, boolean>) => api.post('/privacy/consents', data),
+  requestExport: () => api.post('/privacy/export'),
+  requestDeleteAccount: () => api.post('/privacy/delete-account'),
+  cancelDeleteRequest: () => api.delete('/privacy/delete-account'),
+  getRights: () => api.get('/privacy/rights'),
+};
+
+// Quota API
+export const quotaService = {
+  getUsage: () => api.get('/quota'),
+  getLimits: () => api.get('/quota/limits'),
+  getLogs: (params?: { limit?: number; offset?: number }) =>
+    api.get('/quota/logs', { params }),
 };
 
 // User/Team API

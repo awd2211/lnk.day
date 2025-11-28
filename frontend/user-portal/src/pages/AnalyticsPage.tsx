@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  ClicksLineChart,
-  DevicePieChart,
-  BrowserPieChart,
-  GeoBarChart,
-  ReferrerChart,
-  HourlyHeatmap,
+  ClicksLineChartLazy,
+  DevicePieChartLazy,
+  BrowserPieChartLazy,
+  GeoBarChartLazy,
+  ReferrerChartLazy,
+  HourlyHeatmapLazy,
   StatsCard,
 } from '@/components/charts';
 import { useTeamAnalytics } from '@/hooks/useAnalytics';
@@ -125,7 +125,7 @@ export default function AnalyticsPage() {
           {isLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : (
-            <ClicksLineChart data={analytics?.clicksByDay || []} height={300} />
+            <ClicksLineChartLazy data={analytics?.clicksByDay || []} height={300} />
           )}
         </CardContent>
       </Card>
@@ -147,14 +147,14 @@ export default function AnalyticsPage() {
                 {isLoading ? (
                   <Skeleton className="h-[280px] w-full" />
                 ) : (
-                  <DevicePieChart data={analytics?.devices || []} height={280} />
+                  <DevicePieChartLazy data={analytics?.devices || []} height={280} />
                 )}
               </TabsContent>
               <TabsContent value="browser">
                 {isLoading ? (
                   <Skeleton className="h-[280px] w-full" />
                 ) : (
-                  <BrowserPieChart data={analytics?.browsers || []} height={280} />
+                  <BrowserPieChartLazy data={analytics?.browsers || []} height={280} />
                 )}
               </TabsContent>
             </Tabs>
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
             {isLoading ? (
               <Skeleton className="h-[300px] w-full" />
             ) : (
-              <GeoBarChart data={analytics?.countries || []} height={300} maxItems={6} />
+              <GeoBarChartLazy data={analytics?.countries || []} height={300} maxItems={6} />
             )}
           </CardContent>
         </Card>
@@ -185,7 +185,7 @@ export default function AnalyticsPage() {
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : (
-            <HourlyHeatmap data={analytics?.hourlyActivity || []} height={200} />
+            <HourlyHeatmapLazy data={analytics?.hourlyActivity || []} height={200} />
           )}
         </CardContent>
       </Card>
@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
           {isLoading ? (
             <Skeleton className="h-[300px] w-full" />
           ) : (
-            <ReferrerChart data={analytics?.referrers || []} height={300} maxItems={8} />
+            <ReferrerChartLazy data={analytics?.referrers || []} height={300} maxItems={8} />
           )}
         </CardContent>
       </Card>

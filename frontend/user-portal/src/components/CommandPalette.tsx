@@ -30,6 +30,10 @@ import {
   Keyboard,
   Moon,
   Sun,
+  CreditCard,
+  TestTube2,
+  GitBranch,
+  Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLinks } from '@/hooks/useLinks';
@@ -55,10 +59,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 200);
 
-  // Search links when user types
+  // Search links when user types (only when search has 2+ chars)
+  const shouldSearch = debouncedSearch.length >= 2;
   const { data: linksData } = useLinks(
-    { search: debouncedSearch, limit: 5 },
-    { enabled: debouncedSearch.length >= 2 }
+    shouldSearch ? { search: debouncedSearch, limit: 5 } : undefined
   );
 
   const handleClose = useCallback(() => {
@@ -134,6 +138,30 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         group: 'navigation',
       },
       {
+        id: 'ab-tests',
+        label: 'A/B 测试',
+        icon: <TestTube2 className="mr-2 h-4 w-4" />,
+        action: () => navigate('/ab-tests'),
+        keywords: ['test', '测试', 'experiment', 'split'],
+        group: 'navigation',
+      },
+      {
+        id: 'redirect-rules',
+        label: '重定向规则',
+        icon: <GitBranch className="mr-2 h-4 w-4" />,
+        action: () => navigate('/redirect-rules'),
+        keywords: ['redirect', '跳转', '智能', '条件'],
+        group: 'navigation',
+      },
+      {
+        id: 'deep-links',
+        label: '深度链接',
+        icon: <Smartphone className="mr-2 h-4 w-4" />,
+        action: () => navigate('/deep-links'),
+        keywords: ['deeplink', 'app', 'ios', 'android', '移动'],
+        group: 'navigation',
+      },
+      {
         id: 'team',
         label: '团队管理',
         icon: <Users className="mr-2 h-4 w-4" />,
@@ -163,6 +191,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         icon: <Webhook className="mr-2 h-4 w-4" />,
         action: () => navigate('/webhooks'),
         keywords: ['webhook', '回调', 'api'],
+        group: 'navigation',
+      },
+      {
+        id: 'billing',
+        label: '订阅计费',
+        icon: <CreditCard className="mr-2 h-4 w-4" />,
+        action: () => navigate('/billing'),
+        keywords: ['payment', '支付', '套餐', 'subscription'],
         group: 'navigation',
       },
       {
@@ -262,7 +298,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onOpenChange]);
 
-  const links = linksData?.links || [];
+  const links = shouldSearch ? (linksData?.items || []) : [];
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>

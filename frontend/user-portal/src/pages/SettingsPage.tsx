@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Bell, Key, Save } from 'lucide-react';
+import { User, Lock, Key, Save } from 'lucide-react';
 
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/api';
+import { ApiKeyManager } from '@/components/settings/ApiKeyManager';
+import { TwoFactorSetup } from '@/components/settings/TwoFactorSetup';
 
 type Tab = 'profile' | 'security' | 'api';
 
@@ -116,8 +118,8 @@ export default function SettingsPage() {
         {/* Content */}
         <div className="lg:col-span-3">
           {activeTab === 'profile' && (
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h2 className="mb-6 text-lg font-semibold">个人资料</h2>
+            <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+              <h2 className="mb-6 text-lg font-semibold dark:text-white">个人资料</h2>
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="name">姓名</Label>
@@ -147,79 +149,62 @@ export default function SettingsPage() {
           )}
 
           {activeTab === 'security' && (
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h2 className="mb-6 text-lg font-semibold">修改密码</h2>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="currentPassword">当前密码</Label>
-                  <Input
-                    id="currentPassword"
-                    type="password"
-                    value={passwords.currentPassword}
-                    onChange={(e) =>
-                      setPasswords({ ...passwords, currentPassword: e.target.value })
-                    }
-                    className="mt-1"
-                  />
+            <div className="space-y-6">
+              {/* 2FA Section */}
+              <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <TwoFactorSetup />
+              </div>
+
+              {/* Password Section */}
+              <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+                <h2 className="mb-6 text-lg font-semibold dark:text-white">修改密码</h2>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="currentPassword">当前密码</Label>
+                    <Input
+                      id="currentPassword"
+                      type="password"
+                      value={passwords.currentPassword}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, currentPassword: e.target.value })
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="newPassword">新密码</Label>
+                    <Input
+                      id="newPassword"
+                      type="password"
+                      value={passwords.newPassword}
+                      onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">确认新密码</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={passwords.confirmPassword}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, confirmPassword: e.target.value })
+                      }
+                      className="mt-1"
+                    />
+                  </div>
+                  <Button onClick={handleChangePassword} disabled={isSaving}>
+                    <Lock className="mr-2 h-4 w-4" />
+                    {isSaving ? '更新中...' : '更新密码'}
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor="newPassword">新密码</Label>
-                  <Input
-                    id="newPassword"
-                    type="password"
-                    value={passwords.newPassword}
-                    onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="confirmPassword">确认新密码</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={passwords.confirmPassword}
-                    onChange={(e) =>
-                      setPasswords({ ...passwords, confirmPassword: e.target.value })
-                    }
-                    className="mt-1"
-                  />
-                </div>
-                <Button onClick={handleChangePassword} disabled={isSaving}>
-                  <Lock className="mr-2 h-4 w-4" />
-                  {isSaving ? '更新中...' : '更新密码'}
-                </Button>
               </div>
             </div>
           )}
 
           {activeTab === 'api' && (
-            <div className="rounded-lg bg-white p-6 shadow">
-              <h2 className="mb-6 text-lg font-semibold">API 密钥</h2>
-              <p className="mb-4 text-sm text-gray-500">
-                使用 API 密钥可以通过编程方式访问您的链接数据。请妥善保管您的密钥，不要分享给他人。
-              </p>
-              <div className="rounded-lg border bg-gray-50 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">您的 API 密钥</p>
-                    <p className="text-sm text-gray-500">创建于 2024-01-01</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      显示密钥
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      重新生成
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button>
-                  <Key className="mr-2 h-4 w-4" />
-                  创建新密钥
-                </Button>
-              </div>
+            <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+              <ApiKeyManager />
             </div>
           )}
         </div>
