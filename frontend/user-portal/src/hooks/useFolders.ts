@@ -4,12 +4,14 @@ import { folderService } from '@/lib/api';
 export interface Folder {
   id: string;
   name: string;
+  description?: string;
   color?: string;
   icon?: string;
   parentId?: string;
   teamId: string;
   linkCount: number;
   sortOrder: number;
+  isFavorite?: boolean;
   createdAt: string;
   updatedAt: string;
   children?: Folder[];
@@ -17,15 +19,19 @@ export interface Folder {
 
 export interface CreateFolderData {
   name: string;
+  description?: string;
   color?: string;
   icon?: string;
   parentId?: string;
+  isFavorite?: boolean;
 }
 
 export interface UpdateFolderData {
   name?: string;
+  description?: string;
   color?: string;
   icon?: string;
+  isFavorite?: boolean;
 }
 
 // Query: Get all folders
