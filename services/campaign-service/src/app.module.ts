@@ -6,10 +6,13 @@ import { TemplateModule } from './modules/template/template.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
 import { GoalsModule } from './modules/goals/goals.module';
 import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.module';
+import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RabbitMQModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -31,6 +34,7 @@ import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.
     CollaborationModule,
     GoalsModule,
     CampaignAnalyticsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
