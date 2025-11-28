@@ -29,11 +29,24 @@ export interface SearchSort {
   order: 'asc' | 'desc';
 }
 
+export interface NotificationChannel {
+  type: 'email' | 'slack' | 'teams';
+  enabled: boolean;
+  // Email specific
+  recipients?: string[];
+  // Slack/Teams specific
+  webhookUrl?: string;
+  channelName?: string;
+}
+
 export interface NotificationSettings {
   enabled: boolean;
   frequency: 'daily' | 'weekly' | 'on_match';  // on_match: 当有新链接匹配时
-  recipients: string[];  // Email addresses
+  recipients: string[];  // Email addresses (legacy support)
   threshold?: number;    // 新结果数量阈值
+  channels?: NotificationChannel[];  // Multi-channel support
+  includeTopResults?: boolean;  // 是否包含前10个结果
+  includeSummary?: boolean;     // 是否包含统计摘要
 }
 
 @Entity('saved_searches')

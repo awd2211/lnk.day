@@ -313,11 +313,11 @@ export class ABTestService {
     if (variants.length < 2) return results;
 
     // Use first variant as control
-    const control = variants[0];
+    const control = variants[0]!;
     const controlRate = control.clicks ? (control.conversions || 0) / control.clicks : 0;
 
     for (let i = 1; i < variants.length; i++) {
-      const variant = variants[i];
+      const variant = variants[i]!;
       const variantRate = variant.clicks ? (variant.conversions || 0) / variant.clicks : 0;
 
       const result = this.performZTest(
@@ -460,7 +460,7 @@ export class ABTestService {
     }
 
     const bestResult = significantResults.reduce((best, [id, r]) => {
-      if (!best || r.uplift > best[1].uplift) return [id, r];
+      if (!best || r.uplift > best[1].uplift) return [id, r] as [string, StatisticalResult];
       return best;
     }, null as [string, StatisticalResult] | null);
 
@@ -503,7 +503,7 @@ export class ABTestService {
 
       // If no clear winner among variants, control wins
       if (!winnerId || bestUplift <= 0) {
-        winnerId = abtest.variants[0].id;
+        winnerId = abtest.variants[0]?.id || undefined;
       }
 
       if (settings.autoSelectWinner) {
@@ -563,7 +563,7 @@ export class ABTestService {
 
     // Select variant with highest score
     scores.sort((a, b) => b.score - a.score);
-    return scores[0].variant;
+    return scores[0]?.variant || abtest.variants[0]!;
   }
 
   private sampleBeta(alpha: number, beta: number): number {
@@ -649,11 +649,11 @@ export class ABTestService {
           avgOrderValue: conversions ? revenue / conversions : 0,
           bounceRate: clicks ? (bounces / clicks) * 100 : 0,
         },
-        vsControl: index === 0 ? null : stats[v.id] ? {
-          uplift: stats[v.id].uplift,
-          isSignificant: stats[v.id].isSignificant,
-          pValue: stats[v.id].pValue,
-        } : null,
+        vsControl: index === 0 ? null : (stats[v.id] ? {
+          uplift: stats[v.id]!.uplift,
+          isSignificant: stats[v.id]!.isSignificant,
+          pValue: stats[v.id]!.pValue,
+        } : null),
       };
     });
 
@@ -672,7 +672,7 @@ export class ABTestService {
     if (!winner && abtest.totalClicks >= abtest.settings.minimumSampleSize) {
       const allNegative = Object.values(stats).every((r) => r.uplift <= 0);
       if (allNegative) {
-        winner = control.id;
+        winner = control?.id || null;
       }
     }
 

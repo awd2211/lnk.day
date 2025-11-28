@@ -11,12 +11,18 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   SavedSearch,
   SavedSearchVisibility,
+  NotificationChannel,
 } from './entities/saved-search.entity';
 import {
   CreateSavedSearchDto,
   UpdateSavedSearchDto,
 } from './dto/saved-search.dto';
 import { SearchService } from './search.service';
+import {
+  NotificationClientService,
+  SavedSearchNotificationData,
+  NewMatchNotificationData,
+} from '../../common/notification/notification-client.service';
 
 @Injectable()
 export class SavedSearchService {
@@ -26,6 +32,7 @@ export class SavedSearchService {
     @InjectRepository(SavedSearch)
     private readonly savedSearchRepository: Repository<SavedSearch>,
     private readonly searchService: SearchService,
+    private readonly notificationClient: NotificationClientService,
   ) {}
 
   async create(
@@ -184,7 +191,7 @@ export class SavedSearchService {
       filters: original.filters,
       sort: original.sort,
       visibility: SavedSearchVisibility.PRIVATE,
-      notification: null,
+      notification: undefined,
       userId,
       teamId,
     });
@@ -254,7 +261,7 @@ export class SavedSearchService {
     for (const search of searches) {
       try {
         await this.executeAndNotify(search);
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(
           `Failed to send notification for search ${search.id}: ${error.message}`,
         );
@@ -313,23 +320,87 @@ export class SavedSearchService {
     search: SavedSearch,
     results: any,
   ): Promise<void> {
-    // In production, this would call the notification service
     this.logger.log(
       `Sending search notification for "${search.name}" to ${search.notification?.recipients?.join(', ')}`,
     );
     this.logger.log(`Results: ${results.total} links found`);
 
-    // TODO: Call notification service API
-    // await this.notificationService.sendEmail({
-    //   to: search.notification.recipients,
-    //   template: 'saved-search-results',
-    //   data: {
-    //     searchName: search.name,
-    //     totalResults: results.total,
-    //     topResults: results.hits.slice(0, 10),
-    //     searchUrl: `https://app.lnk.day/links?savedSearch=${search.id}`,
-    //   },
-    // });
+    const notificationData: SavedSearchNotificationData = {
+      searchName: search.name,
+      searchDescription: search.description,
+      totalResults: results.total,
+      newResults: results.total - (search.lastResultCount || 0),
+      topResults: results.hits?.slice(0, 10).map((hit: any) => ({
+        title: hit.title || hit.shortCode,
+        shortUrl: this.notificationClient.getLinkUrl(hit.shortCode),
+        originalUrl: hit.originalUrl,
+        clicks: hit.totalClicks || 0,
+      })),
+      searchUrl: this.notificationClient.getSearchUrl(search.id),
+      frequency: search.notification?.frequency || 'daily',
+    };
+
+    // Get notification channels (support both legacy and new format)
+    const channels = this.getNotificationChannels(search);
+
+    const sendPromises: Promise<boolean>[] = [];
+
+    for (const channel of channels) {
+      if (!channel.enabled) continue;
+
+      switch (channel.type) {
+        case 'email':
+          const emailRecipients = channel.recipients || search.notification?.recipients || [];
+          if (emailRecipients.length > 0) {
+            sendPromises.push(
+              this.notificationClient.sendSavedSearchResultsEmail(emailRecipients, notificationData),
+            );
+          }
+          break;
+
+        case 'slack':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient.sendSavedSearchResultsSlack(channel.webhookUrl, notificationData),
+            );
+          }
+          break;
+
+        case 'teams':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient.sendSavedSearchResultsTeams(channel.webhookUrl, notificationData),
+            );
+          }
+          break;
+      }
+    }
+
+    const results_arr = await Promise.allSettled(sendPromises);
+    const failedCount = results_arr.filter((r) => r.status === 'rejected').length;
+    if (failedCount > 0) {
+      this.logger.warn(`${failedCount} notification(s) failed for search ${search.id}`);
+    }
+  }
+
+  private getNotificationChannels(search: SavedSearch): NotificationChannel[] {
+    // If new channels format exists, use it
+    if (search.notification?.channels && search.notification.channels.length > 0) {
+      return search.notification.channels;
+    }
+
+    // Fallback to legacy email format
+    if (search.notification?.recipients && search.notification.recipients.length > 0) {
+      return [
+        {
+          type: 'email',
+          enabled: true,
+          recipients: search.notification.recipients,
+        },
+      ];
+    }
+
+    return [];
   }
 
   // Check for new matches (for on_match notifications)
@@ -347,7 +418,7 @@ export class SavedSearchService {
         if (matches) {
           await this.sendNewMatchNotification(search, link);
         }
-      } catch (error) {
+      } catch (error: any) {
         this.logger.error(
           `Failed to check match for search ${search.id}: ${error.message}`,
         );
@@ -408,15 +479,159 @@ export class SavedSearchService {
       `New link matches saved search "${search.name}": ${link.shortCode}`,
     );
 
-    // TODO: Call notification service API
-    // await this.notificationService.sendEmail({
-    //   to: search.notification.recipients,
-    //   template: 'saved-search-new-match',
-    //   data: {
-    //     searchName: search.name,
-    //     link: link,
-    //     searchUrl: `https://app.lnk.day/links?savedSearch=${search.id}`,
-    //   },
-    // });
+    const notificationData: NewMatchNotificationData = {
+      searchName: search.name,
+      link: {
+        title: link.title || link.shortCode,
+        shortCode: link.shortCode,
+        shortUrl: this.notificationClient.getLinkUrl(link.shortCode),
+        originalUrl: link.originalUrl,
+        createdAt: new Date(link.createdAt).toLocaleString('zh-CN'),
+      },
+      searchUrl: this.notificationClient.getSearchUrl(search.id),
+    };
+
+    // Get notification channels
+    const channels = this.getNotificationChannels(search);
+
+    const sendPromises: Promise<boolean>[] = [];
+
+    for (const channel of channels) {
+      if (!channel.enabled) continue;
+
+      switch (channel.type) {
+        case 'email':
+          const emailRecipients = channel.recipients || search.notification?.recipients || [];
+          if (emailRecipients.length > 0) {
+            sendPromises.push(
+              this.notificationClient.sendNewMatchEmail(emailRecipients, notificationData),
+            );
+          }
+          break;
+
+        case 'slack':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient.sendNewMatchSlack(channel.webhookUrl, notificationData),
+            );
+          }
+          break;
+
+        case 'teams':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient.sendNewMatchTeams(channel.webhookUrl, notificationData),
+            );
+          }
+          break;
+      }
+    }
+
+    const results = await Promise.allSettled(sendPromises);
+    const failedCount = results.filter((r) => r.status === 'rejected').length;
+    if (failedCount > 0) {
+      this.logger.warn(`${failedCount} new match notification(s) failed for search ${search.id}`);
+    }
+  }
+
+  // ==================== Test Notification ====================
+
+  async testNotification(
+    id: string,
+    userId: string,
+    teamId: string,
+  ): Promise<{ success: boolean; errors: string[] }> {
+    const search = await this.findOne(id, userId, teamId);
+
+    if (!search.notification?.enabled) {
+      return { success: false, errors: ['通知未启用'] };
+    }
+
+    const channels = this.getNotificationChannels(search);
+    if (channels.length === 0) {
+      return { success: false, errors: ['未配置通知渠道'] };
+    }
+
+    // Execute a test search
+    const results = await this.searchService.search(
+      search.teamId,
+      search.query || '',
+      {
+        filters: search.filters
+          ? {
+              domains: search.filters.domains,
+              tags: search.filters.tags,
+              status: search.filters.status,
+            }
+          : undefined,
+        limit: 10,
+      },
+    );
+
+    const notificationData: SavedSearchNotificationData = {
+      searchName: `[测试] ${search.name}`,
+      searchDescription: search.description,
+      totalResults: results.total,
+      topResults: results.hits?.slice(0, 5).map((hit: any) => ({
+        title: hit.title || hit.shortCode,
+        shortUrl: this.notificationClient.getLinkUrl(hit.shortCode),
+        originalUrl: hit.originalUrl,
+        clicks: hit.totalClicks || 0,
+      })),
+      searchUrl: this.notificationClient.getSearchUrl(search.id),
+      frequency: search.notification?.frequency || 'daily',
+    };
+
+    const errors: string[] = [];
+    const sendPromises: Promise<{ channel: string; success: boolean }>[] = [];
+
+    for (const channel of channels) {
+      if (!channel.enabled) continue;
+
+      switch (channel.type) {
+        case 'email':
+          const recipients = channel.recipients || search.notification?.recipients || [];
+          if (recipients.length > 0) {
+            sendPromises.push(
+              this.notificationClient
+                .sendSavedSearchResultsEmail(recipients, notificationData)
+                .then((success) => ({ channel: `email:${recipients.join(',')}`, success })),
+            );
+          }
+          break;
+
+        case 'slack':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient
+                .sendSavedSearchResultsSlack(channel.webhookUrl, notificationData)
+                .then((success) => ({ channel: `slack:${channel.channelName || 'webhook'}`, success })),
+            );
+          }
+          break;
+
+        case 'teams':
+          if (channel.webhookUrl) {
+            sendPromises.push(
+              this.notificationClient
+                .sendSavedSearchResultsTeams(channel.webhookUrl, notificationData)
+                .then((success) => ({ channel: `teams:${channel.channelName || 'webhook'}`, success })),
+            );
+          }
+          break;
+      }
+    }
+
+    const results_arr = await Promise.all(sendPromises);
+    for (const result of results_arr) {
+      if (!result.success) {
+        errors.push(`${result.channel} 发送失败`);
+      }
+    }
+
+    return {
+      success: errors.length === 0,
+      errors,
+    };
   }
 }

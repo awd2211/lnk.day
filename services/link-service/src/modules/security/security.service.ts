@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, In } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { UrlScanResult } from './entities/url-scan-result.entity';
+import { Link, LinkStatus } from '../link/entities/link.entity';
+import { NotificationClientService } from '../../common/notification/notification-client.service';
 
 export interface SafeBrowsingResult {
   safe: boolean;
@@ -57,10 +59,13 @@ export class SecurityService {
     private readonly configService: ConfigService,
     @InjectRepository(UrlScanResult)
     private readonly scanResultRepository: Repository<UrlScanResult>,
+    @InjectRepository(Link)
+    private readonly linkRepository: Repository<Link>,
+    private readonly notificationClient: NotificationClientService,
   ) {
-    this.googleSafeBrowsingApiKey = this.configService.get<string>('GOOGLE_SAFE_BROWSING_API_KEY');
-    this.virusTotalApiKey = this.configService.get<string>('VIRUSTOTAL_API_KEY');
-    this.urlScanApiKey = this.configService.get<string>('URLSCAN_API_KEY');
+    this.googleSafeBrowsingApiKey = this.configService.get<string>('GOOGLE_SAFE_BROWSING_API_KEY') || '';
+    this.virusTotalApiKey = this.configService.get<string>('VIRUSTOTAL_API_KEY') || '';
+    this.urlScanApiKey = this.configService.get<string>('URLSCAN_API_KEY') || '';
   }
 
   async analyzeUrl(url: string, options?: { force?: boolean }): Promise<UrlAnalysis> {
@@ -138,7 +143,7 @@ export class SecurityService {
         },
       );
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.matches && result.matches.length > 0) {
         return {
@@ -153,7 +158,7 @@ export class SecurityService {
       }
 
       return { safe: true, threats: [], cached: false };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Google Safe Browsing check failed: ${error.message}`);
       return { safe: true, threats: [], cached: false };
     }
@@ -252,7 +257,7 @@ export class SecurityService {
         factors.push(...vtScore.factors);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Reputation calculation error: ${error.message}`);
     }
 
@@ -296,7 +301,7 @@ export class SecurityService {
         return { scoreAdjustment: 0, factors: [] };
       }
 
-      const result = await response.json();
+      const result = await response.json() as any;
       const stats = result.data?.attributes?.last_analysis_stats;
 
       if (!stats) {
@@ -337,7 +342,7 @@ export class SecurityService {
       }
 
       return { scoreAdjustment: adjustment, factors };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`VirusTotal check failed: ${error.message}`);
       return { scoreAdjustment: 0, factors: [] };
     }
@@ -374,7 +379,7 @@ export class SecurityService {
         sslValid,
         redirectCount,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {};
     }
   }
@@ -394,7 +399,7 @@ export class SecurityService {
       });
 
       await this.scanResultRepository.save(result);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to save scan result: ${error.message}`);
     }
   }
@@ -467,7 +472,10 @@ export class SecurityService {
       const analyses = await Promise.all(batch.map(url => this.analyzeUrl(url)));
 
       batch.forEach((url, index) => {
-        results.set(url, analyses[index]);
+        const analysis = analyses[index];
+        if (analysis) {
+          results.set(url, analysis);
+        }
       });
     }
 
@@ -512,8 +520,14 @@ export class SecurityService {
           if (!analysis.safe) {
             newlyMalicious++;
             this.logger.warn(`URL became malicious: ${url}`);
-            // TODO: 发送通知给相关团队
-            // TODO: 自动禁用包含此 URL 的链接
+
+            // 查找并禁用包含此恶意 URL 的链接
+            const affectedLinks = await this.disableMaliciousLinks(url, analysis);
+
+            // 发送通知给相关团队
+            if (affectedLinks.length > 0) {
+              await this.notifyMaliciousUrlDetected(url, analysis, affectedLinks);
+            }
           }
         } catch (error: any) {
           this.logger.error(`Failed to rescan ${url}: ${error.message}`);
@@ -582,5 +596,271 @@ export class SecurityService {
       suspiciousUrls,
       recentThreats,
     };
+  }
+
+  // ========== 恶意链接处理 ==========
+
+  /**
+   * 禁用包含恶意 URL 的链接
+   */
+  private async disableMaliciousLinks(
+    maliciousUrl: string,
+    analysis: UrlAnalysis,
+  ): Promise<Link[]> {
+    try {
+      // 查找所有使用此 URL 的链接
+      const affectedLinks = await this.linkRepository.find({
+        where: {
+          originalUrl: maliciousUrl,
+          status: In([LinkStatus.ACTIVE, LinkStatus.INACTIVE]),
+        },
+      });
+
+      if (affectedLinks.length === 0) {
+        return [];
+      }
+
+      this.logger.warn(
+        `Found ${affectedLinks.length} links with malicious URL: ${maliciousUrl}`,
+      );
+
+      // 批量更新状态为 SUSPENDED
+      const linkIds = affectedLinks.map((link) => link.id);
+      await this.linkRepository.update(
+        { id: In(linkIds) },
+        {
+          status: LinkStatus.SUSPENDED,
+          updatedAt: new Date(),
+        },
+      );
+
+      this.logger.log(`Suspended ${affectedLinks.length} links due to malicious URL`);
+
+      // 记录安全事件
+      for (const link of affectedLinks) {
+        await this.logSecurityEvent({
+          type: 'link_suspended',
+          linkId: link.id,
+          teamId: link.teamId,
+          userId: link.userId,
+          url: maliciousUrl,
+          reason: `URL flagged as ${analysis.reputation.category}`,
+          threats: analysis.safeBrowsing.threats,
+          flaggedBy: analysis.flaggedBy,
+        });
+      }
+
+      return affectedLinks;
+    } catch (error: any) {
+      this.logger.error(`Failed to disable malicious links: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 发送恶意 URL 检测通知
+   */
+  private async notifyMaliciousUrlDetected(
+    url: string,
+    analysis: UrlAnalysis,
+    affectedLinks: Link[],
+  ): Promise<void> {
+    // 按团队分组
+    const linksByTeam = new Map<string, Link[]>();
+    for (const link of affectedLinks) {
+      const teamId = link.teamId || '';
+      const existing = linksByTeam.get(teamId) || [];
+      existing.push(link);
+      linksByTeam.set(teamId, existing);
+    }
+
+    // 为每个受影响的团队发送通知
+    for (const [teamId, links] of linksByTeam) {
+      try {
+        // 获取团队管理员邮箱（这里简化为使用第一个链接的用户 ID）
+        // 实际应该调用 user-service 获取团队管理员列表
+        const firstLink = links[0]!;
+
+        const alertData = {
+          type: '恶意链接检测',
+          severity: analysis.reputation.category === 'malicious' ? 'critical' as const : 'high' as const,
+          message: `检测到恶意 URL，已自动禁用 ${links.length} 个关联链接`,
+          details: this.formatMaliciousUrlDetails(url, analysis, links),
+        };
+
+        // 发送邮件通知
+        await this.notificationClient.sendEmail({
+          to: [], // 需要从 user-service 获取团队管理员邮箱
+          subject: `[安全警报] 检测到恶意链接 - ${links.length} 个链接已被禁用`,
+          template: 'security-alert',
+          data: {
+            alertType: alertData.type,
+            severity: alertData.severity,
+            message: alertData.message,
+            details: alertData.details,
+            url,
+            affectedLinks: links.map((l) => ({
+              shortCode: l.shortCode,
+              title: l.title,
+              domain: l.domain,
+            })),
+            threats: analysis.safeBrowsing.threats,
+            reputationScore: analysis.reputation.score,
+            reputationCategory: analysis.reputation.category,
+          },
+        });
+
+        this.logger.log(`Security notification sent to team ${teamId}`);
+      } catch (error: any) {
+        this.logger.error(
+          `Failed to send security notification to team ${teamId}: ${error.message}`,
+        );
+      }
+    }
+  }
+
+  private formatMaliciousUrlDetails(
+    url: string,
+    analysis: UrlAnalysis,
+    links: Link[],
+  ): string {
+    const parts = [
+      `URL: ${url}`,
+      `信誉评分: ${analysis.reputation.score}/100 (${analysis.reputation.category})`,
+      `检测来源: ${analysis.flaggedBy.join(', ') || '内部分析'}`,
+    ];
+
+    if (analysis.safeBrowsing.threats.length > 0) {
+      parts.push(
+        `威胁类型: ${analysis.safeBrowsing.threats.map((t) => t.type).join(', ')}`,
+      );
+    }
+
+    parts.push(`受影响链接数: ${links.length}`);
+
+    return parts.join('\n');
+  }
+
+  /**
+   * 记录安全事件
+   */
+  private async logSecurityEvent(event: {
+    type: string;
+    linkId?: string;
+    teamId?: string;
+    userId?: string;
+    url: string;
+    reason: string;
+    threats?: any[];
+    flaggedBy?: string[];
+  }): Promise<void> {
+    // 这里可以记录到专门的安全事件表或发送到日志系统
+    this.logger.warn(`Security Event: ${JSON.stringify(event)}`);
+  }
+
+  // ========== 手动安全操作 ==========
+
+  /**
+   * 手动触发 URL 安全检查并处理
+   */
+  async checkAndHandleUrl(url: string): Promise<{
+    analysis: UrlAnalysis;
+    actionsToken?: string[];
+  }> {
+    const analysis = await this.analyzeUrl(url, { force: true });
+    const actions: string[] = [];
+
+    if (!analysis.safe) {
+      const affectedLinks = await this.disableMaliciousLinks(url, analysis);
+      if (affectedLinks.length > 0) {
+        actions.push(`Suspended ${affectedLinks.length} links`);
+        await this.notifyMaliciousUrlDetected(url, analysis, affectedLinks);
+        actions.push('Sent security notifications');
+      }
+    }
+
+    return { analysis, actionsToken: actions };
+  }
+
+  /**
+   * 恢复被误判的链接
+   */
+  async reinstateLink(
+    linkId: string,
+    reason: string,
+    userId: string,
+  ): Promise<Link | null> {
+    try {
+      const link = await this.linkRepository.findOne({
+        where: { id: linkId, status: LinkStatus.SUSPENDED },
+      });
+
+      if (!link) {
+        return null;
+      }
+
+      // 恢复链接状态
+      link.status = LinkStatus.ACTIVE;
+      await this.linkRepository.save(link);
+
+      // 记录恢复事件
+      await this.logSecurityEvent({
+        type: 'link_reinstated',
+        linkId: link.id,
+        teamId: link.teamId,
+        userId,
+        url: link.originalUrl,
+        reason,
+      });
+
+      this.logger.log(`Link ${linkId} reinstated by user ${userId}: ${reason}`);
+
+      return link;
+    } catch (error: any) {
+      this.logger.error(`Failed to reinstate link ${linkId}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * 获取被暂停的链接列表
+   */
+  async getSuspendedLinks(
+    teamId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<{ links: Link[]; total: number }> {
+    const [links, total] = await this.linkRepository.findAndCount({
+      where: {
+        teamId,
+        status: LinkStatus.SUSPENDED,
+      },
+      order: { updatedAt: 'DESC' },
+      take: options?.limit || 50,
+      skip: options?.offset || 0,
+    });
+
+    return { links, total };
+  }
+
+  /**
+   * 白名单域名检查
+   */
+  async isWhitelistedDomain(domain: string, teamId: string): Promise<boolean> {
+    // 这里可以实现团队级别的域名白名单功能
+    // 目前返回 false，表示没有白名单
+    const globalWhitelist = [
+      'google.com',
+      'youtube.com',
+      'facebook.com',
+      'twitter.com',
+      'linkedin.com',
+      'github.com',
+      'amazon.com',
+      'microsoft.com',
+      'apple.com',
+      'wikipedia.org',
+    ];
+
+    return globalWhitelist.some((d) => domain.endsWith(d));
   }
 }

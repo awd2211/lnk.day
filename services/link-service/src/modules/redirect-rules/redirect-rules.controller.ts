@@ -20,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 
 import { RedirectRulesService, VisitorContext } from './redirect-rules.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreateRedirectRuleDto,
   UpdateRedirectRuleDto,

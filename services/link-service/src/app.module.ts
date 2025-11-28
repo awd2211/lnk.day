@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { RedisModule } from './common/redis/redis.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
+import { NotificationModule } from './common/notification/notification.module';
 import { LinkModule } from './modules/link/link.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { FolderModule } from './modules/folder/folder.module';
@@ -43,6 +44,7 @@ import { LinkTemplateModule } from './modules/link-template/link-template.module
         retryDelay: 3000,
       }),
     }),
+    NotificationModule,
     AuthModule,
     LinkModule,
     FolderModule,

@@ -233,7 +233,7 @@ export class ThirdPartyAnalyticsService {
         },
       );
 
-      const result = await response.json();
+      const result: any = await response.json();
       if (result.events_received) {
         this.logger.debug(`Facebook Conversions API: ${result.events_received} events sent`);
         return true;
@@ -241,7 +241,7 @@ export class ThirdPartyAnalyticsService {
 
       this.logger.error(`Facebook Conversions API error: ${JSON.stringify(result)}`);
       return false;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Facebook Conversions API failed: ${error.message}`);
       return false;
     }
@@ -288,7 +288,7 @@ export class ThirdPartyAnalyticsService {
         body: JSON.stringify({ data: [eventData] }),
       });
 
-      const result = await response.json();
+      const result: any = await response.json();
       if (result.code === 0) {
         this.logger.debug(`TikTok Events API: event sent successfully`);
         return true;
@@ -296,7 +296,7 @@ export class ThirdPartyAnalyticsService {
 
       this.logger.error(`TikTok Events API error: ${JSON.stringify(result)}`);
       return false;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`TikTok Events API failed: ${error.message}`);
       return false;
     }

@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 
 import { SavedSearchService } from './saved-search.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
   CreateSavedSearchDto,
   UpdateSavedSearchDto,
@@ -167,5 +167,26 @@ export class SavedSearchController {
     @Query('visibility') visibility: SavedSearchVisibility,
   ): Promise<SavedSearch> {
     return this.savedSearchService.share(id, userId, teamId || userId, visibility);
+  }
+
+  @Post(':id/test-notification')
+  @ApiOperation({ summary: '测试通知配置' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        errors: { type: 'array', items: { type: 'string' } },
+      },
+    },
+  })
+  async testNotification(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-team-id') teamId: string,
+  ): Promise<{ success: boolean; errors: string[] }> {
+    return this.savedSearchService.testNotification(id, userId, teamId || userId);
   }
 }
