@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Kafka
     KAFKA_BROKERS: str = "localhost:60033"
 
+    # RabbitMQ
+    RABBITMQ_URL: str = "amqp://rabbit:rabbit123@localhost:60036"
+
     # Celery
     CELERY_BROKER_URL: str = "redis://localhost:60031/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:60031/0"

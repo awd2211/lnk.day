@@ -10,23 +10,33 @@ from app.cohorts import router as cohorts
 from app.core.config import settings
 from app.services.realtime_service import realtime_service
 from app.services.kafka_consumer import KafkaClickConsumer
+from app.services.rabbitmq_consumer import get_rabbitmq_consumer, RabbitMQConsumer
 from app.services.scheduler_runner import scheduler_runner
 from app.services.task_scheduler import task_scheduler, register_all_tasks
 
 logger = logging.getLogger(__name__)
 
-# Global Kafka consumer instance
+# Global consumer instances
 kafka_consumer: KafkaClickConsumer | None = None
+rabbitmq_consumer: RabbitMQConsumer | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global kafka_consumer
+    global kafka_consumer, rabbitmq_consumer
 
     # Startup
     await realtime_service.connect()
 
-    # Start Kafka Consumer in background
+    # Start RabbitMQ Consumer in background (primary)
+    try:
+        rabbitmq_consumer = get_rabbitmq_consumer()
+        asyncio.create_task(rabbitmq_consumer.start())
+        logger.info("RabbitMQ consumer started in background")
+    except Exception as e:
+        logger.error(f"Failed to start RabbitMQ consumer: {e}")
+
+    # Start Kafka Consumer in background (secondary/fallback)
     try:
         kafka_consumer = KafkaClickConsumer()
         asyncio.create_task(kafka_consumer.start())
@@ -53,6 +63,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await realtime_service.close()
+    if rabbitmq_consumer:
+        await rabbitmq_consumer.stop()
+        logger.info("RabbitMQ consumer stopped")
     if kafka_consumer:
         await kafka_consumer.stop()
         logger.info("Kafka consumer stopped")
@@ -84,8 +97,8 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
-app.include_router(funnels.router, prefix="/api/funnels", tags=["funnels"])
-app.include_router(cohorts.router, prefix="/api/cohorts", tags=["cohorts"])
+app.include_router(funnels, prefix="/api/funnels", tags=["funnels"])
+app.include_router(cohorts, prefix="/api/cohorts", tags=["cohorts"])
 
 
 @app.get("/health")
