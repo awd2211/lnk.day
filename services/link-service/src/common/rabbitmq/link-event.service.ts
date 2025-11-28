@@ -1,24 +1,36 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as amqplib from 'amqplib';
+import { v4 as uuidv4 } from 'uuid';
 import { RABBITMQ_CHANNEL, LINK_EVENTS_EXCHANGE } from './rabbitmq.constants';
+import {
+  LinkCreatedEvent,
+  LinkUpdatedEvent,
+  LinkDeletedEvent,
+  ROUTING_KEYS,
+} from '@lnk/shared-types';
 
-export enum LinkEventType {
-  CREATED = 'link.created',
-  UPDATED = 'link.updated',
-  DELETED = 'link.deleted',
-}
-
-export interface LinkEvent {
-  type: LinkEventType;
+export interface LinkCreatedData {
   linkId: string;
   shortCode: string;
-  timestamp: string;
-  data?: Record<string, any>;
+  originalUrl: string;
+  userId: string;
+  teamId?: string;
+  campaignId?: string;
+  tags?: string[];
+  customDomain?: string;
+}
+
+export interface LinkUpdatedData {
+  linkId: string;
+  shortCode: string;
+  changes: Record<string, { old: any; new: any }>;
+  userId: string;
 }
 
 @Injectable()
 export class LinkEventService {
   private readonly logger = new Logger(LinkEventService.name);
+  private readonly serviceName = 'link-service';
 
   constructor(
     @Inject(RABBITMQ_CHANNEL)
@@ -29,54 +41,58 @@ export class LinkEventService {
     }
   }
 
-  async publishLinkCreated(linkId: string, shortCode: string, data?: Record<string, any>): Promise<void> {
-    await this.publish({
-      type: LinkEventType.CREATED,
-      linkId,
-      shortCode,
+  async publishLinkCreated(data: LinkCreatedData): Promise<void> {
+    const event: LinkCreatedEvent = {
+      id: uuidv4(),
+      type: 'link.created',
       timestamp: new Date().toISOString(),
+      source: this.serviceName,
       data,
-    });
+    };
+    await this.publish(event, ROUTING_KEYS.LINK_CREATED);
   }
 
-  async publishLinkUpdated(linkId: string, shortCode: string, data?: Record<string, any>): Promise<void> {
-    await this.publish({
-      type: LinkEventType.UPDATED,
-      linkId,
-      shortCode,
+  async publishLinkUpdated(data: LinkUpdatedData): Promise<void> {
+    const event: LinkUpdatedEvent = {
+      id: uuidv4(),
+      type: 'link.updated',
       timestamp: new Date().toISOString(),
+      source: this.serviceName,
       data,
-    });
+    };
+    await this.publish(event, ROUTING_KEYS.LINK_UPDATED);
   }
 
-  async publishLinkDeleted(linkId: string, shortCode: string): Promise<void> {
-    await this.publish({
-      type: LinkEventType.DELETED,
-      linkId,
-      shortCode,
+  async publishLinkDeleted(linkId: string, shortCode: string, userId: string): Promise<void> {
+    const event: LinkDeletedEvent = {
+      id: uuidv4(),
+      type: 'link.deleted',
       timestamp: new Date().toISOString(),
-    });
+      source: this.serviceName,
+      data: { linkId, shortCode, userId },
+    };
+    await this.publish(event, ROUTING_KEYS.LINK_DELETED);
   }
 
-  private async publish(event: LinkEvent): Promise<void> {
+  private async publish(event: LinkCreatedEvent | LinkUpdatedEvent | LinkDeletedEvent, routingKey: string): Promise<void> {
     if (!this.channel) {
-      this.logger.debug(`Skipping event publish (no channel): ${event.type} for link ${event.shortCode}`);
+      this.logger.debug(`Skipping event publish (no channel): ${event.type}`);
       return;
     }
 
     try {
       const message = Buffer.from(JSON.stringify(event));
-      const routingKey = event.type;
 
       this.channel.publish(LINK_EVENTS_EXCHANGE, routingKey, message, {
         persistent: true,
         contentType: 'application/json',
+        messageId: event.id,
+        timestamp: Date.now(),
       });
 
-      this.logger.debug(`Published event: ${event.type} for link ${event.shortCode}`);
+      this.logger.debug(`Published event: ${event.type} [${event.id}]`);
     } catch (error: any) {
       this.logger.error(`Failed to publish event: ${error.message}`);
-      // Don't throw - we don't want to fail the main operation if messaging fails
     }
   }
 }
