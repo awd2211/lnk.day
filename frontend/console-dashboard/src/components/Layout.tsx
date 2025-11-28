@@ -4,11 +4,16 @@ import {
   Users,
   Building2,
   Link2,
+  Megaphone,
   BarChart3,
   Settings,
   LogOut,
   Server,
   Shield,
+  CreditCard,
+  FileText,
+  Bell,
+  ShieldAlert,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -19,7 +24,12 @@ const navigation = [
   { name: '用户管理', href: '/users', icon: Users },
   { name: '团队管理', href: '/teams', icon: Building2 },
   { name: '链接管理', href: '/links', icon: Link2 },
+  { name: '活动管理', href: '/campaigns', icon: Megaphone },
+  { name: '内容审核', href: '/moderation', icon: ShieldAlert },
   { name: '数据分析', href: '/analytics', icon: BarChart3 },
+  { name: '订阅管理', href: '/subscriptions', icon: CreditCard },
+  { name: '审计日志', href: '/audit-logs', icon: FileText },
+  { name: '告警管理', href: '/alerts', icon: Bell },
   { name: '系统监控', href: '/system', icon: Server },
   { name: '系统设置', href: '/settings', icon: Settings },
 ];
