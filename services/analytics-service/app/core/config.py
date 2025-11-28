@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,22 @@ class Settings(BaseSettings):
     # Celery
     CELERY_BROKER_URL: str = "redis://localhost:60031/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:60031/0"
+
+    # Security APIs
+    GOOGLE_SAFE_BROWSING_API_KEY: Optional[str] = None
+    VIRUSTOTAL_API_KEY: Optional[str] = None
+
+    # Data Retention
+    DATA_RETENTION_DAYS: int = 365
+    TEMP_FILE_RETENTION_HOURS: int = 24
+
+    # Task Scheduler
+    SCHEDULER_ENABLED: bool = True
+    SCHEDULER_TIMEZONE: str = "UTC"
+
+    # External Services
+    LINK_SERVICE_URL: str = "http://localhost:60003"
+    NOTIFICATION_SERVICE_URL: str = "http://localhost:60020"
 
     class Config:
         env_file = ".env"
