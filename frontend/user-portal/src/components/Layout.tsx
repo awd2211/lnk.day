@@ -88,6 +88,18 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* User Menu */}
           <div className="hidden items-center gap-4 md:flex">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-48 justify-start text-muted-foreground"
+              onClick={() => setCommandPaletteOpen(true)}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              <span>搜索...</span>
+              <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Button>
             <span className="text-sm text-gray-600">{user?.name || user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
@@ -142,6 +154,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">{children}</main>
+
+      {/* Command Palette */}
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </div>
   );
 }
