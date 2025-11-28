@@ -5,6 +5,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailModule } from './modules/email/email.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
+import { SlackModule } from './modules/slack/slack.module';
+import { TeamsModule } from './modules/teams/teams.module';
+import { SmsModule } from './modules/sms/sms.module';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
     EmailModule,
     WebhookModule,
     WebsocketModule,
+    SlackModule,
+    TeamsModule,
+    SmsModule,
   ],
 })
 export class AppModule {}

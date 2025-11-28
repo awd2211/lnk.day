@@ -8,17 +8,53 @@ import {
 } from 'typeorm';
 
 export enum WebhookEventType {
+  // Link events
   LINK_CREATED = 'link.created',
   LINK_UPDATED = 'link.updated',
   LINK_DELETED = 'link.deleted',
   LINK_CLICKED = 'link.clicked',
   LINK_MILESTONE = 'link.milestone',
+  LINK_EXPIRED = 'link.expired',
+
+  // QR events
+  QR_CREATED = 'qr.created',
+  QR_SCANNED = 'qr.scanned',
+  QR_UPDATED = 'qr.updated',
+  QR_DELETED = 'qr.deleted',
+
+  // Page events
+  PAGE_CREATED = 'page.created',
   PAGE_PUBLISHED = 'page.published',
   PAGE_UNPUBLISHED = 'page.unpublished',
+  PAGE_DELETED = 'page.deleted',
+
+  // Campaign events
+  CAMPAIGN_CREATED = 'campaign.created',
   CAMPAIGN_STARTED = 'campaign.started',
   CAMPAIGN_ENDED = 'campaign.ended',
+  CAMPAIGN_GOAL_REACHED = 'campaign.goal_reached',
+
+  // Team events
   TEAM_MEMBER_ADDED = 'team.member_added',
   TEAM_MEMBER_REMOVED = 'team.member_removed',
+  TEAM_ROLE_CHANGED = 'team.role_changed',
+
+  // Analytics events
+  ANALYTICS_THRESHOLD = 'analytics.threshold',
+  ANALYTICS_ANOMALY = 'analytics.anomaly',
+}
+
+// Webhook filter configuration
+export interface WebhookFilters {
+  tags?: string[];           // Filter by link tags
+  linkIds?: string[];        // Filter by specific links
+  campaignIds?: string[];    // Filter by campaigns
+  domains?: string[];        // Filter by domains
+  threshold?: {              // Threshold conditions
+    metric: 'clicks' | 'conversions' | 'revenue';
+    operator: 'gt' | 'gte' | 'lt' | 'lte' | 'eq';
+    value: number;
+  };
 }
 
 export enum WebhookStatus {
@@ -84,6 +120,9 @@ export class WebhookEndpoint {
 
   @Column('jsonb', { nullable: true })
   headers: Record<string, string>;
+
+  @Column('jsonb', { nullable: true })
+  filters: WebhookFilters;
 
   @CreateDateColumn()
   createdAt: Date;

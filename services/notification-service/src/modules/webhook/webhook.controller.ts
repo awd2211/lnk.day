@@ -135,17 +135,40 @@ export class WebhookController {
 
   private getEventDescription(event: WebhookEventType): string {
     const descriptions: Record<WebhookEventType, string> = {
+      // Link events
       [WebhookEventType.LINK_CREATED]: '链接创建时触发',
       [WebhookEventType.LINK_UPDATED]: '链接更新时触发',
       [WebhookEventType.LINK_DELETED]: '链接删除时触发',
       [WebhookEventType.LINK_CLICKED]: '链接被点击时触发',
-      [WebhookEventType.LINK_MILESTONE]: '链接达到点击里程碑时触发',
+      [WebhookEventType.LINK_MILESTONE]: '链接达到点击里程碑时触发（如100/1000/10000次点击）',
+      [WebhookEventType.LINK_EXPIRED]: '链接过期时触发',
+
+      // QR events
+      [WebhookEventType.QR_CREATED]: '二维码创建时触发',
+      [WebhookEventType.QR_SCANNED]: '二维码被扫描时触发',
+      [WebhookEventType.QR_UPDATED]: '二维码更新时触发',
+      [WebhookEventType.QR_DELETED]: '二维码删除时触发',
+
+      // Page events
+      [WebhookEventType.PAGE_CREATED]: '落地页创建时触发',
       [WebhookEventType.PAGE_PUBLISHED]: '落地页发布时触发',
       [WebhookEventType.PAGE_UNPUBLISHED]: '落地页取消发布时触发',
+      [WebhookEventType.PAGE_DELETED]: '落地页删除时触发',
+
+      // Campaign events
+      [WebhookEventType.CAMPAIGN_CREATED]: '营销活动创建时触发',
       [WebhookEventType.CAMPAIGN_STARTED]: '营销活动开始时触发',
       [WebhookEventType.CAMPAIGN_ENDED]: '营销活动结束时触发',
+      [WebhookEventType.CAMPAIGN_GOAL_REACHED]: '营销活动达到目标时触发',
+
+      // Team events
       [WebhookEventType.TEAM_MEMBER_ADDED]: '团队成员添加时触发',
       [WebhookEventType.TEAM_MEMBER_REMOVED]: '团队成员移除时触发',
+      [WebhookEventType.TEAM_ROLE_CHANGED]: '团队成员角色变更时触发',
+
+      // Analytics events
+      [WebhookEventType.ANALYTICS_THRESHOLD]: '达到自定义阈值时触发（如点击数超过1000）',
+      [WebhookEventType.ANALYTICS_ANOMALY]: '检测到数据异常时触发（如流量突然激增）',
     };
     return descriptions[event] || event;
   }
