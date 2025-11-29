@@ -48,13 +48,24 @@ export class SystemService {
     this.featureFlags.set('maintenanceMode', false);
 
     this.services = [
+      // 网关服务
+      { name: 'api-gateway', url: this.configService.get('API_GATEWAY_URL', 'http://localhost:60000'), port: 60000 },
+      // 数据服务
+      { name: 'datastream-service', url: this.configService.get('DATASTREAM_SERVICE_URL', 'http://localhost:60001'), port: 60001 },
+      // 核心业务服务
       { name: 'user-service', url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'), port: 60002 },
       { name: 'link-service', url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'), port: 60003 },
       { name: 'campaign-service', url: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'), port: 60004 },
       { name: 'qr-service', url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'), port: 60005 },
       { name: 'page-service', url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'), port: 60007 },
       { name: 'deeplink-service', url: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'), port: 60008 },
+      { name: 'domain-service', url: this.configService.get('DOMAIN_SERVICE_URL', 'http://localhost:60014'), port: 60014 },
+      // 集成服务
+      { name: 'integration-service', url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'), port: 60016 },
+      { name: 'webhook-service', url: this.configService.get('WEBHOOK_SERVICE_URL', 'http://localhost:60017'), port: 60017 },
+      // 通知服务
       { name: 'notification-service', url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'), port: 60020 },
+      // 分析与重定向服务
       { name: 'analytics-service', url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'), port: 60050 },
       { name: 'redirect-service', url: this.configService.get('REDIRECT_SERVICE_URL', 'http://localhost:60080'), port: 60080 },
     ];
@@ -100,10 +111,13 @@ export class SystemService {
       this.services.map(async (service) => {
         const start = Date.now();
         try {
-          // analytics-service 和 redirect-service 使用 /health，其他 NestJS 服务使用 /api/v1/health
-          const healthPath = ['analytics-service', 'redirect-service'].includes(service.name)
-            ? '/health'
-            : '/api/v1/health';
+          // 根据不同服务确定健康检查路径
+          let healthPath = '/api/v1/health'; // 默认 NestJS 服务
+          if (['analytics-service', 'redirect-service', 'datastream-service'].includes(service.name)) {
+            healthPath = '/health'; // Python/Go 服务
+          } else if (service.name === 'api-gateway') {
+            healthPath = '/v1/health'; // api-gateway 使用不同的版本前缀
+          }
           const response = await this.httpClient.get(`${service.url}${healthPath}`, {
             timeout: 3000,
           });

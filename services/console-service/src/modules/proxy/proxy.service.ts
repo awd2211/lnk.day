@@ -68,6 +68,16 @@ export class ProxyService {
     } catch (error: any) {
       this.logger.error(`Proxy error to ${service}: ${error.message}`, error.stack);
 
+      // Return empty data for 404 errors (endpoint not implemented yet)
+      if (error.response?.status === 404) {
+        this.logger.warn(`Endpoint not implemented: ${service}${path}`);
+        // Return appropriate empty response based on path patterns
+        if (path.includes('/stats') || path.includes('/usage') || path.includes('/revenue')) {
+          return { total: 0, data: [], stats: {} };
+        }
+        return { data: [], items: [], total: 0, page: 1, limit: 20, totalPages: 0 };
+      }
+
       if (error.response) {
         throw new HttpException(error.response.data, error.response.status);
       }
@@ -243,7 +253,13 @@ export class ProxyService {
   }
 
   // Subscription Management
-  async getSubscriptions(params?: { page?: number; limit?: number; status?: string; plan?: string }, auth?: string): Promise<any> {
+  async getSubscriptionStats(auth?: string): Promise<any> {
+    return this.forward('user', '/subscriptions/stats', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSubscriptions(params?: { page?: number; limit?: number; status?: string; plan?: string; search?: string }, auth?: string): Promise<any> {
     return this.forward('user', '/subscriptions', {
       params,
       headers: auth ? { Authorization: auth } : {},
@@ -256,15 +272,15 @@ export class ProxyService {
     });
   }
 
-  async updateSubscription(id: string, data: { status?: string; plan?: string }, auth?: string): Promise<any> {
-    return this.forward('user', `/subscriptions/${id}`, {
+  async changeSubscriptionPlan(id: string, data: { plan: string; billingCycle?: string }, auth?: string): Promise<any> {
+    return this.forward('user', `/subscriptions/${id}/plan`, {
       method: 'PATCH',
       data,
       headers: auth ? { Authorization: auth } : {},
     });
   }
 
-  async cancelSubscription(id: string, data?: { reason?: string; immediate?: boolean }, auth?: string): Promise<any> {
+  async cancelSubscription(id: string, data?: { immediately?: boolean; reason?: string }, auth?: string): Promise<any> {
     return this.forward('user', `/subscriptions/${id}/cancel`, {
       method: 'POST',
       data,
@@ -272,23 +288,140 @@ export class ProxyService {
     });
   }
 
+  async reactivateSubscription(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/subscriptions/${id}/reactivate`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async extendSubscriptionTrial(id: string, data: { days: number }, auth?: string): Promise<any> {
+    return this.forward('user', `/subscriptions/${id}/extend-trial`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSubscriptionInvoices(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/subscriptions/${id}/invoices`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async refundSubscriptionInvoice(subscriptionId: string, invoiceId: string, data?: { amount?: number; reason?: string }, auth?: string): Promise<any> {
+    return this.forward('user', `/subscriptions/${subscriptionId}/invoices/${invoiceId}/refund`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
   // Content Moderation
-  async getModerationReports(params?: { page?: number; limit?: number; status?: string; type?: string }, auth?: string): Promise<any> {
-    return this.forward('link', '/moderation/reports', {
+  async getModerationStats(auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/stats', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getFlaggedLinks(params?: { page?: number; limit?: number; status?: string; reason?: string; severity?: string; search?: string }, auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/flagged-links', {
       params,
       headers: auth ? { Authorization: auth } : {},
     });
   }
 
-  async getModerationReport(id: string, auth?: string): Promise<any> {
-    return this.forward('link', `/moderation/reports/${id}`, {
+  async getFlaggedLink(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/flagged-links/${id}`, {
       headers: auth ? { Authorization: auth } : {},
     });
   }
 
-  async resolveModerationReport(id: string, data: { action: string; reason?: string }, auth?: string): Promise<any> {
-    return this.forward('link', `/moderation/reports/${id}/resolve`, {
+  async getLinkReports(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/flagged-links/${id}/reports`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async approveFlaggedLink(id: string, data?: { note?: string }, userId?: string, userName?: string, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/flagged-links/${id}/approve`, {
       method: 'POST',
+      data,
+      headers: {
+        ...(auth ? { Authorization: auth } : {}),
+        ...(userId ? { 'x-user-id': userId } : {}),
+        ...(userName ? { 'x-user-name': userName } : {}),
+      },
+    });
+  }
+
+  async blockFlaggedLink(id: string, data?: { note?: string; blockUser?: boolean }, userId?: string, userName?: string, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/flagged-links/${id}/block`, {
+      method: 'POST',
+      data,
+      headers: {
+        ...(auth ? { Authorization: auth } : {}),
+        ...(userId ? { 'x-user-id': userId } : {}),
+        ...(userName ? { 'x-user-name': userName } : {}),
+      },
+    });
+  }
+
+  async bulkApproveFlaggedLinks(data: { ids: string[]; note?: string }, userId?: string, userName?: string, auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/flagged-links/bulk-approve', {
+      method: 'POST',
+      data,
+      headers: {
+        ...(auth ? { Authorization: auth } : {}),
+        ...(userId ? { 'x-user-id': userId } : {}),
+        ...(userName ? { 'x-user-name': userName } : {}),
+      },
+    });
+  }
+
+  async bulkBlockFlaggedLinks(data: { ids: string[]; note?: string; blockUsers?: boolean }, userId?: string, userName?: string, auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/flagged-links/bulk-block', {
+      method: 'POST',
+      data,
+      headers: {
+        ...(auth ? { Authorization: auth } : {}),
+        ...(userId ? { 'x-user-id': userId } : {}),
+        ...(userName ? { 'x-user-name': userName } : {}),
+      },
+    });
+  }
+
+  async getBlockedUsers(params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/blocked-users', {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async blockModerationUser(userId: string, data?: { reason?: string }, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/users/${userId}/block`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async unblockModerationUser(userId: string, auth?: string): Promise<any> {
+    return this.forward('link', `/moderation/users/${userId}/unblock`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getModerationSettings(auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/settings', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateModerationSettings(data: any, auth?: string): Promise<any> {
+    return this.forward('link', '/moderation/settings', {
+      method: 'PUT',
       data,
       headers: auth ? { Authorization: auth } : {},
     });
@@ -309,22 +442,22 @@ export class ProxyService {
     });
   }
 
-  // QR Code Service Proxies
+  // QR Code Service Proxies (uses /qr-records endpoint from tracking controller)
   async getQRCodes(teamId: string, params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
-    return this.forward('qr', '/qrcodes', {
+    return this.forward('qr', '/qr-records', {
       params,
       headers: { 'x-team-id': teamId, ...(auth ? { Authorization: auth } : {}) },
     });
   }
 
   async getQRCode(id: string, auth?: string): Promise<any> {
-    return this.forward('qr', `/qrcodes/${id}`, {
+    return this.forward('qr', `/qr-records/${id}`, {
       headers: auth ? { Authorization: auth } : {},
     });
   }
 
   async deleteQRCode(id: string, auth?: string): Promise<any> {
-    return this.forward('qr', `/qrcodes/${id}`, {
+    return this.forward('qr', `/qr-records/${id}`, {
       method: 'DELETE',
       headers: auth ? { Authorization: auth } : {},
     });

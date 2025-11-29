@@ -35,6 +35,12 @@ export class Admin {
   @Column({ nullable: true })
   lastLoginAt?: Date;
 
+  @Column({ nullable: true })
+  passwordResetToken?: string;
+
+  @Column({ nullable: true })
+  passwordResetExpires?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

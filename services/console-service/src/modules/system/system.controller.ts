@@ -2,13 +2,17 @@ import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards } fro
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SystemService } from './system.service';
+import { SystemConfigService, EmailSettings } from './config.service';
 
 @ApiTags('system')
 @Controller('system')
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
 export class SystemController {
-  constructor(private readonly systemService: SystemService) {}
+  constructor(
+    private readonly systemService: SystemService,
+    private readonly configService: SystemConfigService,
+  ) {}
 
   @Get('info')
   @ApiOperation({ summary: '获取系统信息' })
@@ -129,5 +133,32 @@ export class SystemController {
   @ApiOperation({ summary: '全系统健康检查' })
   healthCheckAll() {
     return this.systemService.healthCheckAll();
+  }
+
+  // Email Configuration
+  @Get('email-settings')
+  @ApiOperation({ summary: '获取邮件配置' })
+  getEmailSettings() {
+    return this.configService.getEmailSettings();
+  }
+
+  @Put('email-settings')
+  @ApiOperation({ summary: '更新邮件配置' })
+  updateEmailSettings(@Body() settings: Partial<EmailSettings>) {
+    return this.configService.updateEmailSettings(settings);
+  }
+
+  @Post('test-email')
+  @ApiOperation({ summary: '发送测试邮件' })
+  testEmail(@Body() data: { to: string }) {
+    return this.configService.testEmailSettings(data.to);
+  }
+
+  // Internal endpoint for notification-service (no auth required for internal calls)
+  @Get('email-settings-internal')
+  @ApiOperation({ summary: '获取邮件配置（内部）' })
+  async getEmailSettingsInternal() {
+    // Return unmasked settings for internal service use
+    return this.configService.getEmailSettingsInternal();
   }
 }

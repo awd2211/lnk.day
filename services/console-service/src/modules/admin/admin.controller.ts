@@ -10,8 +10,20 @@ export class AdminController {
 
   @Post('login')
   @ApiOperation({ summary: '管理员登录' })
-  login(@Body() body: { email: string; password: string }) {
-    return this.adminService.login(body.email, body.password);
+  login(@Body() body: { email: string; password: string; rememberMe?: boolean }) {
+    return this.adminService.login(body.email, body.password, body.rememberMe);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: '忘记密码' })
+  forgotPassword(@Body() body: { email: string }) {
+    return this.adminService.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: '重置密码' })
+  resetPassword(@Body() body: { token: string; password: string }) {
+    return this.adminService.resetPassword(body.token, body.password);
   }
 
   @Get()

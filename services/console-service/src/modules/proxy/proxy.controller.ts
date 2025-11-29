@@ -232,20 +232,28 @@ export class ProxyController {
   }
 
   // Subscription Management
+  @Get('subscriptions/stats')
+  @ApiOperation({ summary: '获取订阅统计' })
+  getSubscriptionStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getSubscriptionStats(auth);
+  }
+
   @Get('subscriptions')
   @ApiOperation({ summary: '获取订阅列表' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'plan', required: false })
+  @ApiQuery({ name: 'search', required: false })
   getSubscriptions(
     @Headers('authorization') auth: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,
     @Query('plan') plan?: string,
+    @Query('search') search?: string,
   ) {
-    return this.proxyService.getSubscriptions({ page, limit, status, plan }, auth);
+    return this.proxyService.getSubscriptions({ page, limit, status, plan, search }, auth);
   }
 
   @Get('subscriptions/:id')
@@ -254,49 +262,182 @@ export class ProxyController {
     return this.proxyService.getSubscription(id, auth);
   }
 
-  @Patch('subscriptions/:id')
-  @ApiOperation({ summary: '更新订阅状态' })
-  updateSubscription(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { status?: string; plan?: string }) {
-    return this.proxyService.updateSubscription(id, data, auth);
+  @Patch('subscriptions/:id/plan')
+  @ApiOperation({ summary: '更改订阅计划' })
+  changeSubscriptionPlan(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { plan: string; billingCycle?: 'monthly' | 'annual' },
+  ) {
+    return this.proxyService.changeSubscriptionPlan(id, data, auth);
   }
 
   @Post('subscriptions/:id/cancel')
   @ApiOperation({ summary: '取消订阅' })
-  cancelSubscription(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data?: { reason?: string; immediate?: boolean }) {
+  cancelSubscription(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data?: { immediately?: boolean; reason?: string },
+  ) {
     return this.proxyService.cancelSubscription(id, data, auth);
   }
 
+  @Post('subscriptions/:id/reactivate')
+  @ApiOperation({ summary: '重新激活订阅' })
+  reactivateSubscription(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.reactivateSubscription(id, auth);
+  }
+
+  @Post('subscriptions/:id/extend-trial')
+  @ApiOperation({ summary: '延长试用期' })
+  extendSubscriptionTrial(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { days: number },
+  ) {
+    return this.proxyService.extendSubscriptionTrial(id, data, auth);
+  }
+
+  @Get('subscriptions/:id/invoices')
+  @ApiOperation({ summary: '获取订阅发票列表' })
+  getSubscriptionInvoices(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getSubscriptionInvoices(id, auth);
+  }
+
+  @Post('subscriptions/:id/invoices/:invoiceId/refund')
+  @ApiOperation({ summary: '退款发票' })
+  refundSubscriptionInvoice(
+    @Headers('authorization') auth: string,
+    @Param('id') subscriptionId: string,
+    @Param('invoiceId') invoiceId: string,
+    @Body() data?: { amount?: number; reason?: string },
+  ) {
+    return this.proxyService.refundSubscriptionInvoice(subscriptionId, invoiceId, data, auth);
+  }
+
   // Content Moderation
-  @Get('moderation/reports')
-  @ApiOperation({ summary: '获取举报列表' })
+  @Get('moderation/stats')
+  @ApiOperation({ summary: '获取审核统计' })
+  getModerationStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getModerationStats(auth);
+  }
+
+  @Get('moderation/flagged-links')
+  @ApiOperation({ summary: '获取标记链接列表' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'type', required: false })
-  getModerationReports(
+  @ApiQuery({ name: 'reason', required: false })
+  @ApiQuery({ name: 'severity', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getFlaggedLinks(
     @Headers('authorization') auth: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,
-    @Query('type') type?: string,
+    @Query('reason') reason?: string,
+    @Query('severity') severity?: string,
+    @Query('search') search?: string,
   ) {
-    return this.proxyService.getModerationReports({ page, limit, status, type }, auth);
+    return this.proxyService.getFlaggedLinks({ page, limit, status, reason, severity, search }, auth);
   }
 
-  @Get('moderation/reports/:id')
-  @ApiOperation({ summary: '获取举报详情' })
-  getModerationReport(@Headers('authorization') auth: string, @Param('id') id: string) {
-    return this.proxyService.getModerationReport(id, auth);
+  @Get('moderation/flagged-links/:id')
+  @ApiOperation({ summary: '获取标记链接详情' })
+  getFlaggedLink(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getFlaggedLink(id, auth);
   }
 
-  @Post('moderation/reports/:id/resolve')
-  @ApiOperation({ summary: '处理举报' })
-  resolveModerationReport(
+  @Get('moderation/flagged-links/:id/reports')
+  @ApiOperation({ summary: '获取链接举报记录' })
+  getLinkReports(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getLinkReports(id, auth);
+  }
+
+  @Post('moderation/flagged-links/:id/approve')
+  @ApiOperation({ summary: '通过审核' })
+  approveFlaggedLink(
     @Headers('authorization') auth: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-name') userName: string,
     @Param('id') id: string,
-    @Body() data: { action: 'approve' | 'reject' | 'remove_content' | 'ban_user'; reason?: string },
+    @Body() data?: { note?: string },
   ) {
-    return this.proxyService.resolveModerationReport(id, data, auth);
+    return this.proxyService.approveFlaggedLink(id, data, userId, userName, auth);
+  }
+
+  @Post('moderation/flagged-links/:id/block')
+  @ApiOperation({ summary: '封禁链接' })
+  blockFlaggedLink(
+    @Headers('authorization') auth: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-name') userName: string,
+    @Param('id') id: string,
+    @Body() data?: { note?: string; blockUser?: boolean },
+  ) {
+    return this.proxyService.blockFlaggedLink(id, data, userId, userName, auth);
+  }
+
+  @Post('moderation/flagged-links/bulk-approve')
+  @ApiOperation({ summary: '批量通过审核' })
+  bulkApproveFlaggedLinks(
+    @Headers('authorization') auth: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-name') userName: string,
+    @Body() data: { ids: string[]; note?: string },
+  ) {
+    return this.proxyService.bulkApproveFlaggedLinks(data, userId, userName, auth);
+  }
+
+  @Post('moderation/flagged-links/bulk-block')
+  @ApiOperation({ summary: '批量封禁链接' })
+  bulkBlockFlaggedLinks(
+    @Headers('authorization') auth: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-name') userName: string,
+    @Body() data: { ids: string[]; note?: string; blockUsers?: boolean },
+  ) {
+    return this.proxyService.bulkBlockFlaggedLinks(data, userId, userName, auth);
+  }
+
+  @Get('moderation/blocked-users')
+  @ApiOperation({ summary: '获取被封禁用户列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getBlockedUsers(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.proxyService.getBlockedUsers({ page, limit }, auth);
+  }
+
+  @Post('moderation/users/:userId/block')
+  @ApiOperation({ summary: '封禁用户' })
+  blockModerationUser(
+    @Headers('authorization') auth: string,
+    @Param('userId') userId: string,
+    @Body() data?: { reason?: string },
+  ) {
+    return this.proxyService.blockModerationUser(userId, data, auth);
+  }
+
+  @Post('moderation/users/:userId/unblock')
+  @ApiOperation({ summary: '解封用户' })
+  unblockModerationUser(@Headers('authorization') auth: string, @Param('userId') userId: string) {
+    return this.proxyService.unblockModerationUser(userId, auth);
+  }
+
+  @Get('moderation/settings')
+  @ApiOperation({ summary: '获取审核设置' })
+  getModerationSettings(@Headers('authorization') auth: string) {
+    return this.proxyService.getModerationSettings(auth);
+  }
+
+  @Put('moderation/settings')
+  @ApiOperation({ summary: '更新审核设置' })
+  updateModerationSettings(@Headers('authorization') auth: string, @Body() data: any) {
+    return this.proxyService.updateModerationSettings(data, auth);
   }
 
   @Post('links/:id/flag')

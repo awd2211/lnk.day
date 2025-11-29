@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { VersionModule } from '@lnk/nestjs-common';
 import { AdminModule } from './modules/admin/admin.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SystemModule } from './modules/system/system.module';
@@ -28,6 +29,7 @@ import { AlertsModule } from './modules/alerts/alerts.module';
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    VersionModule,
     AdminModule,
     DashboardModule,
     SystemModule,
