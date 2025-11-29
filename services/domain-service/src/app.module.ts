@@ -8,6 +8,9 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { DomainModule } from './modules/domain/domain.module';
 import { HealthModule } from './modules/health/health.module';
@@ -25,6 +28,9 @@ import { HealthModule } from './modules/health/health.module';
     }),
     CircuitBreakerModule,
     VersionModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

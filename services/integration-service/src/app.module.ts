@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule, VersionModule } from '@lnk/nestjs-common';
+import { MetricsModule, MetricsInterceptor, TracingModule, VersionModule, CircuitBreakerModule, TimeoutModule, LoggerModule, AuthModule } from '@lnk/nestjs-common';
 
 import { ZapierModule } from './modules/zapier/zapier.module';
 import { HubSpotModule } from './modules/hubspot/hubspot.module';
@@ -23,6 +23,10 @@ import { HealthModule } from './modules/health/health.module';
       serviceName: 'integration-service',
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
+    CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

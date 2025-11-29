@@ -8,6 +8,9 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { PageModule } from './modules/page/page.module';
 import { TemplateModule } from './modules/template/template.module';
@@ -25,6 +28,9 @@ import { HealthModule } from './modules/health/health.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

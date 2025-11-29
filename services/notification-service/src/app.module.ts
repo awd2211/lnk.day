@@ -9,6 +9,8 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { EmailModule } from './modules/email/email.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
@@ -30,6 +32,8 @@ import { NotificationConfigModule } from './modules/config/config.module';
     }),
     CircuitBreakerModule,
     VersionModule,
+    TimeoutModule,
+    LoggerModule,
     RabbitMQModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],

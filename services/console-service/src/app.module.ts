@@ -1,7 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { VersionModule } from '@lnk/nestjs-common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import {
+  VersionModule,
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  CircuitBreakerModule,
+  TimeoutModule,
+  LoggerModule,
+  AuthModule,
+} from '@lnk/nestjs-common';
 import { AdminModule } from './modules/admin/admin.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SystemModule } from './modules/system/system.module';
@@ -13,6 +23,15 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MetricsModule.forRoot({ serviceName: 'console-service' }),
+    TracingModule.forRoot({
+      serviceName: 'console-service',
+      jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    }),
+    CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -37,6 +56,12 @@ import { AlertsModule } from './modules/alerts/alerts.module';
     HealthModule,
     AuditModule,
     AlertsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
   ],
 })
 export class AppModule {}

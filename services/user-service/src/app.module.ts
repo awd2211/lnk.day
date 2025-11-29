@@ -10,6 +10,8 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  TimeoutModule,
+  LoggerModule,
   serviceConfigPresets,
 } from '@lnk/nestjs-common';
 
@@ -53,6 +55,8 @@ import { HealthModule } from './modules/health/health.module';
     }),
     CircuitBreakerModule,
     VersionModule,
+    TimeoutModule,
+    LoggerModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
