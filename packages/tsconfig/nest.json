@@ -12,6 +12,8 @@
     "incremental": true,
     "noPropertyAccessFromIndexSignature": false,
     "strictPropertyInitialization": false,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "skipLibCheck": true,
+    "types": ["node"]
   }
 }

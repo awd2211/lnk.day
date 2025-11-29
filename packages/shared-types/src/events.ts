@@ -80,8 +80,11 @@ export interface LinkUpdatedEvent extends BaseEvent {
   data: {
     linkId: string;
     shortCode: string;
-    changes: Record<string, { old: any; new: any }>;
+    changes: Record<string, any>;
     userId: string;
+    teamId?: string;
+    campaignId?: string;
+    previousCampaignId?: string;
   };
 }
 
@@ -91,6 +94,8 @@ export interface LinkDeletedEvent extends BaseEvent {
     linkId: string;
     shortCode: string;
     userId: string;
+    teamId?: string;
+    campaignId?: string;
   };
 }
 
