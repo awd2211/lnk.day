@@ -6,3 +6,5 @@ export * from './http';
 export * from './config';
 export * from './notification';
 export * from './cache';
+export * from './version/version.module';
+export * from './version/version.service';
