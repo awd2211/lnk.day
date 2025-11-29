@@ -10,7 +10,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
 import { ProxyService } from './proxy.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @ApiTags('proxy')
 @Controller('api')
@@ -18,15 +18,23 @@ export class ProxyController {
   constructor(private readonly proxyService: ProxyService) {}
 
   @All('*')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Proxy requests to backend services' })
   async proxyRequest(@Req() req: Request, @Res() res: Response) {
-    const path = `/api${req.path}`;
+    // req.path 在 NestJS 版本控制下是完整路径如 /v1/api/links
+    // 需要去掉版本前缀 /v1/api，然后加上 /api 前缀
+    const resourcePath = req.path.replace(/^\/v\d+\/api/, ''); // /v1/api/links -> /links
+    const path = `/api${resourcePath}`;
     const route = this.proxyService.findRoute(path);
 
     if (!route) {
       throw new HttpException('Route not found', 404);
+    }
+
+    // Check if route requires auth and user is not authenticated
+    if (route.requireAuth && !(req as any).user) {
+      throw new HttpException('Unauthorized', 401);
     }
 
     try {
@@ -38,6 +46,11 @@ export class ProxyController {
         'x-request-id': req.headers['x-request-id'] as string || crypto.randomUUID(),
         'x-forwarded-for': req.ip || '',
       };
+
+      // Forward authorization header for downstream services
+      if (req.headers.authorization) {
+        headers['authorization'] = req.headers.authorization as string;
+      }
 
       // Add team ID if present
       if (req.headers['x-team-id']) {

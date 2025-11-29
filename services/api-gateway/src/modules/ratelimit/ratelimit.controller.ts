@@ -12,7 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 import { RateLimitService } from './ratelimit.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SkipRateLimit } from '../../common/decorators/rate-limit.decorator';
 import { PLAN_RATE_LIMITS, PlanType } from '../../common/guards/plan-throttler.guard';
 
