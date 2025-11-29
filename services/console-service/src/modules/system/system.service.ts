@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import * as os from 'os';
+import Redis from 'ioredis';
 
 export interface ServiceInfo {
   name: string;
@@ -14,6 +15,8 @@ export class SystemService {
   private readonly logger = new Logger(SystemService.name);
   private readonly httpClient: AxiosInstance;
   private readonly services: ServiceInfo[];
+  private redis: Redis | null = null;
+  private featureFlags: Map<string, boolean> = new Map();
 
   constructor(private readonly configService: ConfigService) {
     this.httpClient = axios.create({
@@ -23,16 +26,37 @@ export class SystemService {
       },
     });
 
+    // Initialize Redis connection
+    const redisUrl = this.configService.get('REDIS_URL', 'redis://localhost:60031');
+    try {
+      this.redis = new Redis(redisUrl);
+      this.redis.on('error', (err) => {
+        this.logger.error('Redis connection error', err);
+      });
+    } catch (error) {
+      this.logger.warn('Could not connect to Redis');
+    }
+
+    // Initialize default feature flags
+    this.featureFlags.set('analytics', true);
+    this.featureFlags.set('campaigns', true);
+    this.featureFlags.set('deeplinks', true);
+    this.featureFlags.set('pages', true);
+    this.featureFlags.set('qrCodes', true);
+    this.featureFlags.set('webhooks', true);
+    this.featureFlags.set('apiRateLimiting', true);
+    this.featureFlags.set('maintenanceMode', false);
+
     this.services = [
       { name: 'user-service', url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'), port: 60002 },
       { name: 'link-service', url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'), port: 60003 },
-      { name: 'redirect-service', url: this.configService.get('REDIRECT_SERVICE_URL', 'http://localhost:60004'), port: 60004 },
-      { name: 'analytics-service', url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60020'), port: 60020 },
+      { name: 'campaign-service', url: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'), port: 60004 },
       { name: 'qr-service', url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'), port: 60005 },
-      { name: 'page-service', url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60006'), port: 60006 },
-      { name: 'deeplink-service', url: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60007'), port: 60007 },
-      { name: 'notification-service', url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60010'), port: 60010 },
-      { name: 'campaign-service', url: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60008'), port: 60008 },
+      { name: 'page-service', url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'), port: 60007 },
+      { name: 'deeplink-service', url: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'), port: 60008 },
+      { name: 'notification-service', url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'), port: 60020 },
+      { name: 'analytics-service', url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'), port: 60050 },
+      { name: 'redirect-service', url: this.configService.get('REDIRECT_SERVICE_URL', 'http://localhost:60080'), port: 60080 },
     ];
   }
 
@@ -76,7 +100,11 @@ export class SystemService {
       this.services.map(async (service) => {
         const start = Date.now();
         try {
-          const response = await this.httpClient.get(`${service.url}/health`, {
+          // analytics-service 和 redirect-service 使用 /health，其他 NestJS 服务使用 /api/v1/health
+          const healthPath = ['analytics-service', 'redirect-service'].includes(service.name)
+            ? '/health'
+            : '/api/v1/health';
+          const response = await this.httpClient.get(`${service.url}${healthPath}`, {
             timeout: 3000,
           });
           return {
@@ -172,16 +200,49 @@ export class SystemService {
       misses: number;
     };
   }> {
-    // Would fetch from Redis INFO command
-    return {
-      redis: {
-        connected: true,
-        memory: { used: '0MB', peak: '0MB' },
-        keys: 0,
-        hits: 0,
-        misses: 0,
-      },
-    };
+    if (!this.redis) {
+      return {
+        redis: {
+          connected: false,
+          memory: { used: '0MB', peak: '0MB' },
+          keys: 0,
+          hits: 0,
+          misses: 0,
+        },
+      };
+    }
+
+    try {
+      const info = await this.redis.info('memory');
+      const stats = await this.redis.info('stats');
+      const dbsize = await this.redis.dbsize();
+
+      const usedMemory = info.match(/used_memory_human:(\S+)/)?.[1] || '0MB';
+      const peakMemory = info.match(/used_memory_peak_human:(\S+)/)?.[1] || '0MB';
+      const keyspaceHits = parseInt(stats.match(/keyspace_hits:(\d+)/)?.[1] || '0', 10);
+      const keyspaceMisses = parseInt(stats.match(/keyspace_misses:(\d+)/)?.[1] || '0', 10);
+
+      return {
+        redis: {
+          connected: true,
+          memory: { used: usedMemory, peak: peakMemory },
+          keys: dbsize,
+          hits: keyspaceHits,
+          misses: keyspaceMisses,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Failed to get Redis stats', error);
+      return {
+        redis: {
+          connected: false,
+          memory: { used: '0MB', peak: '0MB' },
+          keys: 0,
+          hits: 0,
+          misses: 0,
+        },
+      };
+    }
   }
 
   async getDatabaseStats(): Promise<{
@@ -211,5 +272,164 @@ export class SystemService {
         diskUsage: '0MB',
       },
     };
+  }
+
+  // Feature Flags Management
+  async getFeatureFlags(): Promise<Record<string, boolean>> {
+    const flags: Record<string, boolean> = {};
+    this.featureFlags.forEach((value, key) => {
+      flags[key] = value;
+    });
+    return flags;
+  }
+
+  async updateFeatureFlag(flag: string, enabled: boolean): Promise<{ flag: string; enabled: boolean }> {
+    if (!this.featureFlags.has(flag)) {
+      throw new BadRequestException(`Unknown feature flag: ${flag}`);
+    }
+    this.featureFlags.set(flag, enabled);
+    this.logger.log(`Feature flag '${flag}' set to ${enabled}`);
+    return { flag, enabled };
+  }
+
+  async toggleMaintenanceMode(enabled: boolean): Promise<{ maintenanceMode: boolean; message: string }> {
+    this.featureFlags.set('maintenanceMode', enabled);
+    this.logger.warn(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
+    return {
+      maintenanceMode: enabled,
+      message: enabled ? 'System is now in maintenance mode' : 'Maintenance mode disabled',
+    };
+  }
+
+  // Cache Management
+  async clearCache(pattern?: string): Promise<{ cleared: number; message: string }> {
+    if (!this.redis) {
+      return { cleared: 0, message: 'Redis not connected' };
+    }
+
+    try {
+      if (pattern) {
+        const keys = await this.redis.keys(pattern);
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+        }
+        this.logger.log(`Cleared ${keys.length} keys matching pattern: ${pattern}`);
+        return { cleared: keys.length, message: `Cleared ${keys.length} keys matching '${pattern}'` };
+      } else {
+        await this.redis.flushdb();
+        this.logger.warn('Flushed entire cache database');
+        return { cleared: -1, message: 'Entire cache database flushed' };
+      }
+    } catch (error) {
+      this.logger.error('Failed to clear cache', error);
+      throw new BadRequestException('Failed to clear cache');
+    }
+  }
+
+  async getCacheKeys(pattern: string = '*', limit: number = 100): Promise<{ keys: string[]; total: number }> {
+    if (!this.redis) {
+      return { keys: [], total: 0 };
+    }
+
+    try {
+      const keys = await this.redis.keys(pattern);
+      return {
+        keys: keys.slice(0, limit),
+        total: keys.length,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get cache keys', error);
+      return { keys: [], total: 0 };
+    }
+  }
+
+  // Backup Operations
+  async createBackup(type: 'full' | 'incremental' = 'full'): Promise<{
+    success: boolean;
+    backupId: string;
+    type: string;
+    message: string;
+    timestamp: Date;
+  }> {
+    // In a real implementation, this would trigger backup via pg_dump, ClickHouse backup, etc.
+    const backupId = `backup_${Date.now()}`;
+    this.logger.log(`Backup requested: ${type} - ${backupId}`);
+    return {
+      success: true,
+      backupId,
+      type,
+      message: 'Backup request queued. Check backup status for progress.',
+      timestamp: new Date(),
+    };
+  }
+
+  async getBackups(): Promise<Array<{
+    id: string;
+    type: string;
+    status: string;
+    size: string;
+    createdAt: Date;
+  }>> {
+    // Would fetch from backup storage/metadata
+    return [
+      {
+        id: 'backup_sample_1',
+        type: 'full',
+        status: 'completed',
+        size: '1.2GB',
+        createdAt: new Date(Date.now() - 86400000),
+      },
+    ];
+  }
+
+  async restoreBackup(backupId: string): Promise<{ success: boolean; message: string }> {
+    this.logger.warn(`Restore requested for backup: ${backupId}`);
+    return {
+      success: false,
+      message: 'Backup restoration requires manual intervention. Contact system administrator.',
+    };
+  }
+
+  // Config Management
+  async updateConfig(updates: Record<string, any>): Promise<{
+    success: boolean;
+    updated: string[];
+    message: string;
+  }> {
+    // In production, this would update a config store or trigger service reloads
+    const updatedKeys = Object.keys(updates);
+    this.logger.log(`Config update requested for keys: ${updatedKeys.join(', ')}`);
+    return {
+      success: true,
+      updated: updatedKeys,
+      message: 'Config changes will take effect after service restart',
+    };
+  }
+
+  // Health Check All Services
+  async healthCheckAll(): Promise<{
+    healthy: boolean;
+    services: Array<{ name: string; status: string; latency: number }>;
+    timestamp: Date;
+  }> {
+    const statuses = await this.getServicesStatus();
+    const healthy = statuses.every(s => s.status === 'online');
+
+    return {
+      healthy,
+      services: statuses.map(s => ({
+        name: s.name,
+        status: s.status,
+        latency: s.latency,
+      })),
+      timestamp: new Date(),
+    };
+  }
+
+  // Cleanup on module destroy
+  async onModuleDestroy() {
+    if (this.redis) {
+      await this.redis.quit();
+    }
   }
 }

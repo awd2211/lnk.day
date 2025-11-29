@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SystemService } from './system.service';
 
@@ -46,6 +46,12 @@ export class SystemController {
     return this.systemService.getConfig();
   }
 
+  @Put('config')
+  @ApiOperation({ summary: '更新系统配置' })
+  updateConfig(@Body() updates: Record<string, any>) {
+    return this.systemService.updateConfig(updates);
+  }
+
   @Get('queues')
   @ApiOperation({ summary: '获取队列状态' })
   getQueueStats() {
@@ -58,9 +64,70 @@ export class SystemController {
     return this.systemService.getCacheStats();
   }
 
+  @Get('cache/keys')
+  @ApiOperation({ summary: '获取缓存键列表' })
+  @ApiQuery({ name: 'pattern', required: false, description: '匹配模式，默认为 *' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '返回数量限制，默认100' })
+  getCacheKeys(@Query('pattern') pattern?: string, @Query('limit') limit?: number) {
+    return this.systemService.getCacheKeys(pattern, limit);
+  }
+
+  @Delete('cache')
+  @ApiOperation({ summary: '清除缓存' })
+  @ApiQuery({ name: 'pattern', required: false, description: '匹配模式，不指定则清除全部' })
+  clearCache(@Query('pattern') pattern?: string) {
+    return this.systemService.clearCache(pattern);
+  }
+
   @Get('database')
   @ApiOperation({ summary: '获取数据库状态' })
   getDatabaseStats() {
     return this.systemService.getDatabaseStats();
+  }
+
+  // Feature Flags
+  @Get('features')
+  @ApiOperation({ summary: '获取功能开关列表' })
+  getFeatureFlags() {
+    return this.systemService.getFeatureFlags();
+  }
+
+  @Put('features/:flag')
+  @ApiOperation({ summary: '更新功能开关' })
+  updateFeatureFlag(@Param('flag') flag: string, @Body() data: { enabled: boolean }) {
+    return this.systemService.updateFeatureFlag(flag, data.enabled);
+  }
+
+  @Post('maintenance')
+  @ApiOperation({ summary: '切换维护模式' })
+  toggleMaintenanceMode(@Body() data: { enabled: boolean }) {
+    return this.systemService.toggleMaintenanceMode(data.enabled);
+  }
+
+  // Backup Operations
+  @Get('backups')
+  @ApiOperation({ summary: '获取备份列表' })
+  getBackups() {
+    return this.systemService.getBackups();
+  }
+
+  @Post('backups')
+  @ApiOperation({ summary: '创建备份' })
+  @ApiBody({ schema: { properties: { type: { type: 'string', enum: ['full', 'incremental'] } } } })
+  createBackup(@Body() data?: { type?: 'full' | 'incremental' }) {
+    return this.systemService.createBackup(data?.type);
+  }
+
+  @Post('backups/:id/restore')
+  @ApiOperation({ summary: '恢复备份' })
+  restoreBackup(@Param('id') id: string) {
+    return this.systemService.restoreBackup(id);
+  }
+
+  // Health Check
+  @Get('health')
+  @ApiOperation({ summary: '全系统健康检查' })
+  healthCheckAll() {
+    return this.systemService.healthCheckAll();
   }
 }

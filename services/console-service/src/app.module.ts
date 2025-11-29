@@ -6,6 +6,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { SystemModule } from './modules/system/system.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { AlertsModule } from './modules/alerts/alerts.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { HealthModule } from './modules/health/health.module';
     SystemModule,
     ProxyModule,
     HealthModule,
+    AuditModule,
+    AlertsModule,
   ],
 })
 export class AppModule {}

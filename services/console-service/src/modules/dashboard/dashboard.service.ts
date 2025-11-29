@@ -1,6 +1,5 @@
-import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
 import axios, { AxiosInstance } from 'axios';
 
 interface ServiceEndpoints {
@@ -11,7 +10,7 @@ interface ServiceEndpoints {
   notificationService: string;
 }
 
-interface ActivityItem {
+export interface ActivityItem {
   id: string;
   type: 'user' | 'link' | 'campaign' | 'team' | 'system';
   action: string;
@@ -31,7 +30,6 @@ export class DashboardService {
 
   constructor(
     private readonly configService: ConfigService,
-    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
   ) {
     this.httpClient = axios.create({
       timeout: 5000,
@@ -93,14 +91,6 @@ export class DashboardService {
   }
 
   async getRecentActivity(limit: number = 20): Promise<ActivityItem[]> {
-    const cacheKey = `dashboard:activity:${limit}`;
-
-    // Try cache first
-    if (this.cacheManager) {
-      const cached = await this.cacheManager.get<ActivityItem[]>(cacheKey);
-      if (cached) return cached;
-    }
-
     try {
       // Fetch activities from multiple services in parallel
       const [userActivities, linkActivities, campaignActivities] = await Promise.all([
@@ -117,11 +107,6 @@ export class DashboardService {
       ]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, limit);
-
-      // Cache the result
-      if (this.cacheManager) {
-        await this.cacheManager.set(cacheKey, allActivities, this.CACHE_TTL * 1000);
-      }
 
       return allActivities;
     } catch (error) {
@@ -244,17 +229,6 @@ export class DashboardService {
     timeSeries: Array<{ date: string; clicks: number; users: number }>;
     summary: { avgDailyClicks: number; avgDailyUsers: number; peakHour: string };
   }> {
-    const cacheKey = `dashboard:usage:${period}`;
-
-    // Try cache first
-    if (this.cacheManager) {
-      const cached = await this.cacheManager.get<{
-        timeSeries: Array<{ date: string; clicks: number; users: number }>;
-        summary: { avgDailyClicks: number; avgDailyUsers: number; peakHour: string };
-      }>(cacheKey);
-      if (cached) return cached;
-    }
-
     try {
       // Calculate date range based on period
       const now = new Date();
@@ -312,7 +286,7 @@ export class DashboardService {
         }
       }
 
-      const result = {
+      return {
         timeSeries,
         summary: {
           avgDailyClicks: Math.round(totalClicks / days),
@@ -320,13 +294,6 @@ export class DashboardService {
           peakHour,
         },
       };
-
-      // Cache the result
-      if (this.cacheManager) {
-        await this.cacheManager.set(cacheKey, result, this.CACHE_TTL * 1000);
-      }
-
-      return result;
     } catch (error) {
       this.logger.error('Failed to fetch usage metrics', error);
       return {
