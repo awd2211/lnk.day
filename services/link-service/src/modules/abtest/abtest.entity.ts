@@ -57,6 +57,7 @@ export interface StatisticalResult {
 }
 
 @Entity('ab_tests')
+@Index(['status', 'startedAt'])
 export class ABTest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -82,6 +83,7 @@ export class ABTest {
   variants: ABTestVariant[];
 
   @Column({ type: 'enum', enum: ABTestStatus, default: ABTestStatus.DRAFT })
+  @Index()
   status: ABTestStatus;
 
   @Column({ nullable: true })
@@ -125,6 +127,8 @@ export class ABTest {
 }
 
 @Entity('ab_test_events')
+@Index(['testId', 'variantId'])
+@Index(['testId', 'timestamp'])
 export class ABTestEvent {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -134,6 +138,7 @@ export class ABTestEvent {
   testId: string;
 
   @Column()
+  @Index()
   variantId: string;
 
   @Column()
@@ -161,5 +166,6 @@ export class ABTestEvent {
   device?: string;
 
   @CreateDateColumn()
+  @Index()
   timestamp: Date;
 }

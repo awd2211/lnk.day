@@ -1,13 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import axios, { AxiosInstance } from 'axios';
 
 interface ServiceEndpoints {
-  userService: string;
-  linkService: string;
   analyticsService: string;
-  campaignService: string;
-  notificationService: string;
 }
 
 export interface ActivityItem {
@@ -26,24 +24,23 @@ export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
   private readonly httpClient: AxiosInstance;
   private readonly endpoints: ServiceEndpoints;
-  private readonly CACHE_TTL = 60; // 60 seconds
 
   constructor(
     private readonly configService: ConfigService,
+    @InjectDataSource('usersConnection')
+    private readonly usersDataSource: DataSource,
+    @InjectDataSource('linksConnection')
+    private readonly linksDataSource: DataSource,
   ) {
     this.httpClient = axios.create({
-      timeout: 5000,
+      timeout: 10000,
       headers: {
-        'x-internal-key': this.configService.get('INTERNAL_API_KEY'),
+        'x-internal-api-key': this.configService.get('INTERNAL_API_KEY'),
       },
     });
 
     this.endpoints = {
-      userService: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
-      linkService: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
-      analyticsService: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:8000'),
-      campaignService: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'),
-      notificationService: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+      analyticsService: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
     };
   }
 
@@ -92,97 +89,136 @@ export class DashboardService {
 
   async getRecentActivity(limit: number = 20): Promise<ActivityItem[]> {
     try {
-      // Fetch activities from multiple services in parallel
-      const [userActivities, linkActivities, campaignActivities] = await Promise.all([
-        this.fetchUserActivities(Math.ceil(limit / 3)),
-        this.fetchLinkActivities(Math.ceil(limit / 3)),
-        this.fetchCampaignActivities(Math.ceil(limit / 3)),
+      // Ensure limit is a valid number
+      const validLimit = Number.isFinite(limit) && limit > 0 ? limit : 20;
+
+      // Fetch recent users and links from databases
+      const [userActivities, linkActivities] = await Promise.all([
+        this.fetchUserActivities(Math.ceil(validLimit / 2)),
+        this.fetchLinkActivities(Math.ceil(validLimit / 2)),
       ]);
 
       // Merge and sort by timestamp
       const allActivities: ActivityItem[] = [
         ...userActivities,
         ...linkActivities,
-        ...campaignActivities,
       ]
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, limit);
 
       return allActivities;
-    } catch (error) {
-      this.logger.error('Failed to fetch recent activity', error);
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch recent activity: ${error.message}`);
       return [];
     }
   }
 
   private async fetchUserActivities(limit: number): Promise<ActivityItem[]> {
     try {
-      const response = await this.httpClient.get(`${this.endpoints.userService}/internal/activities`, {
-        params: { limit },
+      const validLimit = Number.isFinite(limit) && limit > 0 ? limit : 10;
+
+      // Query recent users from database (using camelCase column names)
+      const users = await this.usersDataSource.query(`
+        SELECT id, name, email, "createdAt", "lastLoginAt"
+        FROM users
+        WHERE "deletedAt" IS NULL
+        ORDER BY GREATEST(COALESCE("lastLoginAt", "createdAt"), "createdAt") DESC
+        LIMIT $1
+      `, [validLimit * 2]);
+
+      // Convert users to activities
+      const activities: ActivityItem[] = [];
+
+      users.forEach((user: any) => {
+        // Registration activity
+        if (user.createdAt) {
+          activities.push({
+            id: `user-reg-${user.id}`,
+            type: 'user',
+            action: 'registered',
+            description: `用户 ${user.name || user.email} 注册了账户`,
+            userId: user.id,
+            metadata: { email: user.email },
+            timestamp: user.createdAt,
+          });
+        }
+
+        // Login activity
+        if (user.lastLoginAt && user.lastLoginAt !== user.createdAt) {
+          activities.push({
+            id: `user-login-${user.id}-${user.lastLoginAt}`,
+            type: 'user',
+            action: 'logged_in',
+            description: `用户 ${user.name || user.email} 登录了系统`,
+            userId: user.id,
+            metadata: { email: user.email },
+            timestamp: user.lastLoginAt,
+          });
+        }
       });
-      return (response.data || []).map((item: any) => ({
-        id: item.id,
-        type: 'user' as const,
-        action: item.action,
-        description: item.description || `User ${item.action}`,
-        userId: item.userId,
-        teamId: item.teamId,
-        metadata: item.metadata,
-        timestamp: item.createdAt || item.timestamp,
-      }));
-    } catch {
+
+      return activities
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, limit);
+    } catch (error: any) {
+      this.logger.warn(`Failed to fetch user activities: ${error.message}`);
       return [];
     }
   }
 
   private async fetchLinkActivities(limit: number): Promise<ActivityItem[]> {
     try {
-      const response = await this.httpClient.get(`${this.endpoints.linkService}/internal/activities`, {
-        params: { limit },
-      });
-      return (response.data || []).map((item: any) => ({
-        id: item.id,
-        type: 'link' as const,
-        action: item.action,
-        description: item.description || `Link ${item.action}`,
-        userId: item.userId,
-        teamId: item.teamId,
-        metadata: { linkId: item.linkId, shortCode: item.shortCode, ...item.metadata },
-        timestamp: item.createdAt || item.timestamp,
-      }));
-    } catch {
-      return [];
-    }
-  }
+      const validLimit = Number.isFinite(limit) && limit > 0 ? limit : 10;
 
-  private async fetchCampaignActivities(limit: number): Promise<ActivityItem[]> {
-    try {
-      const response = await this.httpClient.get(`${this.endpoints.campaignService}/internal/activities`, {
-        params: { limit },
-      });
-      return (response.data || []).map((item: any) => ({
-        id: item.id,
-        type: 'campaign' as const,
-        action: item.action,
-        description: item.description || `Campaign ${item.action}`,
-        userId: item.userId,
-        teamId: item.teamId,
-        metadata: { campaignId: item.campaignId, ...item.metadata },
-        timestamp: item.createdAt || item.timestamp,
+      // Query recent links from database (using camelCase column names)
+      const links = await this.linksDataSource.query(`
+        SELECT id, "shortCode", "originalUrl", "userId", "teamId", "createdAt"
+        FROM links
+        ORDER BY "createdAt" DESC
+        LIMIT $1
+      `, [validLimit]);
+
+      // Convert links to activities
+      return links.map((link: any) => ({
+        id: `link-create-${link.id}`,
+        type: 'link' as const,
+        action: 'created',
+        description: `创建了短链接 ${link.shortCode}`,
+        userId: link.userId,
+        teamId: link.teamId,
+        metadata: {
+          linkId: link.id,
+          shortCode: link.shortCode,
+          originalUrl: link.originalUrl?.substring(0, 50),
+        },
+        timestamp: link.createdAt,
       }));
-    } catch {
+    } catch (error: any) {
+      this.logger.warn(`Failed to fetch link activities: ${error.message}`);
       return [];
     }
   }
 
   async getTopLinks(limit: number = 10): Promise<any[]> {
     try {
-      const response = await this.httpClient.get(`${this.endpoints.linkService}/links/internal/top`, {
-        params: { limit },
-      });
-      return response.data;
-    } catch (error) {
-      this.logger.error('Failed to fetch top links', error);
+      // Query top links by click count from database (using camelCase column names)
+      const links = await this.linksDataSource.query(`
+        SELECT id, "shortCode", "originalUrl", title, "totalClicks", "createdAt"
+        FROM links
+        ORDER BY "totalClicks" DESC NULLS LAST
+        LIMIT $1
+      `, [limit]);
+
+      return links.map((link: any) => ({
+        id: link.id,
+        shortCode: link.shortCode,
+        originalUrl: link.originalUrl,
+        title: link.title || link.shortCode,
+        clicks: link.totalClicks || 0,
+        createdAt: link.createdAt,
+      }));
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch top links: ${error.message}`);
       return [];
     }
   }
@@ -192,9 +228,16 @@ export class DashboardService {
     overall: 'healthy' | 'degraded' | 'unhealthy';
   }> {
     const services = [
-      { name: 'user-service', url: `${this.endpoints.userService}/health` },
-      { name: 'link-service', url: `${this.endpoints.linkService}/health` },
-      { name: 'analytics-service', url: `${this.endpoints.analyticsService}/health` },
+      { name: 'user-service', url: 'http://localhost:60002/api/v1/health' },
+      { name: 'link-service', url: 'http://localhost:60003/api/v1/health' },
+      { name: 'analytics-service', url: 'http://localhost:60050/health' },
+      { name: 'campaign-service', url: 'http://localhost:60004/api/v1/health' },
+      { name: 'qr-service', url: 'http://localhost:60005/api/v1/health' },
+      { name: 'page-service', url: 'http://localhost:60007/api/v1/health' },
+      { name: 'deeplink-service', url: 'http://localhost:60008/api/v1/health' },
+      { name: 'notification-service', url: 'http://localhost:60020/api/v1/health' },
+      { name: 'domain-service', url: 'http://localhost:60014/api/v1/health' },
+      { name: 'redirect-service', url: 'http://localhost:60080/health' },
     ];
 
     const results = await Promise.all(
@@ -305,27 +348,97 @@ export class DashboardService {
 
   private async fetchUserStats() {
     try {
-      const response = await this.httpClient.get(`${this.endpoints.userService}/internal/stats`);
-      return response.data;
-    } catch {
+      // Query users database directly (using camelCase column names as per TypeORM convention)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+      const [
+        totalUsersResult,
+        totalTeamsResult,
+        activeUsersResult,
+        recentUsersResult,
+        previousUsersResult,
+      ] = await Promise.all([
+        this.usersDataSource.query('SELECT COUNT(*) as count FROM users WHERE "deletedAt" IS NULL'),
+        this.usersDataSource.query('SELECT COUNT(*) as count FROM teams'),
+        this.usersDataSource.query(
+          'SELECT COUNT(*) as count FROM users WHERE "lastLoginAt" > $1 AND "deletedAt" IS NULL',
+          [sevenDaysAgo],
+        ),
+        this.usersDataSource.query(
+          'SELECT COUNT(*) as count FROM users WHERE "createdAt" > $1 AND "deletedAt" IS NULL',
+          [sevenDaysAgo],
+        ),
+        this.usersDataSource.query(
+          'SELECT COUNT(*) as count FROM users WHERE "createdAt" > $1 AND "createdAt" <= $2 AND "deletedAt" IS NULL',
+          [fourteenDaysAgo, sevenDaysAgo],
+        ),
+      ]);
+
+      const totalUsers = parseInt(totalUsersResult[0]?.count || '0', 10);
+      const totalTeams = parseInt(totalTeamsResult[0]?.count || '0', 10);
+      const activeUsers = parseInt(activeUsersResult[0]?.count || '0', 10);
+      const recentUsers = parseInt(recentUsersResult[0]?.count || '0', 10);
+      const previousUsers = parseInt(previousUsersResult[0]?.count || '0', 10);
+
+      const growthRate = previousUsers > 0
+        ? Math.round(((recentUsers - previousUsers) / previousUsers) * 100)
+        : (recentUsers > 0 ? 100 : 0);
+
+      return { totalUsers, totalTeams, activeUsers, growthRate };
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch user stats: ${error.message}`);
       return { totalUsers: 0, totalTeams: 0, activeUsers: 0, growthRate: 0 };
     }
   }
 
   private async fetchLinkStats() {
     try {
-      const response = await this.httpClient.get(`${this.endpoints.linkService}/internal/stats`);
-      return response.data;
-    } catch {
+      // Query links database directly (links table doesn't have deletedAt)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+      const [totalLinksResult, recentLinksResult, previousLinksResult] = await Promise.all([
+        this.linksDataSource.query('SELECT COUNT(*) as count FROM links'),
+        this.linksDataSource.query(
+          'SELECT COUNT(*) as count FROM links WHERE "createdAt" > $1',
+          [sevenDaysAgo],
+        ),
+        this.linksDataSource.query(
+          'SELECT COUNT(*) as count FROM links WHERE "createdAt" > $1 AND "createdAt" <= $2',
+          [fourteenDaysAgo, sevenDaysAgo],
+        ),
+      ]);
+
+      const totalLinks = parseInt(totalLinksResult[0]?.count || '0', 10);
+      const recentLinks = parseInt(recentLinksResult[0]?.count || '0', 10);
+      const previousLinks = parseInt(previousLinksResult[0]?.count || '0', 10);
+
+      const growthRate = previousLinks > 0
+        ? Math.round(((recentLinks - previousLinks) / previousLinks) * 100)
+        : (recentLinks > 0 ? 100 : 0);
+
+      return { totalLinks, growthRate };
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch link stats: ${error.message}`);
       return { totalLinks: 0, growthRate: 0 };
     }
   }
 
   private async fetchAnalyticsStats() {
     try {
+      // Try to get analytics summary from analytics-service
       const response = await this.httpClient.get(`${this.endpoints.analyticsService}/api/analytics/summary`);
-      return response.data;
-    } catch {
+      const data = response.data;
+
+      return {
+        totalClicks: data?.total_clicks || data?.totalClicks || 0,
+        todayClicks: data?.today_clicks || data?.todayClicks || 0,
+        growthRate: data?.growth_rate || data?.growthRate || 0,
+      };
+    } catch (error: any) {
+      this.logger.warn(`Analytics service unavailable: ${error.message}`);
+      // Return mock data when analytics service is down
       return { totalClicks: 0, todayClicks: 0, growthRate: 0 };
     }
   }

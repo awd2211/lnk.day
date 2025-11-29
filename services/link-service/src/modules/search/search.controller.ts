@@ -9,9 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
+import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
 import { SearchService, LinkDocument } from './search.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 class SearchDto {
   query: string;

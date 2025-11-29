@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { Request } from 'express';
 import { TrackingService } from './tracking.service';
 import { QrType, QrContentType } from './qr-record.entity';

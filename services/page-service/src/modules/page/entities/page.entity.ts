@@ -204,6 +204,9 @@ export interface ABTestConfig {
 }
 
 @Entity('pages')
+@Index(['teamId', 'status'])
+@Index(['teamId', 'createdAt'])
+@Index(['status', 'type'])
 export class Page {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -216,15 +219,19 @@ export class Page {
   slug: string;
 
   @Column()
+  @Index()
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ type: 'enum', enum: PageType, default: PageType.LINK_IN_BIO })
+  @Index()
   type: PageType;
 
   @Column({ type: 'enum', enum: PageStatus, default: PageStatus.DRAFT })
+  @Index()
   status: PageStatus;
 
   @Column({ nullable: true })

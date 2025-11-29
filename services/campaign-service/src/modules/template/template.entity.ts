@@ -9,6 +9,7 @@ import {
 import { UTMParams, CampaignType } from '../campaign/entities/campaign.entity';
 
 @Entity('campaign_templates')
+@Index(['teamId', 'userId'])
 export class CampaignTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -24,9 +25,11 @@ export class CampaignTemplate {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ default: false })
+  @Index()
   isPublic: boolean;
 
   @Column({ type: 'enum', enum: CampaignType, default: CampaignType.MARKETING })

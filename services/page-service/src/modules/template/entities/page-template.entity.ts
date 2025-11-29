@@ -26,6 +26,7 @@ export enum TemplateType {
 }
 
 @Entity('page_templates')
+@Index(['category', 'type'])
 export class PageTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -81,12 +82,14 @@ export class PageTemplate {
   tags: string[];
 
   @Column({ default: true })
+  @Index()
   isPublic: boolean;
 
   @Column({ default: false })
   isPremium: boolean;
 
   @Column({ default: false })
+  @Index()
   isFeatured: boolean;
 
   @Column({ default: 0 })
@@ -96,6 +99,7 @@ export class PageTemplate {
   favoriteCount: number;
 
   @Column({ nullable: true })
+  @Index()
   authorId: string;
 
   @Column({ nullable: true })

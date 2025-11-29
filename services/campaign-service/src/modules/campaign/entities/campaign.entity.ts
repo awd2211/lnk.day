@@ -39,6 +39,10 @@ export interface CampaignGoal {
 }
 
 @Entity('campaigns')
+@Index(['teamId', 'status'])
+@Index(['teamId', 'createdAt'])
+@Index(['status', 'startDate'])
+@Index(['status', 'endDate'])
 export class Campaign {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -54,12 +58,15 @@ export class Campaign {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ type: 'enum', enum: CampaignType, default: CampaignType.MARKETING })
+  @Index()
   type: CampaignType;
 
   @Column({ type: 'enum', enum: CampaignStatus, default: CampaignStatus.DRAFT })
+  @Index()
   status: CampaignStatus;
 
   @Column('simple-array', { default: '' })

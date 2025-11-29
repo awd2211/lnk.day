@@ -34,6 +34,8 @@ export enum DomainType {
 
 @Entity('custom_domains')
 @Unique(['domain'])
+@Index(['teamId', 'status'])
+@Index(['status', 'createdAt'])
 export class CustomDomain {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -43,6 +45,7 @@ export class CustomDomain {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column()
@@ -50,12 +53,15 @@ export class CustomDomain {
   domain: string;
 
   @Column({ type: 'enum', enum: DomainType, default: DomainType.REDIRECT })
+  @Index()
   type: DomainType;
 
   @Column({ type: 'enum', enum: DomainStatus, default: DomainStatus.PENDING })
+  @Index()
   status: DomainStatus;
 
   @Column({ type: 'enum', enum: SSLStatus, default: SSLStatus.NONE })
+  @Index()
   sslStatus: SSLStatus;
 
   @Column({ nullable: true })

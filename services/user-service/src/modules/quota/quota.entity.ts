@@ -171,6 +171,8 @@ export class TeamQuota {
 }
 
 @Entity('quota_usage_logs')
+@Index(['teamId', 'resourceType', 'timestamp'])
+@Index(['teamId', 'timestamp'])
 export class QuotaUsageLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -180,6 +182,7 @@ export class QuotaUsageLog {
   teamId: string;
 
   @Column()
+  @Index()
   resourceType: string;
 
   @Column()

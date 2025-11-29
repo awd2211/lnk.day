@@ -11,8 +11,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsPlatform } from './entities/pixel-config.entity';
 

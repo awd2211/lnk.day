@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 
 @Entity('folders')
+@Index(['teamId', 'userId'])
 export class Folder {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -26,9 +27,11 @@ export class Folder {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ nullable: true })
+  @Index()
   parentId?: string;
 
   @ManyToOne(() => Folder, (folder) => folder.children, { nullable: true })

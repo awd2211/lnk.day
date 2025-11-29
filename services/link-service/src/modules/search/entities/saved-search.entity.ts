@@ -50,6 +50,8 @@ export interface NotificationSettings {
 }
 
 @Entity('saved_searches')
+@Index(['teamId', 'userId'])
+@Index(['teamId', 'visibility'])
 export class SavedSearch {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -59,6 +61,7 @@ export class SavedSearch {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column()

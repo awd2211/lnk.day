@@ -23,6 +23,7 @@ export enum QrContentType {
 }
 
 @Entity('qr_records')
+@Index(['teamId', 'userId', 'createdAt'])
 export class QrRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -32,6 +33,7 @@ export class QrRecord {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ nullable: true })
@@ -92,6 +94,7 @@ export class QrRecord {
   tags: string[];
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @CreateDateColumn()
@@ -102,6 +105,8 @@ export class QrRecord {
 }
 
 @Entity('qr_scans')
+@Index(['qrId', 'scannedAt'])
+@Index(['qrId', 'country'])
 export class QrScan {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -144,5 +149,6 @@ export class QrScan {
   language?: string;
 
   @CreateDateColumn()
+  @Index()
   scannedAt: Date;
 }

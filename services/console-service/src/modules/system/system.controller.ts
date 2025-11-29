@@ -128,6 +128,12 @@ export class SystemController {
     return this.systemService.restoreBackup(id);
   }
 
+  @Delete('backups/:id')
+  @ApiOperation({ summary: '删除备份' })
+  deleteBackup(@Param('id') id: string) {
+    return this.systemService.deleteBackup(id);
+  }
+
   // Health Check
   @Get('health')
   @ApiOperation({ summary: '全系统健康检查' })
@@ -153,6 +159,35 @@ export class SystemController {
   testEmail(@Body() data: { to: string }) {
     return this.configService.testEmailSettings(data.to);
   }
+
+  // Email Templates
+  @Get('email-templates')
+  @ApiOperation({ summary: '获取邮件模板列表' })
+  getEmailTemplates() {
+    return this.configService.getEmailTemplates();
+  }
+
+  @Put('email-templates/:id')
+  @ApiOperation({ summary: '更新邮件模板' })
+  updateEmailTemplate(
+    @Param('id') id: string,
+    @Body() data: { subject: string; html: string },
+  ) {
+    return this.configService.updateEmailTemplate(id, data);
+  }
+
+  @Post('email-templates/:id/reset')
+  @ApiOperation({ summary: '重置邮件模板为默认值' })
+  resetEmailTemplate(@Param('id') id: string) {
+    return this.configService.resetEmailTemplate(id);
+  }
+}
+
+// Separate internal controller without JWT authentication
+@ApiTags('system-internal')
+@Controller('system')
+export class SystemInternalController {
+  constructor(private readonly configService: SystemConfigService) {}
 
   // Internal endpoint for notification-service (no auth required for internal calls)
   @Get('email-settings-internal')

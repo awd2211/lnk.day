@@ -802,4 +802,293 @@ export class ProxyController {
   downloadExport(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.downloadExport(id, auth);
   }
+
+  // ==================== Role Management ====================
+  @Get('teams/:teamId/roles')
+  @ApiOperation({ summary: '获取团队角色列表' })
+  getTeamRoles(@Headers('authorization') auth: string, @Param('teamId') teamId: string) {
+    return this.proxyService.getTeamRoles(teamId, auth);
+  }
+
+  @Get('teams/:teamId/roles/permissions')
+  @ApiOperation({ summary: '获取所有可用权限' })
+  getAvailablePermissions(@Headers('authorization') auth: string, @Param('teamId') teamId: string) {
+    return this.proxyService.getAvailablePermissions(teamId, auth);
+  }
+
+  @Get('teams/:teamId/roles/:roleId')
+  @ApiOperation({ summary: '获取单个角色详情' })
+  getTeamRole(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('roleId') roleId: string,
+  ) {
+    return this.proxyService.getTeamRole(teamId, roleId, auth);
+  }
+
+  @Post('teams/:teamId/roles')
+  @ApiOperation({ summary: '创建自定义角色' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['name', 'permissions'],
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        color: { type: 'string' },
+        permissions: { type: 'array', items: { type: 'string' } },
+        isDefault: { type: 'boolean' },
+      },
+    },
+  })
+  createTeamRole(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Body() data: { name: string; description?: string; color?: string; permissions: string[]; isDefault?: boolean },
+  ) {
+    return this.proxyService.createTeamRole(teamId, data, auth);
+  }
+
+  @Put('teams/:teamId/roles/:roleId')
+  @ApiOperation({ summary: '更新角色' })
+  updateTeamRole(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('roleId') roleId: string,
+    @Body() data: { name?: string; description?: string; color?: string; permissions?: string[]; isDefault?: boolean },
+  ) {
+    return this.proxyService.updateTeamRole(teamId, roleId, data, auth);
+  }
+
+  @Delete('teams/:teamId/roles/:roleId')
+  @ApiOperation({ summary: '删除角色' })
+  deleteTeamRole(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('roleId') roleId: string,
+  ) {
+    return this.proxyService.deleteTeamRole(teamId, roleId, auth);
+  }
+
+  @Post('teams/:teamId/roles/:roleId/duplicate')
+  @ApiOperation({ summary: '复制角色' })
+  duplicateTeamRole(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('roleId') roleId: string,
+    @Body() data: { name: string },
+  ) {
+    return this.proxyService.duplicateTeamRole(teamId, roleId, data.name, auth);
+  }
+
+  @Post('teams/:teamId/roles/initialize')
+  @ApiOperation({ summary: '初始化默认角色' })
+  initializeDefaultRoles(@Headers('authorization') auth: string, @Param('teamId') teamId: string) {
+    return this.proxyService.initializeDefaultRoles(teamId, auth);
+  }
+
+  @Put('teams/:teamId/members/:memberId')
+  @ApiOperation({ summary: '更新团队成员角色' })
+  updateTeamMember(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('memberId') memberId: string,
+    @Body() data: { role?: string; customRoleId?: string },
+  ) {
+    return this.proxyService.updateTeamMemberRole(teamId, memberId, data, auth);
+  }
+
+  // ==================== Integration Management ====================
+  @Get('integrations/stats')
+  @ApiOperation({ summary: '获取集成统计' })
+  getIntegrationStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getIntegrationStats(auth);
+  }
+
+  @Get('integrations')
+  @ApiOperation({ summary: '获取集成列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getIntegrations(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getIntegrations({ page, limit, type, status, search }, auth);
+  }
+
+  @Get('integrations/:id')
+  @ApiOperation({ summary: '获取集成详情' })
+  getIntegration(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getIntegration(id, auth);
+  }
+
+  @Put('integrations/:id/config')
+  @ApiOperation({ summary: '更新集成配置' })
+  updateIntegrationConfig(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() config: Record<string, any>,
+  ) {
+    return this.proxyService.updateIntegrationConfig(id, config, auth);
+  }
+
+  @Post('integrations/:id/sync')
+  @ApiOperation({ summary: '触发集成同步' })
+  triggerIntegrationSync(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.triggerIntegrationSync(id, auth);
+  }
+
+  @Patch('integrations/:id/sync')
+  @ApiOperation({ summary: '开关自动同步' })
+  toggleIntegrationSync(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { enabled: boolean },
+  ) {
+    return this.proxyService.toggleIntegrationSync(id, data.enabled, auth);
+  }
+
+  @Post('integrations/:id/disconnect')
+  @ApiOperation({ summary: '断开集成连接' })
+  disconnectIntegration(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.disconnectIntegration(id, auth);
+  }
+
+  @Get('integrations/:id/logs')
+  @ApiOperation({ summary: '获取集成同步日志' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getIntegrationSyncLogs(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.proxyService.getIntegrationSyncLogs(id, { page, limit }, auth);
+  }
+
+  // ==================== Notification Management ====================
+  @Get('notifications/stats')
+  @ApiOperation({ summary: '获取通知统计' })
+  getNotificationStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getNotificationStats(auth);
+  }
+
+  @Get('notifications/logs')
+  @ApiOperation({ summary: '获取通知发送记录' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getNotificationLogs(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getNotificationLogs({ page, limit, type, status, search }, auth);
+  }
+
+  @Get('notifications/logs/:id')
+  @ApiOperation({ summary: '获取通知详情' })
+  getNotificationLog(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getNotificationLog(id, auth);
+  }
+
+  @Post('notifications/logs/:id/resend')
+  @ApiOperation({ summary: '重新发送通知' })
+  resendNotification(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.resendNotification(id, auth);
+  }
+
+  @Post('notifications/broadcast')
+  @ApiOperation({ summary: '发送广播通知' })
+  sendNotificationBroadcast(
+    @Headers('authorization') auth: string,
+    @Body() data: { subject: string; content: string; type: string },
+  ) {
+    return this.proxyService.sendNotificationBroadcast(data, auth);
+  }
+
+  // Notification Templates
+  @Get('notifications/templates')
+  @ApiOperation({ summary: '获取通知模板列表' })
+  @ApiQuery({ name: 'type', required: false })
+  getNotificationTemplates(
+    @Headers('authorization') auth: string,
+    @Query('type') type?: string,
+  ) {
+    return this.proxyService.getNotificationTemplates({ type }, auth);
+  }
+
+  @Get('notifications/templates/:id')
+  @ApiOperation({ summary: '获取通知模板详情' })
+  getNotificationTemplate(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getNotificationTemplate(id, auth);
+  }
+
+  @Put('notifications/templates/:id')
+  @ApiOperation({ summary: '更新通知模板' })
+  updateNotificationTemplate(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.updateNotificationTemplate(id, data, auth);
+  }
+
+  @Post('notifications/templates/:id/reset')
+  @ApiOperation({ summary: '重置通知模板为默认' })
+  resetNotificationTemplate(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.resetNotificationTemplate(id, auth);
+  }
+
+  // Notification Channels
+  @Get('notifications/channels')
+  @ApiOperation({ summary: '获取通知渠道列表' })
+  getNotificationChannels(@Headers('authorization') auth: string) {
+    return this.proxyService.getNotificationChannels(auth);
+  }
+
+  @Get('notifications/channels/:id')
+  @ApiOperation({ summary: '获取通知渠道详情' })
+  getNotificationChannel(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getNotificationChannel(id, auth);
+  }
+
+  @Put('notifications/channels/:id')
+  @ApiOperation({ summary: '更新通知渠道配置' })
+  updateNotificationChannel(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.updateNotificationChannel(id, data, auth);
+  }
+
+  @Patch('notifications/channels/:id')
+  @ApiOperation({ summary: '开关通知渠道' })
+  toggleNotificationChannel(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { enabled: boolean },
+  ) {
+    return this.proxyService.toggleNotificationChannel(id, data.enabled, auth);
+  }
+
+  @Post('notifications/channels/:id/test')
+  @ApiOperation({ summary: '测试通知渠道' })
+  testNotificationChannel(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.testNotificationChannel(id, auth);
+  }
 }

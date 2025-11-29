@@ -28,6 +28,8 @@ export enum DataRequestStatus {
 }
 
 @Entity('data_requests')
+@Index(['type', 'status'])
+@Index(['status', 'createdAt'])
 export class DataRequest {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,9 +39,11 @@ export class DataRequest {
   userId: string;
 
   @Column({ type: 'enum', enum: DataRequestType })
+  @Index()
   type: DataRequestType;
 
   @Column({ type: 'enum', enum: DataRequestStatus, default: DataRequestStatus.PENDING })
+  @Index()
   status: DataRequestStatus;
 
   // 请求原因（可选）

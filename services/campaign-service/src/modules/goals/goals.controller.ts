@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { GoalsService, CreateGoalDto } from './goals.service';
 import { GoalType, GoalStatus, NotificationChannels } from './entities/campaign-goal.entity';
 

@@ -85,7 +85,7 @@ export class UserController {
   @Get('internal/validate/:id')
   @UseGuards(InternalAuthGuard)
   @ApiOperation({ summary: '内部服务验证用户 (供其他微服务调用)' })
-  @ApiHeader({ name: 'x-internal-key', description: '内部 API 密钥', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
   async internalValidateUser(@Param('id') id: string) {
     const user = await this.userService.findOne(id);
     return {
@@ -100,7 +100,7 @@ export class UserController {
   @Get('internal/by-email/:email')
   @UseGuards(InternalAuthGuard)
   @ApiOperation({ summary: '内部服务通过邮箱查询用户' })
-  @ApiHeader({ name: 'x-internal-key', description: '内部 API 密钥', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
   async internalFindByEmail(@Param('email') email: string) {
     const user = await this.userService.findByEmail(email);
     if (!user) {

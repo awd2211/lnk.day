@@ -24,7 +24,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 
 import { BatchService } from './batch.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { ImportLinksDto, ImportResultDto } from './dto/import-links.dto';
 import { ExportLinksQueryDto } from './dto/export-links.dto';
 import {

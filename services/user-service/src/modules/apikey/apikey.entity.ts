@@ -15,6 +15,8 @@ export enum ApiKeyScope {
 }
 
 @Entity('api_keys')
+@Index(['teamId', 'isActive'])
+@Index(['teamId', 'createdAt'])
 export class ApiKey {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -44,6 +46,7 @@ export class ApiKey {
   scopes: ApiKeyScope[];
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ nullable: true })

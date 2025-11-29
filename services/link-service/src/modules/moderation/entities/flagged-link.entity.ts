@@ -35,6 +35,8 @@ export enum FlagStatus {
 }
 
 @Entity('flagged_links')
+@Index(['teamId', 'status'])
+@Index(['status', 'severity'])
 export class FlaggedLink {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -63,12 +65,14 @@ export class FlaggedLink {
   userEmail?: string;
 
   @Column({ nullable: true })
+  @Index()
   teamId?: string;
 
   @Column({ type: 'enum', enum: FlagReason, default: FlagReason.OTHER })
   reason: FlagReason;
 
   @Column({ type: 'enum', enum: FlagSeverity, default: FlagSeverity.MEDIUM })
+  @Index()
   severity: FlagSeverity;
 
   @Column({ type: 'enum', enum: FlagStatus, default: FlagStatus.PENDING })

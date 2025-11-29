@@ -15,6 +15,10 @@ export enum LinkStatus {
 }
 
 @Entity('links')
+@Index(['teamId', 'createdAt'])
+@Index(['teamId', 'status'])
+@Index(['teamId', 'folderId'])
+@Index(['userId', 'createdAt'])
 export class Link {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -33,15 +37,19 @@ export class Link {
   description?: string;
 
   @Column({ default: 'lnk.day' })
+  @Index()
   domain: string;
 
   @Column()
+  @Index()
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ nullable: true })
+  @Index()
   folderId?: string;
 
   @Column('simple-array', { default: '' })
@@ -82,6 +90,7 @@ export class Link {
   };
 
   @Column({ type: 'enum', enum: LinkStatus, default: LinkStatus.ACTIVE })
+  @Index()
   status: LinkStatus;
 
   @Column({ default: 0 })

@@ -46,6 +46,7 @@ export class SalesforceConnection {
   };
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ nullable: true })

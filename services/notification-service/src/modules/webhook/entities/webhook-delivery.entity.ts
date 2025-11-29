@@ -15,6 +15,8 @@ export enum DeliveryStatus {
 }
 
 @Entity('webhook_deliveries')
+@Index(['webhookId', 'status', 'createdAt'])
+@Index(['status', 'createdAt'])
 export class WebhookDelivery {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -34,6 +36,7 @@ export class WebhookDelivery {
   payload: Record<string, any>;
 
   @Column({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.PENDING })
+  @Index()
   status: DeliveryStatus;
 
   @Column({ nullable: true })

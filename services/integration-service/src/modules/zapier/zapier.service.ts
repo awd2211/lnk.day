@@ -40,7 +40,11 @@ export class ZapierService {
     @InjectRepository(ZapierSubscription)
     private readonly subscriptionRepository: Repository<ZapierSubscription>,
   ) {
-    this.webhookSecret = this.configService.get<string>('ZAPIER_WEBHOOK_SECRET', 'zapier-secret');
+    this.webhookSecret = this.configService.get<string>('ZAPIER_WEBHOOK_SECRET');
+    if (!this.webhookSecret) {
+      this.logger.warn('ZAPIER_WEBHOOK_SECRET not configured');
+      this.webhookSecret = crypto.randomBytes(32).toString('hex');
+    }
   }
 
   // ==================== Triggers (Instant) ====================

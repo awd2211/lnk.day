@@ -53,6 +53,7 @@ export interface NotificationChannels {
 }
 
 @Entity('campaign_goals')
+@Index(['campaignId', 'status'])
 export class CampaignGoal {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -81,6 +82,7 @@ export class CampaignGoal {
   currency?: string; // For revenue goals
 
   @Column({ type: 'enum', enum: GoalStatus, default: GoalStatus.ACTIVE })
+  @Index()
   status: GoalStatus;
 
   @Column('jsonb', { default: [] })
@@ -148,6 +150,7 @@ export class CampaignGoal {
 }
 
 @Entity('goal_notifications')
+@Index(['goalId', 'sentAt'])
 export class GoalNotification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -179,6 +182,7 @@ export class GoalNotification {
   response?: Record<string, any>;
 
   @Column({ default: false })
+  @Index()
   success: boolean;
 
   @Column({ nullable: true })

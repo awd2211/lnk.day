@@ -21,14 +21,17 @@ export enum TeamMemberRole {
 
 @Entity('team_members')
 @Unique(['teamId', 'userId'])
+@Index(['teamId', 'role'])
 export class TeamMember {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
+  @Index()
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ type: 'enum', enum: TeamMemberRole, default: TeamMemberRole.MEMBER })

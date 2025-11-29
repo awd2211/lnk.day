@@ -12,6 +12,8 @@ import {
  * The QR code points to a redirect URL, and the destination can be changed anytime
  */
 @Entity('dynamic_qr_codes')
+@Index(['teamId', 'isActive'])
+@Index(['teamId', 'createdAt'])
 export class DynamicQrCode {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -21,6 +23,7 @@ export class DynamicQrCode {
   teamId: string;
 
   @Column()
+  @Index()
   createdBy: string;
 
   @Column()
@@ -84,6 +87,7 @@ export class DynamicQrCode {
 
   // Status
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ nullable: true })

@@ -34,6 +34,7 @@ export type WebhookEvent =
 @Entity('webhooks')
 @Index(['teamId', 'platform', 'event'])
 @Index(['teamId', 'enabled'])
+@Index(['platform', 'event'])
 export class Webhook {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -62,6 +63,7 @@ export class Webhook {
   event: WebhookEvent;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

@@ -13,5 +13,11 @@ export default defineConfig({
   server: {
     port: 60011,
     host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:60009',
+        changeOrigin: true,
+      },
+    },
   },
 });

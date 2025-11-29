@@ -6,6 +6,8 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { authenticator } from 'otplib';
+import * as QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
 import { Admin } from './entities/admin.entity';
 
@@ -26,7 +28,7 @@ export class AdminService {
     this.consoleUrl = this.configService.get('CONSOLE_URL', 'http://localhost:60011');
   }
 
-  async login(email: string, password: string, rememberMe = false) {
+  async login(email: string, password: string, rememberMe = false, twoFactorCode?: string) {
     const admin = await this.adminRepository.findOne({ where: { email } });
     if (!admin || !admin.active) {
       throw new UnauthorizedException('Invalid credentials');
@@ -37,13 +39,46 @@ export class AdminService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if 2FA is enabled
+    if (admin.twoFactorEnabled) {
+      if (!twoFactorCode) {
+        return {
+          requiresTwoFactor: true,
+          message: '需要双因素认证码',
+        };
+      }
+
+      const isCodeValid = authenticator.verify({
+        token: twoFactorCode,
+        secret: admin.twoFactorSecret!,
+      });
+
+      if (!isCodeValid) {
+        // Check backup codes
+        const backupCodes = admin.twoFactorBackupCodes || [];
+        const codeIndex = backupCodes.indexOf(twoFactorCode);
+        if (codeIndex === -1) {
+          throw new UnauthorizedException('双因素认证码无效');
+        }
+        // Remove used backup code
+        backupCodes.splice(codeIndex, 1);
+        admin.twoFactorBackupCodes = backupCodes;
+      }
+    }
+
     admin.lastLoginAt = new Date();
     await this.adminRepository.save(admin);
 
     const payload = { sub: admin.id, email: admin.email, role: admin.role };
     const expiresIn = rememberMe ? '7d' : '8h';
     return {
-      admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
+      admin: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        role: admin.role,
+        twoFactorEnabled: admin.twoFactorEnabled,
+      },
       accessToken: this.jwtService.sign(payload, { expiresIn }),
     };
   }
@@ -138,5 +173,174 @@ export class AdminService {
   async remove(id: string): Promise<void> {
     const admin = await this.findOne(id);
     await this.adminRepository.remove(admin);
+  }
+
+  // ==================== Profile Management ====================
+
+  async getProfile(id: string) {
+    const admin = await this.findOne(id);
+    return {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      twoFactorEnabled: admin.twoFactorEnabled,
+      lastLoginAt: admin.lastLoginAt,
+      createdAt: admin.createdAt,
+    };
+  }
+
+  async updateProfile(id: string, data: { name?: string; email?: string }) {
+    const admin = await this.findOne(id);
+    if (data.name) admin.name = data.name;
+    if (data.email && data.email !== admin.email) {
+      // Check if email is already used
+      const existing = await this.adminRepository.findOne({ where: { email: data.email } });
+      if (existing) {
+        throw new BadRequestException('该邮箱已被使用');
+      }
+      admin.email = data.email;
+    }
+    await this.adminRepository.save(admin);
+    return {
+      id: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+      twoFactorEnabled: admin.twoFactorEnabled,
+    };
+  }
+
+  async changePassword(id: string, currentPassword: string, newPassword: string) {
+    const admin = await this.findOne(id);
+
+    const isValid = await bcrypt.compare(currentPassword, admin.password);
+    if (!isValid) {
+      throw new BadRequestException('当前密码不正确');
+    }
+
+    admin.password = await bcrypt.hash(newPassword, 10);
+    await this.adminRepository.save(admin);
+
+    return { message: '密码修改成功' };
+  }
+
+  // ==================== Two-Factor Authentication ====================
+
+  async setupTwoFactor(id: string) {
+    const admin = await this.findOne(id);
+
+    if (admin.twoFactorEnabled) {
+      throw new BadRequestException('双因素认证已启用，请先禁用');
+    }
+
+    // Generate secret
+    const secret = authenticator.generateSecret();
+    admin.twoFactorSecret = secret;
+    await this.adminRepository.save(admin);
+
+    // Generate QR code
+    const otpAuthUrl = authenticator.keyuri(admin.email, 'lnk.day Console', secret);
+    const qrCodeDataUrl = await QRCode.toDataURL(otpAuthUrl);
+
+    return {
+      secret,
+      qrCode: qrCodeDataUrl,
+      otpAuthUrl,
+    };
+  }
+
+  async verifyAndEnableTwoFactor(id: string, code: string) {
+    const admin = await this.findOne(id);
+
+    if (!admin.twoFactorSecret) {
+      throw new BadRequestException('请先设置双因素认证');
+    }
+
+    if (admin.twoFactorEnabled) {
+      throw new BadRequestException('双因素认证已启用');
+    }
+
+    const isValid = authenticator.verify({
+      token: code,
+      secret: admin.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      throw new BadRequestException('验证码无效');
+    }
+
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes();
+    admin.twoFactorEnabled = true;
+    admin.twoFactorBackupCodes = backupCodes;
+    await this.adminRepository.save(admin);
+
+    return {
+      message: '双因素认证已启用',
+      backupCodes,
+    };
+  }
+
+  async disableTwoFactor(id: string, code: string) {
+    const admin = await this.findOne(id);
+
+    if (!admin.twoFactorEnabled) {
+      throw new BadRequestException('双因素认证未启用');
+    }
+
+    const isValid = authenticator.verify({
+      token: code,
+      secret: admin.twoFactorSecret!,
+    });
+
+    // Also check backup codes
+    const backupCodes = admin.twoFactorBackupCodes || [];
+    const isBackupCode = backupCodes.includes(code);
+
+    if (!isValid && !isBackupCode) {
+      throw new BadRequestException('验证码无效');
+    }
+
+    admin.twoFactorEnabled = false;
+    admin.twoFactorSecret = undefined;
+    admin.twoFactorBackupCodes = undefined;
+    await this.adminRepository.save(admin);
+
+    return { message: '双因素认证已禁用' };
+  }
+
+  async regenerateBackupCodes(id: string, code: string) {
+    const admin = await this.findOne(id);
+
+    if (!admin.twoFactorEnabled) {
+      throw new BadRequestException('双因素认证未启用');
+    }
+
+    const isValid = authenticator.verify({
+      token: code,
+      secret: admin.twoFactorSecret!,
+    });
+
+    if (!isValid) {
+      throw new BadRequestException('验证码无效');
+    }
+
+    const backupCodes = this.generateBackupCodes();
+    admin.twoFactorBackupCodes = backupCodes;
+    await this.adminRepository.save(admin);
+
+    return {
+      message: '备用码已重新生成',
+      backupCodes,
+    };
+  }
+
+  private generateBackupCodes(count = 8): string[] {
+    const codes: string[] = [];
+    for (let i = 0; i < count; i++) {
+      codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
+    }
+    return codes;
   }
 }

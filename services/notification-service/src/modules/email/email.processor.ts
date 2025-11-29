@@ -204,6 +204,21 @@ export class EmailProcessor {
           <p style="color: #666;">检测到 ${d.alertType}：${d.details}</p>
         </div>
       `,
+      test: (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2563eb; margin: 0;">lnk.day</h1>
+          </div>
+          <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">✅ 测试邮件</h2>
+            <p style="color: #666;">${d.message}</p>
+            <p style="color: #999; font-size: 12px;">发送时间: ${d.timestamp}</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            如果您收到了这封邮件，说明您的邮件配置已正确设置。
+          </p>
+        </div>
+      `,
     };
     const templateFn = templates[template];
     return templateFn ? templateFn(data) : '';

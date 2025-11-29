@@ -8,7 +8,6 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
-  TimeoutModule,
   LoggerModule,
   AuthModule,
 } from '@lnk/nestjs-common';
@@ -29,16 +28,16 @@ import { AlertsModule } from './modules/alerts/alerts.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
-    TimeoutModule,
     LoggerModule,
     AuthModule.forValidation(),
+    // Main console database
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         host: config.get('DB_HOST', 'localhost'),
-        port: parseInt(config.get('DB_PORT', '5432'), 10),
+        port: parseInt(config.get('DB_PORT', '60030'), 10),
         retryAttempts: 3,
         retryDelay: 3000,
         username: config.get('DB_USER', 'postgres'),
@@ -46,6 +45,38 @@ import { AlertsModule } from './modules/alerts/alerts.module';
         database: config.get('DB_NAME', 'lnk_console'),
         autoLoadEntities: true,
         synchronize: config.get('NODE_ENV') !== 'production',
+      }),
+    }),
+    // Users database connection (read-only for dashboard stats)
+    TypeOrmModule.forRootAsync({
+      name: 'usersConnection',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get('DB_HOST', 'localhost'),
+        port: parseInt(config.get('DB_PORT', '60030'), 10),
+        username: config.get('DB_USER', 'postgres'),
+        password: config.get('DB_PASSWORD', 'postgres'),
+        database: 'lnk_users',
+        entities: [],
+        synchronize: false,
+      }),
+    }),
+    // Links database connection (read-only for dashboard stats)
+    TypeOrmModule.forRootAsync({
+      name: 'linksConnection',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get('DB_HOST', 'localhost'),
+        port: parseInt(config.get('DB_PORT', '60030'), 10),
+        username: config.get('DB_USER', 'postgres'),
+        password: config.get('DB_PASSWORD', 'postgres'),
+        database: 'lnk_links',
+        entities: [],
+        synchronize: false,
       }),
     }),
     VersionModule,

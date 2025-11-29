@@ -11,6 +11,7 @@ import {
  * Link Template - allows users to create links quickly using saved presets
  */
 @Entity('link_templates')
+@Index(['teamId', 'isFavorite'])
 export class LinkTemplate {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -115,6 +116,7 @@ export class LinkTemplate {
  * Preset templates - system-defined templates available to all users
  */
 @Entity('link_template_presets')
+@Index(['category', 'isActive'])
 export class LinkTemplatePreset {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -132,6 +134,7 @@ export class LinkTemplatePreset {
   color: string;
 
   @Column()
+  @Index()
   category: string; // 'marketing', 'social', 'email', 'qr', 'custom'
 
   @Column('jsonb')
@@ -149,6 +152,7 @@ export class LinkTemplatePreset {
   };
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ default: 0 })

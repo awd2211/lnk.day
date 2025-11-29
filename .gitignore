@@ -100,3 +100,4 @@ logs/
 # Build artifacts
 build/
 .turbo/
+backups/

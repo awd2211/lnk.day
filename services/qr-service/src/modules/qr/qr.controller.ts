@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Res, Get, Query, Param, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { Response } from 'express';
 import { QrService, QrOptions, GradientConfig, EyeStyle, TextLabelConfig } from './qr.service';
 import {

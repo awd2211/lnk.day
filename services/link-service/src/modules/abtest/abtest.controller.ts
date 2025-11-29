@@ -11,10 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
+import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
 import { ABTestService } from './abtest.service';
 import { CreateABTestDto } from './dto/create-abtest.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('ab-tests')
 @Controller('ab-tests')

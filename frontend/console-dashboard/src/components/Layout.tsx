@@ -29,6 +29,8 @@ import {
   Code2,
   ShieldCheck,
   Cog,
+  Plug,
+  Mail,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -60,6 +62,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: '用户管理', href: '/users', icon: Users },
       { name: '团队管理', href: '/teams', icon: Building2 },
+      { name: '角色权限', href: '/roles', icon: Shield },
     ],
   },
   {
@@ -96,6 +99,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: 'API 密钥', href: '/api-keys', icon: Key },
       { name: 'Webhooks', href: '/webhooks', icon: Webhook },
+      { name: '第三方集成', href: '/integrations', icon: Plug },
     ],
   },
   {
@@ -112,13 +116,17 @@ const navigationGroups: NavGroup[] = [
     icon: Cog,
     items: [
       { name: '系统监控', href: '/system', icon: Server },
+      { name: '通知管理', href: '/notifications', icon: Mail },
       { name: '系统设置', href: '/settings', icon: Settings },
     ],
   },
 ];
 
 // Flatten for page title lookup
-const allNavItems = navigationGroups.flatMap(g => g.items);
+const allNavItems = [
+  ...navigationGroups.flatMap(g => g.items),
+  { name: '个人中心', href: '/profile', icon: Shield },
+];
 
 function NavGroupComponent({ group, isExpanded, onToggle, location }: {
   group: NavGroup;
@@ -255,7 +263,10 @@ export default function Layout() {
         </nav>
 
         <div className="shrink-0 border-t p-4">
-          <div className="mb-3 flex items-center gap-3 px-3">
+          <Link
+            to="/profile"
+            className="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white">
               <Shield className="h-4 w-4" />
             </div>
@@ -263,7 +274,7 @@ export default function Layout() {
               <p className="truncate text-sm font-medium">{admin?.name}</p>
               <p className="truncate text-xs text-gray-500">{admin?.role}</p>
             </div>
-          </div>
+          </Link>
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"

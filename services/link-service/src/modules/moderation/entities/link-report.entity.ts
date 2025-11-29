@@ -10,6 +10,7 @@ import {
 import { FlaggedLink, FlagReason } from './flagged-link.entity';
 
 @Entity('link_reports')
+@Index(['flaggedLinkId', 'createdAt'])
 export class LinkReport {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -23,6 +24,7 @@ export class LinkReport {
   flaggedLink: FlaggedLink;
 
   @Column({ nullable: true })
+  @Index()
   reporterId?: string;
 
   @Column({ nullable: true })

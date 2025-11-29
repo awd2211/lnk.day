@@ -85,6 +85,8 @@ export interface RuleConditions {
 }
 
 @Entity('redirect_rules')
+@Index(['linkId', 'enabled'])
+@Index(['linkId', 'priority'])
 export class RedirectRule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -116,6 +118,7 @@ export class RedirectRule {
   priority: number;  // Higher priority rules are evaluated first
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column({ default: 0 })
@@ -133,6 +136,7 @@ export class RedirectRule {
 
 // Rule Group for complex AND/OR logic
 @Entity('redirect_rule_groups')
+@Index(['linkId', 'enabled'])
 export class RedirectRuleGroup {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -157,6 +161,7 @@ export class RedirectRuleGroup {
   priority: number;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @CreateDateColumn()

@@ -20,6 +20,8 @@ export type TriggerEvent =
   | 'campaign.ended';
 
 @Entity('zapier_subscriptions')
+@Index(['teamId', 'event'])
+@Index(['teamId', 'enabled'])
 export class ZapierSubscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -36,6 +38,7 @@ export class ZapierSubscription {
   webhookUrl: string;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column({ default: 0 })

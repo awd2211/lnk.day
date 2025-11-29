@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { Observable } from 'rxjs';
 
 export const IS_PUBLIC_KEY = 'isPublic';
@@ -17,7 +18,10 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private reflector: Reflector) {
+  constructor(
+    private reflector: Reflector,
+    private configService: ConfigService,
+  ) {
     super();
   }
 
@@ -32,6 +36,35 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     if (isPublic) {
       return true;
+    }
+
+    // Check for internal API key authentication
+    const request = context.switchToHttp().getRequest();
+    const internalApiKey = this.configService.get<string>('INTERNAL_API_KEY');
+
+    if (internalApiKey) {
+      const authHeader = request.headers.authorization;
+      const xInternalKey = request.headers['x-internal-api-key'];
+
+      // Check Bearer token matches internal API key
+      if (authHeader === `Bearer ${internalApiKey}`) {
+        request.user = {
+          sub: 'system',
+          email: 'system@internal',
+          role: 'INTERNAL',
+        };
+        return true;
+      }
+
+      // Check x-internal-api-key header
+      if (xInternalKey === internalApiKey) {
+        request.user = {
+          sub: 'system',
+          email: 'system@internal',
+          role: 'INTERNAL',
+        };
+        return true;
+      }
     }
 
     return super.canActivate(context);

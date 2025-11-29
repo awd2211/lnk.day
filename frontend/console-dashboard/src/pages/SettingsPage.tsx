@@ -17,6 +17,14 @@ import {
   Trash2,
   HardDrive,
   Server,
+  Download,
+  Upload,
+  Archive,
+  Clock,
+  FileText,
+  Eye,
+  Code,
+  RotateCw,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -24,6 +32,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -143,23 +153,83 @@ const defaultConfig: SystemConfig = {
   },
 };
 
+// Email template info
+const EMAIL_TEMPLATE_INFO: Record<string, { name: string; description: string; variables: string[] }> = {
+  welcome: {
+    name: '欢迎邮件',
+    description: '新用户注册后发送',
+    variables: ['name'],
+  },
+  'password-reset': {
+    name: '密码重置',
+    description: '用户请求重置密码时发送',
+    variables: ['resetLink'],
+  },
+  'team-invite': {
+    name: '团队邀请',
+    description: '邀请用户加入团队时发送',
+    variables: ['inviterName', 'teamName', 'inviteLink'],
+  },
+  'link-milestone': {
+    name: '链接里程碑',
+    description: '链接达到点击里程碑时发送',
+    variables: ['linkTitle', 'clicks'],
+  },
+  'weekly-report': {
+    name: '周报',
+    description: '每周发送的统计报告',
+    variables: ['totalClicks', 'growth'],
+  },
+  'security-alert': {
+    name: '安全提醒',
+    description: '检测到安全事件时发送',
+    variables: ['alertType', 'details'],
+  },
+  test: {
+    name: '测试邮件',
+    description: '用于测试邮件配置',
+    variables: ['message', 'timestamp'],
+  },
+};
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'general' | 'api' | 'email' | 'security' | 'features' | 'maintenance'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'api' | 'email' | 'templates' | 'security' | 'features' | 'maintenance'>('general');
   const [formData, setFormData] = useState<SystemConfig>(defaultConfig);
   const [hasChanges, setHasChanges] = useState(false);
   const [testEmailTo, setTestEmailTo] = useState('');
   const [showTestEmailDialog, setShowTestEmailDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
+  // Email templates state
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [templateSubject, setTemplateSubject] = useState('');
+  const [templateHtml, setTemplateHtml] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [templateHasChanges, setTemplateHasChanges] = useState(false);
 
   // Fetch config
   const { data: config, isLoading } = useQuery({
     queryKey: ['system', 'config'],
     queryFn: async () => {
       try {
-        const res = await systemService.getConfig();
-        return res.data as SystemConfig;
+        const [configRes, emailRes] = await Promise.all([
+          systemService.getConfig(),
+          systemService.getEmailSettings(),
+        ]);
+        const configData = configRes.data as Partial<SystemConfig>;
+        const emailData = emailRes.data;
+        return {
+          ...defaultConfig,
+          ...configData,
+          email: emailData ? {
+            provider: emailData.provider || 'smtp',
+            fromName: emailData.fromName || 'lnk.day',
+            fromEmail: emailData.fromEmail || 'noreply@lnk.day',
+            smtp: emailData.smtp || defaultConfig.email.smtp,
+            mailgun: emailData.mailgun || defaultConfig.email.mailgun,
+          } : defaultConfig.email,
+        } as SystemConfig;
       } catch {
         return defaultConfig;
       }
@@ -172,9 +242,20 @@ export default function SettingsPage() {
     queryFn: async () => {
       try {
         const res = await systemService.getCache();
-        return res.data;
+        const redis = res.data?.redis;
+        if (redis) {
+          const hits = redis.hits || 0;
+          const misses = redis.misses || 0;
+          const hitRate = hits + misses > 0 ? ((hits / (hits + misses)) * 100).toFixed(1) : 0;
+          return {
+            size: redis.memory?.used || '0 MB',
+            keys: redis.keys || 0,
+            hitRate: hitRate,
+          };
+        }
+        return { size: '0 MB', keys: 0, hitRate: 0 };
       } catch {
-        return { size: '128 MB', keys: 15234, hitRate: 94.5 };
+        return { size: '-', keys: 0, hitRate: 0 };
       }
     },
     enabled: activeTab === 'maintenance',
@@ -186,9 +267,17 @@ export default function SettingsPage() {
     queryFn: async () => {
       try {
         const res = await systemService.getDatabase();
-        return res.data;
+        const postgres = res.data?.postgres;
+        if (postgres) {
+          return {
+            size: postgres.databaseSize || '0 MB',
+            connections: postgres.activeConnections || 0,
+            maxConnections: postgres.maxConnections || 100,
+          };
+        }
+        return { size: '0 MB', connections: 0, maxConnections: 100 };
       } catch {
-        return { size: '2.4 GB', connections: 12, maxConnections: 100 };
+        return { size: '-', connections: 0, maxConnections: 100 };
       }
     },
     enabled: activeTab === 'maintenance',
@@ -209,7 +298,13 @@ export default function SettingsPage() {
 
   // Save config mutation
   const saveMutation = useMutation({
-    mutationFn: () => systemService.updateConfig(formData),
+    mutationFn: async () => {
+      // Save general config and email settings separately
+      await Promise.all([
+        systemService.updateConfig(formData),
+        systemService.updateEmailSettings(formData.email),
+      ]);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system', 'config'] });
       setHasChanges(false);
@@ -244,6 +339,83 @@ export default function SettingsPage() {
     },
   });
 
+  // Fetch backups
+  const { data: backups, isLoading: backupsLoading } = useQuery({
+    queryKey: ['system', 'backups'],
+    queryFn: async () => {
+      try {
+        const res = await systemService.getBackups();
+        return res.data || [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: activeTab === 'maintenance',
+  });
+
+  // Create backup mutation
+  const createBackupMutation = useMutation({
+    mutationFn: () => systemService.createBackup(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system', 'backups'] });
+    },
+  });
+
+  // Restore backup mutation
+  const restoreBackupMutation = useMutation({
+    mutationFn: (id: string) => systemService.restoreBackup(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system', 'backups'] });
+    },
+  });
+
+  // Email templates query
+  const { data: emailTemplates, isLoading: templatesLoading } = useQuery({
+    queryKey: ['system', 'email-templates'],
+    queryFn: async () => {
+      try {
+        const res = await systemService.getEmailTemplates();
+        return res.data as Record<string, { subject: string; html: string }>;
+      } catch {
+        return {};
+      }
+    },
+    enabled: activeTab === 'templates',
+  });
+
+  // Save template mutation
+  const saveTemplateMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedTemplate) throw new Error('No template selected');
+      return systemService.updateEmailTemplate(selectedTemplate, {
+        subject: templateSubject,
+        html: templateHtml,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system', 'email-templates'] });
+      setTemplateHasChanges(false);
+    },
+  });
+
+  // Reset template mutation
+  const resetTemplateMutation = useMutation({
+    mutationFn: (id: string) => systemService.resetEmailTemplate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['system', 'email-templates'] });
+      setTemplateHasChanges(false);
+    },
+  });
+
+  // Load template when selected
+  useEffect(() => {
+    if (selectedTemplate && emailTemplates?.[selectedTemplate]) {
+      setTemplateSubject(emailTemplates[selectedTemplate].subject);
+      setTemplateHtml(emailTemplates[selectedTemplate].html);
+      setTemplateHasChanges(false);
+    }
+  }, [selectedTemplate, emailTemplates]);
+
   const updateFormData = (section: keyof SystemConfig, key: string, value: any) => {
     setFormData((prev) => ({
       ...prev,
@@ -256,6 +428,7 @@ export default function SettingsPage() {
     { id: 'general', label: '常规设置', icon: Globe },
     { id: 'api', label: 'API 设置', icon: Zap },
     { id: 'email', label: '邮件设置', icon: Mail },
+    { id: 'templates', label: '邮件模板', icon: FileText },
     { id: 'security', label: '安全设置', icon: Shield },
     { id: 'features', label: '功能开关', icon: Bell },
     { id: 'maintenance', label: '系统维护', icon: Server },
@@ -690,6 +863,173 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Email Templates */}
+      {activeTab === 'templates' && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Template List */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">邮件模板</h3>
+            {templatesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(EMAIL_TEMPLATE_INFO).map(([id, info]) => {
+                  const isSelected = selectedTemplate === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setSelectedTemplate(id)}
+                      className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Mail className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-gray-400'}`} />
+                        <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
+                          {info.name}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">{info.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Template Editor */}
+          <div className="lg:col-span-2">
+            {selectedTemplate ? (
+              <div className="rounded-lg bg-white p-6 shadow">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      {EMAIL_TEMPLATE_INFO[selectedTemplate]?.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {EMAIL_TEMPLATE_INFO[selectedTemplate]?.description}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPreview(!showPreview)}
+                    >
+                      {showPreview ? (
+                        <>
+                          <Code className="mr-2 h-4 w-4" />
+                          编辑
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          预览
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resetTemplateMutation.mutate(selectedTemplate)}
+                      disabled={resetTemplateMutation.isPending}
+                    >
+                      {resetTemplateMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RotateCw className="mr-2 h-4 w-4" />
+                      )}
+                      重置
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => saveTemplateMutation.mutate()}
+                      disabled={!templateHasChanges || saveTemplateMutation.isPending}
+                    >
+                      {saveTemplateMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      保存
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Variables info */}
+                <div className="mb-4 rounded-lg bg-blue-50 p-3">
+                  <p className="text-sm text-blue-700">
+                    <span className="font-medium">可用变量：</span>{' '}
+                    {EMAIL_TEMPLATE_INFO[selectedTemplate]?.variables.map((v) => (
+                      <code key={v} className="mx-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs">
+                        {`{{${v}}}`}
+                      </code>
+                    ))}
+                  </p>
+                </div>
+
+                {showPreview ? (
+                  /* Preview Mode */
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-gray-500">邮件主题</Label>
+                      <p className="mt-1 rounded-lg border bg-gray-50 p-3">{templateSubject}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-500">邮件内容</Label>
+                      <div
+                        className="mt-1 min-h-[300px] rounded-lg border bg-white p-4"
+                        dangerouslySetInnerHTML={{ __html: templateHtml }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Edit Mode */
+                  <div className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="templateSubject">邮件主题</Label>
+                      <Input
+                        id="templateSubject"
+                        value={templateSubject}
+                        onChange={(e) => {
+                          setTemplateSubject(e.target.value);
+                          setTemplateHasChanges(true);
+                        }}
+                        placeholder="邮件主题，可使用 {{变量}}"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="templateHtml">邮件内容 (HTML)</Label>
+                      <Textarea
+                        id="templateHtml"
+                        value={templateHtml}
+                        onChange={(e) => {
+                          setTemplateHtml(e.target.value);
+                          setTemplateHasChanges(true);
+                        }}
+                        placeholder="HTML 内容，可使用 {{变量}}"
+                        className="min-h-[300px] font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg bg-white p-6 shadow">
+                <div className="text-center text-gray-500">
+                  <FileText className="mx-auto h-12 w-12 text-gray-300" />
+                  <p className="mt-2">选择左侧的模板进行编辑</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* System Maintenance */}
       {activeTab === 'maintenance' && (
         <div className="space-y-6">
@@ -767,6 +1107,83 @@ export default function SettingsPage() {
                 </Badge>
               </div>
             </div>
+          </div>
+
+          {/* Backup Management */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">备份管理</h3>
+              <Button
+                onClick={() => createBackupMutation.mutate()}
+                disabled={createBackupMutation.isPending}
+              >
+                {createBackupMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
+                创建备份
+              </Button>
+            </div>
+
+            {backupsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : backups?.length ? (
+              <div className="space-y-3">
+                {backups.map((backup: any) => (
+                  <div
+                    key={backup.id}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-lg bg-blue-100 p-2">
+                        <Database className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{backup.database || 'Database'}</p>
+                        <div className="flex items-center gap-3 text-sm text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(backup.createdAt).toLocaleString('zh-CN')}
+                          </span>
+                          <span>{backup.size}</span>
+                          <Badge
+                            className={
+                              backup.status === 'completed'
+                                ? 'bg-green-100 text-green-700'
+                                : backup.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }
+                          >
+                            {backup.status === 'completed' ? '完成' : backup.status === 'failed' ? '失败' : backup.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => restoreBackupMutation.mutate(backup.id)}
+                        disabled={backup.status !== 'completed' || restoreBackupMutation.isPending}
+                      >
+                        <Upload className="mr-1 h-4 w-4" />
+                        恢复
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-gray-500">
+                <Archive className="mx-auto h-12 w-12 text-gray-300" />
+                <p className="mt-2">暂无备份记录</p>
+                <p className="text-sm">点击"创建备份"按钮创建第一个备份</p>
+              </div>
+            )}
           </div>
 
           {/* Danger Zone */}

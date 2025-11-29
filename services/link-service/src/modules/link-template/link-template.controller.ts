@@ -19,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 
 import { LinkTemplateService } from './link-template.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import {
   CreateLinkTemplateDto,
   UpdateLinkTemplateDto,

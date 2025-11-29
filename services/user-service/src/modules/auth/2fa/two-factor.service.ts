@@ -322,7 +322,10 @@ export class TwoFactorService {
   }
 
   private getEncryptionKey(): Buffer {
-    const secret = this.configService.get('TWO_FACTOR_SECRET', 'default-2fa-secret-change-me');
+    const secret = this.configService.get('TWO_FACTOR_SECRET');
+    if (!secret) {
+      throw new Error('TWO_FACTOR_SECRET environment variable is required for 2FA');
+    }
     return crypto.scryptSync(secret, 'salt', 32);
   }
 

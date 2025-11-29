@@ -52,6 +52,7 @@ export class PageComment {
     enum: CommentStatus,
     default: CommentStatus.PENDING,
   })
+  @Index()
   status: CommentStatus;
 
   @Column({ default: 0 })
@@ -70,6 +71,7 @@ export class PageComment {
   city?: string;
 
   @Column({ type: 'uuid', nullable: true })
+  @Index()
   parentId?: string;
 
   @ManyToOne(() => PageComment, { nullable: true, onDelete: 'CASCADE' })

@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
+  Index,
 } from 'typeorm';
 
 export enum UserRole {
@@ -20,11 +21,14 @@ export enum UserStatus {
 }
 
 @Entity('users')
+@Index(['status', 'createdAt'])
+@Index(['teamId', 'status'])
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ unique: true })
+  @Index()
   email: string;
 
   @Column()
@@ -52,9 +56,11 @@ export class User {
   role: UserRole;
 
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
+  @Index()
   status: UserStatus;
 
   @Column({ nullable: true })
+  @Index()
   teamId?: string;
 
   @Column({ nullable: true })

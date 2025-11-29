@@ -29,11 +29,14 @@ export class SearchService implements OnModuleInit {
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get('MEILISEARCH_HOST', 'http://localhost:60035');
-    const apiKey = this.configService.get('MEILISEARCH_API_KEY', 'meilisearch-master-key-change-in-production');
+    const apiKey = this.configService.get('MEILISEARCH_API_KEY') || this.configService.get('MEILI_MASTER_KEY');
+    if (!apiKey) {
+      this.logger.warn('MEILISEARCH_API_KEY or MEILI_MASTER_KEY not configured, search may not work');
+    }
 
     this.client = new MeiliSearch({
       host,
-      apiKey,
+      apiKey: apiKey || '',
     });
   }
 

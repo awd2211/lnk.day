@@ -60,6 +60,7 @@ export class ShopifyConnection {
   };
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ nullable: true })

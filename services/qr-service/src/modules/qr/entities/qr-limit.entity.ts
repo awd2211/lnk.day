@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity('qr_limits')
+@Index(['qrId', 'enabled'])
 export class QrLimit {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -17,6 +18,7 @@ export class QrLimit {
   qrId: string;
 
   @Column()
+  @Index()
   teamId: string;
 
   // 扫码次数限制
@@ -53,6 +55,7 @@ export class QrLimit {
 
   // 是否启用
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   // 超出限制时的行为

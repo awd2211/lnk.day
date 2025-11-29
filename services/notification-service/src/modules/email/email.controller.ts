@@ -20,4 +20,11 @@ export class EmailController {
     await this.emailService.sendWelcomeEmail(body.to, body.name);
     return { message: 'Welcome email queued' };
   }
+
+  @Post('test')
+  @ApiOperation({ summary: '发送测试邮件' })
+  async sendTestEmail(@Body() body: { to: string }) {
+    await this.emailService.sendTestEmail(body.to);
+    return { success: true, message: '测试邮件已发送' };
+  }
 }

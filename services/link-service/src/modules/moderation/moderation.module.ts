@@ -5,12 +5,10 @@ import { ModerationService } from './moderation.service';
 import { FlaggedLink } from './entities/flagged-link.entity';
 import { LinkReport } from './entities/link-report.entity';
 import { Link } from '../link/entities/link.entity';
-import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([FlaggedLink, LinkReport, Link]),
-    AuthModule,
   ],
   controllers: [ModerationController],
   providers: [ModerationService],

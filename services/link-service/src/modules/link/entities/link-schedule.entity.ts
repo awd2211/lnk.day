@@ -23,6 +23,7 @@ export enum ScheduleStatus {
 }
 
 @Entity('link_schedules')
+@Index(['status', 'scheduledAt'])
 export class LinkSchedule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -46,6 +47,7 @@ export class LinkSchedule {
   timezone: string;
 
   @Column({ type: 'enum', enum: ScheduleStatus, default: ScheduleStatus.PENDING })
+  @Index()
   status: ScheduleStatus;
 
   @Column({ nullable: true })

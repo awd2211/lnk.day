@@ -1,8 +1,16 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import axios, { AxiosInstance } from 'axios';
 import * as os from 'os';
+import * as fs from 'fs';
+import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import Redis from 'ioredis';
+
+const execAsync = promisify(exec);
 
 export interface ServiceInfo {
   name: string;
@@ -17,12 +25,17 @@ export class SystemService {
   private readonly services: ServiceInfo[];
   private redis: Redis | null = null;
   private featureFlags: Map<string, boolean> = new Map();
+  private clickhouseUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectDataSource() private readonly dataSource: DataSource,
+  ) {
+    this.clickhouseUrl = this.configService.get('CLICKHOUSE_HTTP_URL', 'http://localhost:60032');
     this.httpClient = axios.create({
       timeout: 5000,
       headers: {
-        'x-internal-key': this.configService.get('INTERNAL_API_KEY'),
+        'x-internal-api-key': this.configService.get('INTERNAL_API_KEY'),
       },
     });
 
@@ -38,13 +51,14 @@ export class SystemService {
     }
 
     // Initialize default feature flags
-    this.featureFlags.set('analytics', true);
-    this.featureFlags.set('campaigns', true);
-    this.featureFlags.set('deeplinks', true);
-    this.featureFlags.set('pages', true);
-    this.featureFlags.set('qrCodes', true);
-    this.featureFlags.set('webhooks', true);
-    this.featureFlags.set('apiRateLimiting', true);
+    // Feature flags matching frontend expected names
+    this.featureFlags.set('enableRegistration', true);
+    this.featureFlags.set('enableBioLinks', true);
+    this.featureFlags.set('enableQRCodes', true);
+    this.featureFlags.set('enableCampaigns', true);
+    this.featureFlags.set('enableTeams', true);
+    this.featureFlags.set('enableDeepLinks', true);
+    this.featureFlags.set('enableRedirectRules', true);
     this.featureFlags.set('maintenanceMode', false);
 
     this.services = [
@@ -147,15 +161,58 @@ export class SystemService {
   async getServiceLogs(serviceName: string, options?: { lines?: number; level?: string }): Promise<{
     service: string;
     logs: string[];
+    total: number;
     message: string;
   }> {
-    // In a real implementation, this would fetch logs from a centralized logging system
-    // like ELK Stack, Loki, or CloudWatch
-    return {
-      service: serviceName,
-      logs: [],
-      message: 'Log aggregation not configured. Connect to ELK/Loki for centralized logging.',
-    };
+    const lines = options?.lines || 100;
+    const level = options?.level;
+
+    try {
+      // Try to read from PM2 logs
+      const pm2LogDir = path.join(os.homedir(), '.pm2', 'logs');
+      const outLogFile = path.join(pm2LogDir, `${serviceName}-out.log`);
+      const errLogFile = path.join(pm2LogDir, `${serviceName}-error.log`);
+
+      let logs: string[] = [];
+
+      // Read out log
+      if (fs.existsSync(outLogFile)) {
+        const { stdout } = await execAsync(`tail -n ${lines} "${outLogFile}"`);
+        logs.push(...stdout.split('\n').filter(line => line.trim()));
+      }
+
+      // Read error log
+      if (fs.existsSync(errLogFile)) {
+        const { stdout } = await execAsync(`tail -n ${lines} "${errLogFile}"`);
+        logs.push(...stdout.split('\n').filter(line => line.trim()));
+      }
+
+      // Filter by log level if specified
+      if (level) {
+        const levelPattern = new RegExp(`\\b${level.toUpperCase()}\\b`, 'i');
+        logs = logs.filter(line => levelPattern.test(line));
+      }
+
+      // Sort by timestamp (newest first) and limit
+      logs = logs
+        .sort((a, b) => b.localeCompare(a))
+        .slice(0, lines);
+
+      return {
+        service: serviceName,
+        logs,
+        total: logs.length,
+        message: logs.length > 0 ? 'Logs retrieved from PM2' : 'No logs found for this service',
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to get logs for ${serviceName}`, error);
+      return {
+        service: serviceName,
+        logs: [],
+        total: 0,
+        message: `Failed to retrieve logs: ${error?.message || 'Unknown error'}`,
+      };
+    }
   }
 
   async getConfig(): Promise<{
@@ -163,27 +220,67 @@ export class SystemService {
     services: ServiceInfo[];
     features: Record<string, boolean>;
   }> {
+    // Use the featureFlags Map for dynamic configuration
+    const features: Record<string, boolean> = {};
+    this.featureFlags.forEach((value, key) => {
+      features[key] = value;
+    });
+
     return {
       environment: this.configService.get('NODE_ENV', 'development'),
       services: this.services,
-      features: {
-        analytics: true,
-        campaigns: true,
-        deeplinks: true,
-        pages: true,
-        qrCodes: true,
-        webhooks: true,
-      },
+      features,
     };
   }
 
-  async restartService(serviceName: string): Promise<{ success: boolean; message: string }> {
-    // This would integrate with a container orchestrator like Docker Swarm or Kubernetes
+  async restartService(serviceName: string): Promise<{ success: boolean; message: string; details?: any }> {
     this.logger.warn(`Service restart requested for: ${serviceName}`);
-    return {
-      success: false,
-      message: 'Service restart requires container orchestration. Use Docker/K8s commands.',
-    };
+
+    // Validate service name to prevent command injection
+    const validServiceNames = this.services.map(s => s.name);
+    if (!validServiceNames.includes(serviceName)) {
+      return {
+        success: false,
+        message: `Unknown service: ${serviceName}. Valid services: ${validServiceNames.join(', ')}`,
+      };
+    }
+
+    try {
+      // Try PM2 restart first
+      const { stdout, stderr } = await execAsync(`pm2 restart ${serviceName} --update-env 2>&1`);
+
+      if (stderr && !stderr.includes('Process successfully started')) {
+        this.logger.error(`PM2 restart stderr: ${stderr}`);
+      }
+
+      this.logger.log(`Service ${serviceName} restarted successfully`);
+      return {
+        success: true,
+        message: `Service ${serviceName} restarted successfully`,
+        details: { output: stdout.trim() },
+      };
+    } catch (pm2Error: any) {
+      this.logger.warn(`PM2 restart failed for ${serviceName}, trying Docker...`);
+
+      // Try Docker restart as fallback
+      try {
+        const containerName = `lnk-${serviceName}`;
+        const { stdout } = await execAsync(`docker restart ${containerName} 2>&1`);
+
+        return {
+          success: true,
+          message: `Docker container ${containerName} restarted successfully`,
+          details: { output: stdout.trim() },
+        };
+      } catch (dockerError: any) {
+        this.logger.error(`Failed to restart ${serviceName}`, dockerError);
+        return {
+          success: false,
+          message: `Failed to restart ${serviceName}. Neither PM2 nor Docker container found.`,
+          details: { pm2Error: pm2Error?.message, dockerError: dockerError?.message },
+        };
+      }
+    }
   }
 
   async getQueueStats(): Promise<{
@@ -195,14 +292,43 @@ export class SystemService {
       failed: number;
     }>;
   }> {
-    // Would fetch from Bull/BullMQ dashboard or Redis directly
-    return {
-      queues: [
-        { name: 'email', waiting: 0, active: 0, completed: 0, failed: 0 },
-        { name: 'webhook', waiting: 0, active: 0, completed: 0, failed: 0 },
-        { name: 'analytics', waiting: 0, active: 0, completed: 0, failed: 0 },
-      ],
-    };
+    const queues: Array<{
+      name: string;
+      waiting: number;
+      active: number;
+      completed: number;
+      failed: number;
+    }> = [];
+
+    try {
+      // Query RabbitMQ Management API
+      const rabbitmqUrl = this.configService.get('RABBITMQ_MANAGEMENT_URL', 'http://localhost:60037');
+      const rabbitmqUser = this.configService.get('RABBITMQ_USER', 'rabbit');
+      const rabbitmqPass = this.configService.get('RABBITMQ_PASS', 'rabbit123');
+
+      const response = await axios.get(`${rabbitmqUrl}/api/queues`, {
+        auth: {
+          username: rabbitmqUser,
+          password: rabbitmqPass,
+        },
+        timeout: 3000,
+      });
+
+      for (const queue of response.data) {
+        queues.push({
+          name: queue.name,
+          waiting: queue.messages_ready || 0,
+          active: queue.messages_unacknowledged || 0,
+          completed: queue.message_stats?.ack || 0,
+          failed: queue.message_stats?.redeliver || 0,
+        });
+      }
+    } catch (error) {
+      this.logger.warn('Failed to get RabbitMQ queue stats', error);
+      // Return empty array if RabbitMQ is not available
+    }
+
+    return { queues };
   }
 
   async getCacheStats(): Promise<{
@@ -272,19 +398,73 @@ export class SystemService {
       diskUsage: string;
     };
   }> {
-    // Would query database system tables
+    // PostgreSQL stats
+    let pgStats = {
+      connected: false,
+      activeConnections: 0,
+      maxConnections: 100,
+      databaseSize: '0MB',
+    };
+
+    try {
+      // Check if connected
+      if (this.dataSource.isInitialized) {
+        pgStats.connected = true;
+
+        // Get active connections
+        const activeResult = await this.dataSource.query(
+          `SELECT count(*) as count FROM pg_stat_activity WHERE state = 'active'`
+        );
+        pgStats.activeConnections = parseInt(activeResult[0]?.count || '0', 10);
+
+        // Get max connections
+        const maxResult = await this.dataSource.query(
+          `SHOW max_connections`
+        );
+        pgStats.maxConnections = parseInt(maxResult[0]?.max_connections || '100', 10);
+
+        // Get database size
+        const sizeResult = await this.dataSource.query(
+          `SELECT pg_size_pretty(pg_database_size(current_database())) as size`
+        );
+        pgStats.databaseSize = sizeResult[0]?.size || '0MB';
+      }
+    } catch (error) {
+      this.logger.error('Failed to get PostgreSQL stats', error);
+    }
+
+    // ClickHouse stats
+    let chStats = {
+      connected: false,
+      totalRows: 0,
+      diskUsage: '0MB',
+    };
+
+    try {
+      // Query ClickHouse HTTP interface
+      const rowsResponse = await axios.get(`${this.clickhouseUrl}/?query=SELECT sum(rows) FROM system.parts WHERE active FORMAT JSONCompact`, {
+        timeout: 3000,
+      });
+      const rowsData = rowsResponse.data;
+      if (rowsData?.data?.[0]?.[0]) {
+        chStats.totalRows = parseInt(rowsData.data[0][0], 10);
+      }
+      chStats.connected = true;
+
+      const diskResponse = await axios.get(`${this.clickhouseUrl}/?query=SELECT formatReadableSize(sum(bytes_on_disk)) FROM system.parts WHERE active FORMAT JSONCompact`, {
+        timeout: 3000,
+      });
+      const diskData = diskResponse.data;
+      if (diskData?.data?.[0]?.[0]) {
+        chStats.diskUsage = diskData.data[0][0];
+      }
+    } catch (error) {
+      this.logger.warn('Failed to get ClickHouse stats', error);
+    }
+
     return {
-      postgres: {
-        connected: true,
-        activeConnections: 0,
-        maxConnections: 100,
-        databaseSize: '0MB',
-      },
-      clickhouse: {
-        connected: true,
-        totalRows: 0,
-        diskUsage: '0MB',
-      },
+      postgres: pgStats,
+      clickhouse: chStats,
     };
   }
 
@@ -298,9 +478,6 @@ export class SystemService {
   }
 
   async updateFeatureFlag(flag: string, enabled: boolean): Promise<{ flag: string; enabled: boolean }> {
-    if (!this.featureFlags.has(flag)) {
-      throw new BadRequestException(`Unknown feature flag: ${flag}`);
-    }
     this.featureFlags.set(flag, enabled);
     this.logger.log(`Feature flag '${flag}' set to ${enabled}`);
     return { flag, enabled };
@@ -358,23 +535,192 @@ export class SystemService {
   }
 
   // Backup Operations
+  private getBackupDir(): string {
+    const backupDir = this.configService.get('BACKUP_DIR', '/home/eric/lnk.day/backups');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    return backupDir;
+  }
+
+  private getBackupMetadataFile(): string {
+    return path.join(this.getBackupDir(), 'backup-metadata.json');
+  }
+
+  private loadBackupMetadata(): Array<{
+    id: string;
+    type: string;
+    status: string;
+    size: string;
+    filename: string;
+    database: string;
+    createdAt: Date;
+  }> {
+    const metadataFile = this.getBackupMetadataFile();
+    if (fs.existsSync(metadataFile)) {
+      try {
+        const data = fs.readFileSync(metadataFile, 'utf-8');
+        return JSON.parse(data);
+      } catch (error) {
+        this.logger.error('Failed to load backup metadata', error);
+      }
+    }
+    return [];
+  }
+
+  private saveBackupMetadata(metadata: Array<any>): void {
+    const metadataFile = this.getBackupMetadataFile();
+    fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+  }
+
   async createBackup(type: 'full' | 'incremental' = 'full'): Promise<{
     success: boolean;
     backupId: string;
     type: string;
     message: string;
     timestamp: Date;
+    filename?: string;
+    databases?: string[];
   }> {
-    // In a real implementation, this would trigger backup via pg_dump, ClickHouse backup, etc.
     const backupId = `backup_${Date.now()}`;
-    this.logger.log(`Backup requested: ${type} - ${backupId}`);
-    return {
-      success: true,
-      backupId,
-      type,
-      message: 'Backup request queued. Check backup status for progress.',
-      timestamp: new Date(),
-    };
+    const timestamp = new Date();
+    const backupDir = this.getBackupDir();
+
+    // Get database configuration
+    const dbHost = this.configService.get('DB_HOST', 'localhost');
+    const dbPort = this.configService.get('DB_PORT', '60030');
+    const dbUser = this.configService.get('DB_USER', 'postgres');
+    const dbPassword = this.configService.get('DB_PASSWORD', 'postgres');
+
+    // All databases to backup
+    const databases = [
+      'lnk_users',
+      'lnk_links',
+      'lnk_campaigns',
+      'lnk_pages',
+      'lnk_qr',
+      'lnk_deeplinks',
+      'lnk_notifications',
+      'lnk_console',
+      'lnk_domains',
+      'lnk_webhooks',
+      'lnk_integrations',
+      'lnk_gateway',
+      'lnk_main',
+    ];
+
+    const filename = `${backupId}_all_databases.tar.gz`;
+    const backupPath = path.join(backupDir, filename);
+    const tempDir = path.join(backupDir, backupId);
+
+    this.logger.log(`Creating ${type} backup for all databases: ${backupId}`);
+
+    try {
+      // Create temp directory
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      const backedUpDbs: string[] = [];
+
+      // Backup each database using docker exec
+      for (const dbName of databases) {
+        try {
+          const dbBackupFile = path.join(tempDir, `${dbName}.sql`);
+          // Use docker exec to run pg_dump inside the PostgreSQL container
+          const pgDumpCmd = `docker exec lnk-postgres pg_dump -U ${dbUser} -d ${dbName} > "${dbBackupFile}" 2>/dev/null`;
+          await execAsync(pgDumpCmd, { shell: '/bin/bash' });
+
+          // Check if file has content (database exists)
+          if (fs.existsSync(dbBackupFile)) {
+            const stats = fs.statSync(dbBackupFile);
+            if (stats.size > 100) {  // Minimum valid SQL file size
+              backedUpDbs.push(dbName);
+            } else {
+              fs.unlinkSync(dbBackupFile);
+            }
+          }
+        } catch {
+          // Database might not exist, skip
+          this.logger.warn(`Database ${dbName} not found or backup failed, skipping`);
+        }
+      }
+
+      // Create tar.gz archive
+      await execAsync(`cd "${tempDir}" && tar -czf "${backupPath}" *.sql`, { shell: '/bin/bash' });
+
+      // Cleanup temp directory
+      fs.rmSync(tempDir, { recursive: true, force: true });
+
+      // Get file size
+      const stats = fs.statSync(backupPath);
+      const size = this.formatBytes(stats.size);
+
+      // Update metadata
+      const metadata = this.loadBackupMetadata();
+      metadata.unshift({
+        id: backupId,
+        type,
+        status: 'completed',
+        size,
+        filename,
+        database: `${backedUpDbs.length} databases`,
+        createdAt: timestamp,
+      });
+
+      // Keep only last 20 backups in metadata
+      if (metadata.length > 20) {
+        metadata.splice(20);
+      }
+
+      this.saveBackupMetadata(metadata);
+
+      this.logger.log(`Backup completed: ${backupId}, size: ${size}, databases: ${backedUpDbs.join(', ')}`);
+
+      return {
+        success: true,
+        backupId,
+        type,
+        message: `Backup created successfully: ${backedUpDbs.length} databases`,
+        timestamp,
+        filename,
+        databases: backedUpDbs,
+      };
+    } catch (error: any) {
+      this.logger.error(`Backup failed: ${backupId}`, error);
+
+      // Cleanup temp directory if exists
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+
+      // Record failed backup
+      const metadata = this.loadBackupMetadata();
+      metadata.unshift({
+        id: backupId,
+        type,
+        status: 'failed',
+        size: '0',
+        filename: '',
+        database: 'all',
+        createdAt: timestamp,
+      });
+      this.saveBackupMetadata(metadata);
+
+      return {
+        success: false,
+        backupId,
+        type,
+        message: `Backup failed: ${error?.message || 'Unknown error'}`,
+        timestamp,
+      };
+    }
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   async getBackups(): Promise<Array<{
@@ -382,25 +728,155 @@ export class SystemService {
     type: string;
     status: string;
     size: string;
+    filename?: string;
+    database?: string;
     createdAt: Date;
   }>> {
-    // Would fetch from backup storage/metadata
-    return [
-      {
-        id: 'backup_sample_1',
-        type: 'full',
-        status: 'completed',
-        size: '1.2GB',
-        createdAt: new Date(Date.now() - 86400000),
-      },
-    ];
+    const metadata = this.loadBackupMetadata();
+
+    // Verify files still exist
+    const backupDir = this.getBackupDir();
+    return metadata.map(backup => {
+      if (backup.filename && backup.status === 'completed') {
+        const backupPath = path.join(backupDir, backup.filename);
+        if (!fs.existsSync(backupPath)) {
+          backup.status = 'file_missing';
+        }
+      }
+      return backup;
+    });
   }
 
-  async restoreBackup(backupId: string): Promise<{ success: boolean; message: string }> {
+  async restoreBackup(backupId: string): Promise<{ success: boolean; message: string; databases?: string[] }> {
     this.logger.warn(`Restore requested for backup: ${backupId}`);
+
+    const metadata = this.loadBackupMetadata();
+    const backup = metadata.find(b => b.id === backupId);
+
+    if (!backup) {
+      return {
+        success: false,
+        message: `Backup not found: ${backupId}`,
+      };
+    }
+
+    if (backup.status !== 'completed') {
+      return {
+        success: false,
+        message: `Cannot restore backup with status: ${backup.status}`,
+      };
+    }
+
+    const backupDir = this.getBackupDir();
+    const backupPath = path.join(backupDir, backup.filename);
+
+    if (!fs.existsSync(backupPath)) {
+      return {
+        success: false,
+        message: `Backup file not found: ${backup.filename}`,
+      };
+    }
+
+    const dbHost = this.configService.get('DB_HOST', 'localhost');
+    const dbPort = this.configService.get('DB_PORT', '60030');
+    const dbUser = this.configService.get('DB_USER', 'postgres');
+    const dbPassword = this.configService.get('DB_PASSWORD', 'postgres');
+
+    try {
+      // Check if it's a tar.gz (multi-database) or single .sql.gz file
+      if (backup.filename.endsWith('_all_databases.tar.gz')) {
+        // Multi-database restore
+        const tempDir = path.join(backupDir, `restore_${backupId}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+
+        // Extract archive
+        await execAsync(`tar -xzf "${backupPath}" -C "${tempDir}"`, { shell: '/bin/bash' });
+
+        // Get list of SQL files
+        const sqlFiles = fs.readdirSync(tempDir).filter(f => f.endsWith('.sql'));
+        const restoredDbs: string[] = [];
+
+        // Restore each database using docker exec
+        for (const sqlFile of sqlFiles) {
+          const dbName = sqlFile.replace('.sql', '');
+          const sqlPath = path.join(tempDir, sqlFile);
+
+          try {
+            // Copy SQL file to container and restore
+            const restoreCmd = `cat "${sqlPath}" | docker exec -i lnk-postgres psql -U ${dbUser} -d ${dbName} 2>/dev/null`;
+            await execAsync(restoreCmd, { shell: '/bin/bash' });
+            restoredDbs.push(dbName);
+            this.logger.log(`Restored database: ${dbName}`);
+          } catch (err) {
+            this.logger.warn(`Failed to restore ${dbName}: ${err}`);
+          }
+        }
+
+        // Cleanup temp directory
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
+        this.logger.log(`Backup restored: ${backupId}, databases: ${restoredDbs.join(', ')}`);
+
+        return {
+          success: true,
+          message: `Backup restored successfully: ${restoredDbs.length} databases`,
+          databases: restoredDbs,
+        };
+      } else {
+        // Single database restore (legacy format)
+        const dbName = backup.database || this.configService.get('DB_NAME', 'lnk_console');
+        const restoreCmd = `gunzip -c "${backupPath}" | PGPASSWORD=${dbPassword} psql -h ${dbHost} -p ${dbPort} -U ${dbUser} -d ${dbName}`;
+
+        await execAsync(restoreCmd, { shell: '/bin/bash' });
+
+        this.logger.log(`Backup restored: ${backupId}`);
+
+        return {
+          success: true,
+          message: `Backup ${backupId} restored successfully to database ${dbName}`,
+          databases: [dbName],
+        };
+      }
+    } catch (error: any) {
+      this.logger.error(`Restore failed for ${backupId}`, error);
+      return {
+        success: false,
+        message: `Restore failed: ${error?.message || 'Unknown error'}`,
+      };
+    }
+  }
+
+  async deleteBackup(backupId: string): Promise<{ success: boolean; message: string }> {
+    const metadata = this.loadBackupMetadata();
+    const backupIndex = metadata.findIndex(b => b.id === backupId);
+
+    if (backupIndex === -1) {
+      return {
+        success: false,
+        message: `Backup not found: ${backupId}`,
+      };
+    }
+
+    const backup = metadata[backupIndex]!;
+    const backupDir = this.getBackupDir();
+
+    // Delete file if exists
+    if (backup.filename) {
+      const backupPath = path.join(backupDir, backup.filename);
+      if (fs.existsSync(backupPath)) {
+        fs.unlinkSync(backupPath);
+      }
+    }
+
+    // Remove from metadata
+    metadata.splice(backupIndex, 1);
+    this.saveBackupMetadata(metadata);
+
+    this.logger.log(`Backup deleted: ${backupId}`);
+
     return {
-      success: false,
-      message: 'Backup restoration requires manual intervention. Contact system administrator.',
+      success: true,
+      message: `Backup ${backupId} deleted successfully`,
     };
   }
 

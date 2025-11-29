@@ -10,6 +10,7 @@ import {
 export type AnalyticsPlatform = 'ga4' | 'facebook_pixel' | 'tiktok_pixel' | 'google_ads' | 'linkedin_insight';
 
 @Entity('pixel_configs')
+@Index(['teamId', 'enabled'])
 export class PixelConfigEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -32,6 +33,7 @@ export class PixelConfigEntity {
   name?: string; // Friendly name for the pixel
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column('simple-array', { nullable: true })

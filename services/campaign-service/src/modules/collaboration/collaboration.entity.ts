@@ -21,6 +21,8 @@ export enum CommentType {
 }
 
 @Entity('campaign_collaborators')
+@Index(['campaignId', 'userId'], { unique: true })
+@Index(['campaignId', 'role'])
 export class CampaignCollaborator {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -53,6 +55,7 @@ export class CampaignCollaborator {
 }
 
 @Entity('campaign_comments')
+@Index(['campaignId', 'createdAt'])
 export class CampaignComment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -62,6 +65,7 @@ export class CampaignComment {
   campaignId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column('text')
@@ -82,6 +86,7 @@ export class CampaignComment {
   }>;
 
   @Column({ nullable: true })
+  @Index()
   parentId?: string;
 
   @Column({ default: false })
@@ -95,6 +100,7 @@ export class CampaignComment {
 }
 
 @Entity('campaign_activity_log')
+@Index(['campaignId', 'createdAt'])
 export class CampaignActivityLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -104,6 +110,7 @@ export class CampaignActivityLog {
   campaignId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column()

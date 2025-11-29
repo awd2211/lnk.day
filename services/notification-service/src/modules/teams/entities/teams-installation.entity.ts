@@ -39,6 +39,7 @@ export class TeamsInstallation {
   };
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @CreateDateColumn()

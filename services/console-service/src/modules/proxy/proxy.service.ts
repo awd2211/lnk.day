@@ -14,7 +14,7 @@ export class ProxyService {
     this.httpClient = axios.create({
       timeout: 30000,
       headers: {
-        'x-internal-key': this.configService.get('INTERNAL_API_KEY'),
+        'x-internal-api-key': this.configService.get('INTERNAL_API_KEY'),
       },
     });
 
@@ -89,9 +89,33 @@ export class ProxyService {
     }
   }
 
+  // Helper to normalize list responses to { items, total } format
+  private normalizeListResponse(result: any, params?: { page?: number; limit?: number }): any {
+    if (Array.isArray(result)) {
+      return {
+        items: result,
+        total: result.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+      };
+    }
+    if (result?.items) {
+      return result;
+    }
+    // Handle various response formats: { data: [...] }, { roles: [...] }, { users: [...] }, { teams: [...] }, etc.
+    const dataArray = result?.data || result?.roles || result?.users || result?.teams || result?.members || result?.links || [];
+    return {
+      items: dataArray,
+      total: result?.total || dataArray.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
+  }
+
   // User Service Proxies
   async getUsers(params?: { page?: number; limit?: number; search?: string }, auth?: string): Promise<any> {
-    return this.forward('user', '/users', { params, headers: auth ? { Authorization: auth } : {} });
+    const result = await this.forward('user', '/users', { params, headers: auth ? { Authorization: auth } : {} });
+    return this.normalizeListResponse(result, params);
   }
 
   async getUser(id: string, auth?: string): Promise<any> {
@@ -107,7 +131,8 @@ export class ProxyService {
   }
 
   async getTeams(params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
-    return this.forward('user', '/teams', { params, headers: auth ? { Authorization: auth } : {} });
+    const result = await this.forward('user', '/teams', { params, headers: auth ? { Authorization: auth } : {} });
+    return this.normalizeListResponse(result, params);
   }
 
   async getTeam(id: string, auth?: string): Promise<any> {
@@ -116,7 +141,8 @@ export class ProxyService {
 
   // Link Service Proxies
   async getLinks(teamId: string, params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
-    return this.forward('link', '/links', { params: { ...params, teamId }, headers: auth ? { Authorization: auth } : {} });
+    const result = await this.forward('link', '/links', { params: { ...params, teamId }, headers: auth ? { Authorization: auth } : {} });
+    return this.normalizeListResponse(result, params);
   }
 
   async getLink(id: string, auth?: string): Promise<any> {
@@ -247,9 +273,10 @@ export class ProxyService {
   }
 
   async getTeamMembers(id: string, auth?: string): Promise<any> {
-    return this.forward('user', `/teams/${id}/members`, {
+    const result = await this.forward('user', `/teams/${id}/members`, {
       headers: auth ? { Authorization: auth } : {},
     });
+    return this.normalizeListResponse(result);
   }
 
   // Subscription Management
@@ -719,15 +746,22 @@ export class ProxyService {
 
   // ==================== Role Management ====================
   async getTeamRoles(teamId: string, auth?: string): Promise<any> {
-    return this.forward('user', `/teams/${teamId}/roles`, {
+    const result = await this.forward('user', `/teams/${teamId}/roles`, {
       headers: auth ? { Authorization: auth } : {},
     });
+    return this.normalizeListResponse(result);
   }
 
   async getAvailablePermissions(teamId: string, auth?: string): Promise<any> {
-    return this.forward('user', `/teams/${teamId}/roles/permissions`, {
+    const result = await this.forward('user', `/teams/${teamId}/roles/permissions`, {
       headers: auth ? { Authorization: auth } : {},
     });
+
+    // Normalize response
+    if (Array.isArray(result)) {
+      return { items: result, permissions: result };
+    }
+    return result;
   }
 
   async getTeamRole(teamId: string, roleId: string, auth?: string): Promise<any> {
@@ -778,6 +812,163 @@ export class ProxyService {
     return this.forward('user', `/teams/${teamId}/members/${memberId}`, {
       method: 'PUT',
       data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Integration Management ====================
+  async getIntegrationStats(auth?: string): Promise<any> {
+    return this.forward('integration', '/integrations/stats', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getIntegrations(params?: { page?: number; limit?: number; type?: string; status?: string; search?: string }, auth?: string): Promise<any> {
+    return this.forward('integration', '/integrations', {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getIntegration(id: string, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateIntegrationConfig(id: string, config: Record<string, any>, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}/config`, {
+      method: 'PUT',
+      data: config,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async triggerIntegrationSync(id: string, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}/sync`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async toggleIntegrationSync(id: string, enabled: boolean, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}/sync`, {
+      method: 'PATCH',
+      data: { enabled },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async disconnectIntegration(id: string, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}/disconnect`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getIntegrationSyncLogs(id: string, params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
+    return this.forward('integration', `/integrations/${id}/logs`, {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Notification Management ====================
+  async getNotificationStats(auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/stats', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getNotificationLogs(params?: { page?: number; limit?: number; type?: string; status?: string; search?: string }, auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/logs', {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getNotificationLog(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/logs/${id}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async resendNotification(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/logs/${id}/resend`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async sendNotificationBroadcast(data: { subject: string; content: string; type: string }, auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/broadcast', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // Notification Templates
+  async getNotificationTemplates(params?: { type?: string }, auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/templates', {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getNotificationTemplate(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/templates/${id}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateNotificationTemplate(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/templates/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async resetNotificationTemplate(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/templates/${id}/reset`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // Notification Channels
+  async getNotificationChannels(auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/channels', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getNotificationChannel(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/channels/${id}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateNotificationChannel(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/channels/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async toggleNotificationChannel(id: string, enabled: boolean, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/channels/${id}`, {
+      method: 'PATCH',
+      data: { enabled },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async testNotificationChannel(id: string, auth?: string): Promise<any> {
+    return this.forward('notification', `/notifications/channels/${id}/test`, {
+      method: 'POST',
       headers: auth ? { Authorization: auth } : {},
     });
   }

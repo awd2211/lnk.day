@@ -1,0 +1,671 @@
+{
+  "common": {
+    "brand": "lnk.day",
+    "login": "登入",
+    "signup": "免費開始",
+    "learnMore": "瞭解更多",
+    "getStarted": "立即開始",
+    "startForFree": "免費開始",
+    "contactSales": "聯絡銷售",
+    "tryFree": "免費試用",
+    "email": "電子郵件",
+    "password": "密碼",
+    "name": "姓名",
+    "company": "公司",
+    "message": "留言",
+    "submit": "提交",
+    "send": "傳送訊息",
+    "backToHome": "返回首頁"
+  },
+  "nav": {
+    "products": "產品",
+    "solutions": "解決方案",
+    "pricing": "定價",
+    "resources": "資源",
+    "urlShortener": "短網址",
+    "qrCodes": "QR Code",
+    "linkInBio": "個人主頁",
+    "analytics": "數據分析",
+    "campaigns": "行銷活動",
+    "enterprise": "企業版",
+    "marketing": "行銷團隊",
+    "retail": "零售與電商",
+    "media": "媒體與出版",
+    "tech": "科技公司",
+    "blog": "部落格",
+    "guides": "指南與資源",
+    "api": "API 開發者",
+    "help": "幫助中心"
+  },
+  "hero": {
+    "badge": "全球數百萬使用者的信賴之選",
+    "title": "讓每一次",
+    "titleHighlight": "連結",
+    "titleEnd": "更有價值",
+    "subtitle": "建立短網址、QR Code 和個人主頁。透過強大的分析功能追蹤互動並優化您的行銷活動。",
+    "cta": "免費開始",
+    "secondaryCta": "觀看示範",
+    "inputPlaceholder": "在此貼上您的長網址",
+    "shortenButton": "縮短",
+    "stats": {
+      "links": "已建立連結",
+      "clicks": "點擊追蹤",
+      "users": "活躍使用者"
+    }
+  },
+  "trustedBy": {
+    "title": "全球領先品牌的共同選擇"
+  },
+  "features": {
+    "title": "管理連結所需的一切",
+    "subtitle": "強大的工具，助您大規模建立、分享和追蹤連結",
+    "shortLinks": {
+      "title": "短網址",
+      "description": "建立易於分享和記憶的品牌短網址。支援自訂網域、批次建立和 API 存取。"
+    },
+    "qrCodes": {
+      "title": "QR Code",
+      "description": "產生可隨時更新的動態 QR Code。追蹤掃描數據、自訂設計，支援多種格式下載。"
+    },
+    "linkInBio": {
+      "title": "個人主頁",
+      "description": "建立精美的著陸頁，將所有連結集中展示。社群媒體主頁的完美選擇。"
+    },
+    "analytics": {
+      "title": "數據分析",
+      "description": "取得點擊、地理位置、裝置和來源的詳細洞察。用數據驅動決策，優化您的行銷活動。"
+    },
+    "campaigns": {
+      "title": "行銷活動",
+      "description": "將連結整理為行銷活動。設定目標、追蹤表現，衡量所有行銷工作的投資報酬率。"
+    },
+    "integrations": {
+      "title": "整合",
+      "description": "與您喜愛的工具連接。支援 Zapier、HubSpot、Salesforce 等。透過強大的 API 自動化您的工作流程。"
+    }
+  },
+  "cta": {
+    "title": "準備好掌控您的連結了嗎？",
+    "subtitle": "加入數千家企業，使用 lnk.day 助力數位行銷。",
+    "button": "免費開始"
+  },
+  "products": {
+    "urlShortener": {
+      "title": "短網址",
+      "subtitle": "建立驅動轉換的品牌短網址",
+      "description": "將冗長的 URL 轉換為簡短易記的連結。追蹤每次點擊，透過詳細分析優化您的行銷效果。",
+      "features": [
+        {
+          "title": "自訂品牌連結",
+          "description": "使用您自己的網域，打造專業形象並建立信任"
+        },
+        {
+          "title": "批次建立連結",
+          "description": "透過 CSV 上傳或 API 一次性建立數千個連結"
+        },
+        {
+          "title": "連結管理",
+          "description": "編輯目標地址、設定到期時間，使用標籤整理"
+        },
+        {
+          "title": "UTM 建構器",
+          "description": "自動新增 UTM 參數用於活動追蹤"
+        }
+      ]
+    },
+    "qrCodes": {
+      "title": "QR Code",
+      "subtitle": "連結線下與線上的動態 QR Code",
+      "description": "建立精美、可自訂的 QR Code，隨時更新無需重印。追蹤掃描數據，衡量互動效果。",
+      "features": [
+        {
+          "title": "動態 QR Code",
+          "description": "隨時更新目標 URL，無需更改 QR Code 本身"
+        },
+        {
+          "title": "自訂設計",
+          "description": "新增您的 Logo，選擇顏色，符合您的品牌形象"
+        },
+        {
+          "title": "掃描分析",
+          "description": "依位置、裝置和時間追蹤掃描數據，取得可行動洞察"
+        },
+        {
+          "title": "多種格式",
+          "description": "支援 PNG、SVG 或 PDF 下載，適用於印刷和數位場景"
+        }
+      ]
+    },
+    "linkInBio": {
+      "title": "個人主頁",
+      "subtitle": "一個連結分享一切",
+      "description": "建立一個精美的著陸頁，彙集您所有重要的連結。Instagram、TikTok 等社群平台的完美選擇。",
+      "features": [
+        {
+          "title": "精美範本",
+          "description": "從數十種專業設計的範本中選擇"
+        },
+        {
+          "title": "無限連結",
+          "description": "新增任意數量的連結，按您的方式整理"
+        },
+        {
+          "title": "社群整合",
+          "description": "連接您的社群資料並突顯顯示"
+        },
+        {
+          "title": "效果追蹤",
+          "description": "查看哪些連結獲得最多點擊，據此優化"
+        }
+      ]
+    },
+    "analytics": {
+      "title": "數據分析",
+      "subtitle": "數據驅動的智慧決策",
+      "description": "透過全面的分析瞭解您的受眾。追蹤點擊，衡量互動，優化您的行銷策略。",
+      "features": [
+        {
+          "title": "即時數據",
+          "description": "透過即時儀表板查看點擊發生情況"
+        },
+        {
+          "title": "地理洞察",
+          "description": "透過詳細的地理數據瞭解受眾位置"
+        },
+        {
+          "title": "裝置分析",
+          "description": "瞭解受眾使用的裝置和瀏覽器"
+        },
+        {
+          "title": "來源追蹤",
+          "description": "查看哪些管道為您的連結帶來最多流量"
+        }
+      ]
+    },
+    "campaigns": {
+      "title": "行銷活動",
+      "subtitle": "組織和追蹤您的行銷工作",
+      "description": "將連結分組到活動中，設定目標，衡量投資報酬率。全面瞭解您在所有管道的行銷表現。",
+      "features": [
+        {
+          "title": "活動組織",
+          "description": "將相關連結分組在一起，便於管理和報告"
+        },
+        {
+          "title": "目標設定",
+          "description": "設定點擊和轉換目標來衡量活動成功"
+        },
+        {
+          "title": "A/B 測試",
+          "description": "測試不同目標頁面，優化獲得更好效果"
+        },
+        {
+          "title": "ROI 追蹤",
+          "description": "透過全面分析衡量投資報酬率"
+        }
+      ]
+    }
+  },
+  "solutions": {
+    "enterprise": {
+      "title": "企業解決方案",
+      "subtitle": "為大型組織提供可擴展的連結管理",
+      "description": "為整個組織提供企業級連結管理能力。進階安全性、專屬支援和自訂整合。",
+      "features": [
+        "單一登入 (SSO)",
+        "進階權限和角色",
+        "專屬客戶經理",
+        "自訂 SLA 保障",
+        "API 速率限制提升",
+        "自訂整合"
+      ]
+    },
+    "marketing": {
+      "title": "行銷團隊",
+      "subtitle": "用智慧連結驅動您的行銷活動",
+      "description": "在所有行銷管道中建立、管理和追蹤連結。透過數據驅動的優化提高轉換率。",
+      "features": [
+        "活動組織管理",
+        "A/B 測試功能",
+        "UTM 參數管理",
+        "團隊協作工具",
+        "效果儀表板",
+        "行銷工具整合"
+      ]
+    },
+    "retail": {
+      "title": "零售與電商",
+      "subtitle": "無縫連接客戶與產品",
+      "description": "在包裝上使用 QR Code，建立促銷短網址，追蹤客戶在所有接觸點的互動。",
+      "features": [
+        "產品 QR Code",
+        "促銷短網址",
+        "購物車追蹤",
+        "庫存整合",
+        "客戶旅程分析",
+        "行動裝置優化體驗"
+      ]
+    },
+    "media": {
+      "title": "媒體與出版",
+      "subtitle": "用可追蹤的連結分發內容",
+      "description": "使用品牌連結分享文章、影片和播客。瞭解您的受眾，增長您的讀者群。",
+      "features": [
+        "內容分發追蹤",
+        "社群分享分析",
+        "電子報連結管理",
+        "受眾洞察",
+        "訂閱轉換追蹤",
+        "多平台分析"
+      ]
+    },
+    "tech": {
+      "title": "科技公司",
+      "subtitle": "將連結管理整合到您的產品中",
+      "description": "透過我們強大的 API 將連結功能建構到您的應用程式中。白標解決方案實現無縫整合。",
+      "features": [
+        "RESTful API 存取",
+        "主流程式語言 SDK",
+        "Webhook 通知",
+        "白標選項",
+        "高流量支援",
+        "開發者文件"
+      ]
+    }
+  },
+  "about": {
+    "title": "關於 lnk.day",
+    "subtitle": "在數位世界中賦能連結",
+    "mission": {
+      "title": "我們的使命",
+      "description": "我們相信每一個連結都是連接、互動和成長的機會。我們的使命是提供讓這些連結變得有意義和可衡量的工具。"
+    },
+    "story": {
+      "title": "我們的故事",
+      "description": "lnk.day 成立於 2024 年，源於一個簡單的理念：連結管理應該強大而簡單。如今，我們服務於全球數百萬使用者，從個人創作者到財富 500 強企業。"
+    },
+    "values": {
+      "title": "我們的價值觀",
+      "items": [
+        {
+          "title": "簡潔",
+          "description": "我們讓複雜的事情變得簡單，讓每個人都能使用"
+        },
+        {
+          "title": "可靠",
+          "description": "您的連結在需要時始終可用，每一次都是"
+        },
+        {
+          "title": "隱私",
+          "description": "我們尊重您的數據，絕不出售您的資訊"
+        },
+        {
+          "title": "創新",
+          "description": "我們持續改進，始終走在您需求的前面"
+        }
+      ]
+    },
+    "stats": {
+      "links": "5億+",
+      "linksLabel": "已建立連結",
+      "clicks": "100億+",
+      "clicksLabel": "點擊追蹤",
+      "users": "10萬+",
+      "usersLabel": "滿意使用者",
+      "uptime": "99.99%",
+      "uptimeLabel": "正常運作時間"
+    }
+  },
+  "contact": {
+    "title": "聯絡我們",
+    "subtitle": "我們很樂意聽到您的聲音",
+    "description": "有問題、反饋或需要幫助？我們的團隊隨時為您服務。",
+    "form": {
+      "name": "您的姓名",
+      "email": "電子郵件地址",
+      "company": "公司（選填）",
+      "subject": "主題",
+      "message": "您的留言",
+      "submit": "傳送訊息"
+    },
+    "info": {
+      "email": "support@lnk.day",
+      "sales": "sales@lnk.day",
+      "address": "舊金山，加利福尼亞"
+    },
+    "success": "感謝您！我們會在 24 小時內回覆您。"
+  },
+  "login": {
+    "title": "歡迎回來",
+    "subtitle": "登入您的帳戶繼續",
+    "email": "電子郵件地址",
+    "password": "密碼",
+    "remember": "記住我",
+    "forgot": "忘記密碼？",
+    "submit": "登入",
+    "noAccount": "還沒有帳戶？",
+    "signUp": "免費註冊",
+    "or": "或透過以下方式繼續",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "signup": {
+    "title": "建立您的帳戶",
+    "subtitle": "立即開始免費試用。無需信用卡。",
+    "name": "姓名",
+    "email": "電子郵件地址",
+    "password": "密碼",
+    "confirmPassword": "確認密碼",
+    "terms": "我同意服務條款和隱私權政策",
+    "submit": "建立帳戶",
+    "hasAccount": "已有帳戶？",
+    "signIn": "登入",
+    "or": "或透過以下方式繼續",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "privacy": {
+    "title": "隱私權政策",
+    "lastUpdated": "最後更新：2025年1月",
+    "sections": [
+      {
+        "title": "我們收集的資訊",
+        "content": "我們收集您直接提供給我們的資訊，例如當您建立帳戶、使用我們的服務或聯絡我們取得支援時提供的資訊。"
+      },
+      {
+        "title": "我們如何使用您的資訊",
+        "content": "我們使用收集的資訊來提供、維護和改進我們的服務，處理交易，以及與您溝通。"
+      },
+      {
+        "title": "資訊共享",
+        "content": "我們不會出售您的個人資訊。我們可能會與協助我們營運服務的第三方服務供應商共享資訊。"
+      },
+      {
+        "title": "資料安全",
+        "content": "我們實施適當的技術和組織措施來保護您的個人資訊免受未經授權的存取或揭露。"
+      },
+      {
+        "title": "您的權利",
+        "content": "您有權存取、更正或刪除您的個人資訊。請聯絡 privacy@lnk.day 行使這些權利。"
+      }
+    ]
+  },
+  "terms": {
+    "title": "服務條款",
+    "lastUpdated": "最後更新：2025年1月",
+    "sections": [
+      {
+        "title": "條款接受",
+        "content": "存取或使用 lnk.day，即表示您同意受這些服務條款和我們的隱私權政策的約束。"
+      },
+      {
+        "title": "服務使用",
+        "content": "您只能將我們的服務用於合法目的並遵守這些條款。您同意不將我們的服務用於垃圾郵件、惡意軟體或任何非法活動。"
+      },
+      {
+        "title": "帳戶責任",
+        "content": "您有責任維護帳戶憑證的保密性，並對您帳戶下發生的所有活動負責。"
+      },
+      {
+        "title": "智慧財產權",
+        "content": "我們的服務及其內容受著作權、商標和其他法律保護。未經許可，您不得複製、修改或分發我們的內容。"
+      },
+      {
+        "title": "責任限制",
+        "content": "在法律允許的最大範圍內，lnk.day 不對因您使用我們的服務而產生的任何間接、附帶或後果性損害負責。"
+      }
+    ]
+  },
+  "pricing": {
+    "title": "簡單透明的定價",
+    "subtitle": "選擇適合您需求的方案。所有方案均包含核心功能。",
+    "monthly": "按月付費",
+    "yearly": "按年付費",
+    "save": "節省 20%",
+    "popular": "最受歡迎",
+    "perMonth": "/月",
+    "free": {
+      "name": "免費版",
+      "price": "NT$0",
+      "description": "適合剛起步的個人使用者",
+      "cta": "立即開始",
+      "features": [
+        "每月 50 個短網址",
+        "基礎分析",
+        "1 個自訂 QR Code",
+        "1 個個人主頁"
+      ]
+    },
+    "starter": {
+      "name": "入門版",
+      "price": "NT$390",
+      "yearlyPrice": "NT$320",
+      "description": "適合專業人士和小團隊",
+      "cta": "開始免費試用",
+      "features": [
+        "每月 1,000 個短網址",
+        "進階分析",
+        "無限 QR Code",
+        "3 個個人主頁",
+        "品牌自訂連結",
+        "API 存取"
+      ]
+    },
+    "pro": {
+      "name": "專業版",
+      "price": "NT$1,090",
+      "yearlyPrice": "NT$890",
+      "description": "適合成長中的企業",
+      "cta": "開始免費試用",
+      "features": [
+        "每月 10,000 個短網址",
+        "完整分析套件",
+        "無限 QR Code",
+        "無限個人主頁",
+        "自訂網域",
+        "團隊協作",
+        "優先支援"
+      ]
+    },
+    "enterprise": {
+      "name": "企業版",
+      "price": "自訂",
+      "description": "適合大型組織",
+      "cta": "聯絡銷售",
+      "features": [
+        "無限制使用",
+        "SSO 與進階安全",
+        "專屬客戶經理",
+        "自訂整合",
+        "SLA 保障",
+        "入職培訓"
+      ]
+    }
+  },
+  "developers": {
+    "title": "API 與開發者",
+    "subtitle": "使用我們的 API 建構強大的整合",
+    "description": "存取驅動數百萬連結的同一平台。我們的 RESTful API 讓您輕鬆以程式化方式建立、管理和追蹤連結。",
+    "features": [
+      {
+        "title": "RESTful API",
+        "description": "乾淨、文件完善的端點，支援所有連結操作"
+      },
+      {
+        "title": "SDK",
+        "description": "JavaScript、Python、Go 等程式語言的官方函式庫"
+      },
+      {
+        "title": "Webhooks",
+        "description": "連結事件和分析的即時通知"
+      },
+      {
+        "title": "速率限制",
+        "description": "慷慨的限制，企業版可提升"
+      }
+    ],
+    "cta": "查看文件"
+  },
+  "blog": {
+    "title": "部落格",
+    "subtitle": "洞察、更新和最佳實務",
+    "description": "瞭解 lnk.day 團隊的最新新聞、產品更新和行銷技巧。",
+    "comingSoon": "我們的部落格即將上線。訂閱以在發佈時收到通知。",
+    "subscribe": "訂閱更新"
+  },
+  "guides": {
+    "title": "指南與資源",
+    "subtitle": "學習如何充分利用 lnk.day",
+    "description": "全面的指南、教學和最佳實務，幫助您掌握連結管理並獲得更好的效果。",
+    "categories": [
+      {
+        "title": "入門指南",
+        "description": "學習建立和管理連結的基礎知識"
+      },
+      {
+        "title": "分析深入",
+        "description": "理解您的數據並做出更好的決策"
+      },
+      {
+        "title": "API 整合",
+        "description": "使用我們的開發者工具建構自訂解決方案"
+      },
+      {
+        "title": "最佳實務",
+        "description": "專家提示，幫助您最大化結果"
+      }
+    ]
+  },
+  "help": {
+    "title": "幫助中心",
+    "subtitle": "找到您問題的答案",
+    "description": "搜尋我們的知識庫取得答案，或聯絡我們的支援團隊獲得個人化幫助。",
+    "search": "搜尋幫助...",
+    "categories": [
+      {
+        "title": "帳戶與帳單",
+        "description": "管理您的帳戶、訂閱和付款"
+      },
+      {
+        "title": "連結管理",
+        "description": "建立、編輯和組織您的短網址"
+      },
+      {
+        "title": "數據分析",
+        "description": "理解您的點擊數據和報告"
+      },
+      {
+        "title": "API 與整合",
+        "description": "將 lnk.day 與您的其他工具連接"
+      }
+    ],
+    "contact": "還需要幫助？",
+    "contactCta": "聯絡支援"
+  },
+  "status": {
+    "title": "系統狀態",
+    "subtitle": "lnk.day 服務的即時狀態",
+    "allOperational": "所有系統正常運作",
+    "services": [
+      {
+        "name": "連結重新導向服務",
+        "status": "operational"
+      },
+      {
+        "name": "API",
+        "status": "operational"
+      },
+      {
+        "name": "控制台",
+        "status": "operational"
+      },
+      {
+        "name": "數據分析",
+        "status": "operational"
+      }
+    ],
+    "uptime": "過去 90 天 99.99% 正常運作時間",
+    "subscribe": "訂閱狀態更新"
+  },
+  "careers": {
+    "title": "加入 lnk.day",
+    "subtitle": "與我們一起建構連結的未來",
+    "description": "我們是一支充滿熱情的遠端優先團隊，致力於打造優秀的產品。加入我們，幫助全球數百萬使用者。",
+    "perks": [
+      {
+        "title": "遠端優先",
+        "description": "在世界任何地方工作"
+      },
+      {
+        "title": "有競爭力的薪資",
+        "description": "市場頂級薪酬和股權"
+      },
+      {
+        "title": "健康福利",
+        "description": "全面的醫療、牙科和視力保險"
+      },
+      {
+        "title": "學習預算",
+        "description": "年度課程和會議預算"
+      }
+    ],
+    "openings": "開放職位",
+    "noOpenings": "目前暫無開放職位。請稍後查看或傳送您的履歷。",
+    "sendResume": "傳送履歷至 careers@lnk.day"
+  },
+  "press": {
+    "title": "新聞與媒體",
+    "subtitle": "為記者提供的新聞和資源",
+    "description": "查找關於 lnk.day 的最新新聞、新聞稿和媒體資源。",
+    "contact": "媒體諮詢請聯絡 press@lnk.day",
+    "kit": "下載媒體資料包",
+    "recentNews": "最新新聞",
+    "comingSoon": "新聞稿即將發佈。"
+  },
+  "cookies": {
+    "title": "Cookie 政策",
+    "lastUpdated": "最後更新：2025年1月",
+    "sections": [
+      {
+        "title": "什麼是 Cookie",
+        "content": "Cookie 是當您造訪我們網站時儲存在您裝置上的小型文字檔案。它們透過記住您的偏好和分析網站使用情況來幫助我們提供更好的體驗。"
+      },
+      {
+        "title": "我們使用的 Cookie 類型",
+        "content": "我們使用必要 Cookie 實現網站功能，分析 Cookie 瞭解使用模式，偏好 Cookie 記住您的設定。"
+      },
+      {
+        "title": "管理 Cookie",
+        "content": "您可以透過瀏覽器設定控制 Cookie。但是，停用某些 Cookie 可能會影響網站功能。"
+      },
+      {
+        "title": "第三方 Cookie",
+        "content": "我們可能會使用設定其自己 Cookie 的第三方服務（如分析供應商）。這些由其各自的隱私權政策管理。"
+      }
+    ]
+  },
+  "footer": {
+    "description": "面向現代企業的完整連結管理平台。",
+    "product": "產品",
+    "resources": "資源",
+    "company": "公司",
+    "legal": "法律",
+    "urlShortener": "短網址",
+    "qrCodes": "QR Code",
+    "linkInBio": "個人主頁",
+    "analytics": "數據分析",
+    "api": "API",
+    "blog": "部落格",
+    "guides": "使用指南",
+    "helpCenter": "幫助中心",
+    "status": "服務狀態",
+    "about": "關於我們",
+    "careers": "加入我們",
+    "contact": "聯絡我們",
+    "press": "媒體合作",
+    "privacy": "隱私權政策",
+    "terms": "服務條款",
+    "cookies": "Cookie 政策",
+    "copyright": "© 2025 lnk.day. 保留所有權利。"
+  }
+}

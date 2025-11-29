@@ -5,6 +5,7 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 
@@ -14,12 +15,15 @@ export class PasswordResetToken {
   id: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ unique: true })
+  @Index()
   token: string;
 
   @Column()
+  @Index()
   expiresAt: Date;
 
   @CreateDateColumn()

@@ -32,6 +32,8 @@ export interface SocialMetadata {
 }
 
 @Entity('deeplinks')
+@Index(['teamId', 'enabled'])
+@Index(['teamId', 'createdAt'])
 export class DeepLink {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -41,6 +43,7 @@ export class DeepLink {
   linkId: string;
 
   @Column()
+  @Index()
   teamId: string;
 
   @Column('jsonb', { nullable: true })
@@ -68,6 +71,7 @@ export class DeepLink {
   customData: Record<string, any>;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column({ default: 0 })

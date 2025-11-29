@@ -7,7 +7,7 @@ export class InternalAuthGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const internalKey = request.headers['x-internal-key'];
+    const internalKey = request.headers['x-internal-api-key'];
     const expectedKey = this.configService.get('INTERNAL_API_KEY');
 
     if (!expectedKey) {

@@ -20,9 +20,11 @@ export class TwoFactorSecret {
   secret: string;
 
   @Column({ default: false })
+  @Index()
   enabled: boolean;
 
   @Column({ default: false })
+  @Index()
   verified: boolean;
 
   @Column('simple-array', { nullable: true })

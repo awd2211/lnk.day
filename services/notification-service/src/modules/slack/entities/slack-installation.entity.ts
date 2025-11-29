@@ -74,6 +74,7 @@ export class SlackInstallation {
   };
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @CreateDateColumn()

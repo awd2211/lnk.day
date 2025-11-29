@@ -29,6 +29,8 @@ export enum BillingCycle {
 }
 
 @Entity('subscriptions')
+@Index(['status', 'currentPeriodEnd'])
+@Index(['plan', 'status'])
 export class Subscription {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -38,9 +40,11 @@ export class Subscription {
   teamId: string;
 
   @Column({ type: 'enum', enum: PlanType })
+  @Index()
   plan: PlanType;
 
   @Column({ type: 'enum', enum: SubscriptionStatus, default: SubscriptionStatus.ACTIVE })
+  @Index()
   status: SubscriptionStatus;
 
   @Column({ type: 'enum', enum: BillingCycle, default: BillingCycle.MONTHLY })
@@ -87,6 +91,8 @@ export class Subscription {
 }
 
 @Entity('invoices')
+@Index(['status', 'dueDate'])
+@Index(['teamId', 'createdAt'])
 export class Invoice {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -96,9 +102,11 @@ export class Invoice {
   teamId: string;
 
   @Column()
+  @Index()
   subscriptionId: string;
 
   @Column({ unique: true })
+  @Index()
   invoiceNumber: string;
 
   @Column({ type: 'enum', enum: PaymentProvider, nullable: true })

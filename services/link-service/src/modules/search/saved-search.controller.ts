@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 
 import { SavedSearchService } from './saved-search.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import {
   CreateSavedSearchDto,
   UpdateSavedSearchDto,

@@ -24,6 +24,10 @@ import DomainsPage from '@/pages/DomainsPage';
 import QRCodesPage from '@/pages/QRCodesPage';
 import DeepLinksPage from '@/pages/DeepLinksPage';
 import PagesPage from '@/pages/PagesPage';
+import RolesPage from '@/pages/RolesPage';
+import AdminProfilePage from '@/pages/AdminProfilePage';
+import IntegrationsPage from '@/pages/IntegrationsPage';
+import NotificationsPage from '@/pages/NotificationsPage';
 
 function App() {
   return (
@@ -36,6 +40,7 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="teams" element={<TeamsPage />} />
+        <Route path="roles" element={<RolesPage />} />
         <Route path="links" element={<LinksPage />} />
         <Route path="campaigns" element={<CampaignsPage />} />
         <Route path="domains" element={<DomainsPage />} />
@@ -53,6 +58,9 @@ function App() {
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="system" element={<SystemPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<AdminProfilePage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
       </Route>
     </Routes>
   );

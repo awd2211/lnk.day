@@ -46,6 +46,7 @@ export class HubSpotConnection {
   webhookSubscriptionId?: string;
 
   @Column({ default: true })
+  @Index()
   isActive: boolean;
 
   @Column({ nullable: true })

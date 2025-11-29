@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
-import { Permission, RequirePermissions, RequireAnyPermission } from '@lnk/nestjs-common';
+import { Permission, RequirePermissions, RequireAnyPermission, PermissionGuard, AuthenticatedUser, CurrentUser } from '@lnk/nestjs-common';
 
 import { LinkService } from './link.service';
 import { CreateLinkDto } from './dto/create-link.dto';
@@ -20,14 +20,11 @@ import { BulkOperationDto, BulkCreateDto } from './dto/bulk-operation.dto';
 import { CloneLinkDto } from './dto/clone-link.dto';
 import { ScheduleLinkDto, UpdateScheduleDto } from './dto/schedule-link.dto';
 import { SetPasswordDto, VerifyPasswordDto } from './dto/password.dto';
-import { PermissionAuthGuard } from '../auth/guards/permission-auth.guard';
 import { InternalAuthGuard } from '../../common/guards/internal-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 
 @ApiTags('links')
 @Controller('links')
-@UseGuards(PermissionAuthGuard)
+@UseGuards(PermissionGuard)
 @ApiBearerAuth()
 export class LinkController {
   constructor(private readonly linkService: LinkService) {}
@@ -229,7 +226,7 @@ export class LinkInternalController {
   @Get('code/:shortCode')
   @UseGuards(InternalAuthGuard)
   @ApiOperation({ summary: '内部 API - 通过短码获取链接' })
-  @ApiHeader({ name: 'x-internal-key', description: '内部 API 密钥', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
   internalFindByShortCode(@Param('shortCode') shortCode: string) {
     return this.linkService.findByShortCode(shortCode);
   }
@@ -237,7 +234,7 @@ export class LinkInternalController {
   @Post('clicks/:id')
   @UseGuards(InternalAuthGuard)
   @ApiOperation({ summary: '内部 API - 增加点击计数' })
-  @ApiHeader({ name: 'x-internal-key', description: '内部 API 密钥', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
   async internalIncrementClicks(@Param('id') id: string) {
     await this.linkService.incrementClicks(id);
     return { success: true };

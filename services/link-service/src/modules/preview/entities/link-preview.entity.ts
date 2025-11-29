@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity('link_previews')
+@Index(['linkId', 'isFetched'])
 export class LinkPreview {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -62,6 +63,7 @@ export class LinkPreview {
   };
 
   @Column({ default: false })
+  @Index()
   isFetched: boolean;
 
   @Column({ nullable: true })

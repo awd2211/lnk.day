@@ -42,6 +42,8 @@ export interface RuleCondition {
 @Entity('alert_rules')
 @Index(['enabled'])
 @Index(['type'])
+@Index(['enabled', 'type'])
+@Index(['type', 'source'])
 export class AlertRule {
   @PrimaryGeneratedColumn('uuid')
   id: string;

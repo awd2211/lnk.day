@@ -21,6 +21,8 @@ export enum InvitationStatus {
 }
 
 @Entity('team_invitations')
+@Index(['teamId', 'status'])
+@Index(['status', 'expiresAt'])
 export class TeamInvitation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -49,6 +51,7 @@ export class TeamInvitation {
 
   // 邀请人
   @Column()
+  @Index()
   invitedById: string;
 
   // 被邀请人（如果已注册）

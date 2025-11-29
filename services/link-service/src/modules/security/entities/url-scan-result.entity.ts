@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('url_scan_results')
+@Index(['url', 'scannedAt'])
 export class UrlScanResult {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -29,6 +30,7 @@ export class UrlScanResult {
   reputationScore: number;
 
   @Column({ type: 'varchar', length: 50 })
+  @Index()
   reputationCategory: 'trusted' | 'safe' | 'suspicious' | 'malicious' | 'unknown';
 
   @Column('jsonb', { default: [] })

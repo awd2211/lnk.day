@@ -98,6 +98,7 @@ export class LdapConfig {
 
   // Status
   @Column({ default: false })
+  @Index()
   enabled: boolean;
 
   @Column({ nullable: true })

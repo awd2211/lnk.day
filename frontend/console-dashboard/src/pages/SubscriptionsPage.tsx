@@ -63,14 +63,15 @@ interface Subscription {
   userId: string;
   userName: string;
   userEmail: string;
-  plan: 'free' | 'core' | 'growth' | 'premium' | 'enterprise';
+  teamId: string;
+  plan: 'free' | 'starter' | 'pro' | 'enterprise';
   status: 'active' | 'canceled' | 'past_due' | 'trialing' | 'paused';
-  billingCycle: 'monthly' | 'annual';
+  billingCycle: 'monthly' | 'yearly';
   amount: number;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   cancelAtPeriodEnd: boolean;
-  trialEnd?: string;
+  trialEndsAt?: string;
   createdAt: string;
 }
 
@@ -91,12 +92,11 @@ interface SubscriptionStats {
   planDistribution: { plan: string; count: number; revenue: number }[];
 }
 
-const planConfig: Record<string, { label: string; color: string; price: { monthly: number; annual: number } }> = {
-  free: { label: '免费版', color: 'bg-gray-100 text-gray-700', price: { monthly: 0, annual: 0 } },
-  core: { label: '核心版', color: 'bg-blue-100 text-blue-700', price: { monthly: 12, annual: 99 } },
-  growth: { label: '成长版', color: 'bg-green-100 text-green-700', price: { monthly: 29, annual: 249 } },
-  premium: { label: '专业版', color: 'bg-purple-100 text-purple-700', price: { monthly: 99, annual: 990 } },
-  enterprise: { label: '企业版', color: 'bg-orange-100 text-orange-700', price: { monthly: 499, annual: 4990 } },
+const planConfig: Record<string, { label: string; color: string; price: { monthly: number; yearly: number } }> = {
+  free: { label: '免费版', color: 'bg-gray-100 text-gray-700', price: { monthly: 0, yearly: 0 } },
+  starter: { label: '入门版', color: 'bg-blue-100 text-blue-700', price: { monthly: 29, yearly: 199 } },
+  pro: { label: '专业版', color: 'bg-purple-100 text-purple-700', price: { monthly: 99, yearly: 990 } },
+  enterprise: { label: '企业版', color: 'bg-orange-100 text-orange-700', price: { monthly: 499, yearly: 4990 } },
 };
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
@@ -128,7 +128,7 @@ export default function SubscriptionsPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [extendTrialOpen, setExtendTrialOpen] = useState(false);
   const [newPlan, setNewPlan] = useState('');
-  const [newBillingCycle, setNewBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [newBillingCycle, setNewBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [trialDays, setTrialDays] = useState(7);
   const [cancelImmediately, setCancelImmediately] = useState(false);
   const queryClient = useQueryClient();
@@ -179,73 +179,78 @@ export default function SubscriptionsPage() {
           {
             id: '1',
             userId: 'u1',
-            userName: 'John Doe',
-            userEmail: 'john@example.com',
-            plan: 'growth',
+            userName: '张伟',
+            userEmail: 'zhang.wei@example.com',
+            teamId: '11111111-1111-1111-1111-111111111111',
+            plan: 'pro',
             status: 'active',
             billingCycle: 'monthly',
-            amount: 29,
-            currentPeriodStart: '2024-01-01',
-            currentPeriodEnd: '2024-02-01',
+            amount: 99,
+            currentPeriodStart: '2025-11-01',
+            currentPeriodEnd: '2025-12-01',
             cancelAtPeriodEnd: false,
             createdAt: '2023-06-15',
           },
           {
             id: '2',
             userId: 'u2',
-            userName: 'Jane Smith',
-            userEmail: 'jane@example.com',
-            plan: 'premium',
+            userName: '李娜',
+            userEmail: 'li.na@example.com',
+            teamId: '22222222-2222-2222-2222-222222222222',
+            plan: 'starter',
             status: 'active',
-            billingCycle: 'annual',
-            amount: 990,
-            currentPeriodStart: '2024-01-01',
-            currentPeriodEnd: '2025-01-01',
+            billingCycle: 'yearly',
+            amount: 199,
+            currentPeriodStart: '2025-01-01',
+            currentPeriodEnd: '2026-01-01',
             cancelAtPeriodEnd: false,
             createdAt: '2023-03-10',
           },
           {
             id: '3',
             userId: 'u3',
-            userName: 'Bob Wilson',
-            userEmail: 'bob@company.com',
+            userName: '王芳',
+            userEmail: 'wang.fang@example.com',
+            teamId: '33333333-3333-3333-3333-333333333333',
             plan: 'enterprise',
             status: 'active',
-            billingCycle: 'annual',
+            billingCycle: 'yearly',
             amount: 4990,
-            currentPeriodStart: '2024-01-01',
-            currentPeriodEnd: '2025-01-01',
+            currentPeriodStart: '2025-06-01',
+            currentPeriodEnd: '2026-06-01',
             cancelAtPeriodEnd: false,
             createdAt: '2022-11-20',
           },
           {
             id: '4',
             userId: 'u4',
-            userName: 'Alice Brown',
-            userEmail: 'alice@startup.io',
-            plan: 'core',
+            userName: '周华',
+            userEmail: 'zhou.hua@example.com',
+            teamId: '88888888-8888-8888-8888-888888888888',
+            plan: 'pro',
             status: 'past_due',
             billingCycle: 'monthly',
-            amount: 12,
-            currentPeriodStart: '2024-01-01',
-            currentPeriodEnd: '2024-02-01',
+            amount: 99,
+            currentPeriodStart: '2025-10-01',
+            currentPeriodEnd: '2025-11-01',
             cancelAtPeriodEnd: false,
             createdAt: '2023-09-05',
           },
           {
             id: '5',
             userId: 'u5',
-            userName: 'Charlie Davis',
-            userEmail: 'charlie@test.com',
-            plan: 'growth',
+            userName: '赵静',
+            userEmail: 'zhao.jing@example.com',
+            teamId: '66666666-6666-6666-6666-666666666666',
+            plan: 'pro',
             status: 'trialing',
             billingCycle: 'monthly',
-            amount: 29,
-            currentPeriodStart: '2024-01-20',
-            currentPeriodEnd: '2024-02-20',
-            trialEnd: '2024-02-03',
+            amount: 99,
+            currentPeriodStart: '2025-11-20',
+            currentPeriodEnd: '2025-12-20',
+            trialEndsAt: '2025-12-05',
             cancelAtPeriodEnd: false,
-            createdAt: '2024-01-20',
+            createdAt: '2025-11-20',
           },
         ];
         return { items: mockSubscriptions, total: 5 };
@@ -275,7 +280,7 @@ export default function SubscriptionsPage() {
 
   // Mutations
   const changePlanMutation = useMutation({
-    mutationFn: (data: { id: string; plan: string; billingCycle: 'monthly' | 'annual' }) =>
+    mutationFn: (data: { id: string; plan: string; billingCycle: 'monthly' | 'yearly' }) =>
       subscriptionsService.changePlan(data.id, { plan: data.plan, billingCycle: data.billingCycle }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
@@ -469,9 +474,8 @@ export default function SubscriptionsPage() {
             <SelectContent>
               <SelectItem value="all">全部套餐</SelectItem>
               <SelectItem value="free">免费版</SelectItem>
-              <SelectItem value="core">核心版</SelectItem>
-              <SelectItem value="growth">成长版</SelectItem>
-              <SelectItem value="premium">专业版</SelectItem>
+              <SelectItem value="starter">入门版</SelectItem>
+              <SelectItem value="pro">专业版</SelectItem>
               <SelectItem value="enterprise">企业版</SelectItem>
             </SelectContent>
           </Select>
@@ -550,9 +554,9 @@ export default function SubscriptionsPage() {
                             周期末取消
                           </span>
                         )}
-                        {sub.status === 'trialing' && sub.trialEnd && (
+                        {sub.status === 'trialing' && sub.trialEndsAt && (
                           <span className="mt-1 block text-xs text-yellow-600">
-                            试用至 {formatDate(sub.trialEnd)}
+                            试用至 {formatDate(sub.trialEndsAt)}
                           </span>
                         )}
                       </td>
@@ -771,7 +775,7 @@ export default function SubscriptionsPage() {
                       <div className="flex items-center gap-2">
                         <span>{config.label}</span>
                         <span className="text-gray-500">
-                          - ${config.price.monthly}/月 或 ${config.price.annual}/年
+                          - ${config.price.monthly}/月 或 ${config.price.yearly}/年
                         </span>
                       </div>
                     </SelectItem>
@@ -783,14 +787,14 @@ export default function SubscriptionsPage() {
               <Label>计费周期</Label>
               <Select
                 value={newBillingCycle}
-                onValueChange={(v) => setNewBillingCycle(v as 'monthly' | 'annual')}
+                onValueChange={(v) => setNewBillingCycle(v as 'monthly' | 'yearly')}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">月付</SelectItem>
-                  <SelectItem value="annual">年付 (省 2 个月)</SelectItem>
+                  <SelectItem value="yearly">年付 (省 2 个月)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -800,7 +804,7 @@ export default function SubscriptionsPage() {
                   新金额: {formatCurrency(
                     newBillingCycle === 'monthly'
                       ? planConfig[newPlan]?.price.monthly || 0
-                      : planConfig[newPlan]?.price.annual || 0
+                      : planConfig[newPlan]?.price.yearly || 0
                   )}
                   /{newBillingCycle === 'monthly' ? '月' : '年'}
                 </p>
@@ -893,13 +897,13 @@ export default function SubscriptionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            {selectedSubscription?.trialEnd && (
+            {selectedSubscription?.trialEndsAt && (
               <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-600">
-                <p>当前试用结束: {formatDate(selectedSubscription.trialEnd)}</p>
+                <p>当前试用结束: {formatDate(selectedSubscription.trialEndsAt)}</p>
                 <p className="mt-1">
                   延长后结束: {formatDate(
                     new Date(
-                      new Date(selectedSubscription.trialEnd).getTime() + trialDays * 24 * 60 * 60 * 1000
+                      new Date(selectedSubscription.trialEndsAt).getTime() + trialDays * 24 * 60 * 60 * 1000
                     ).toISOString()
                   )}
                 </p>

@@ -32,6 +32,7 @@ export class SSOConfig {
   provider: SSOProvider;
 
   @Column({ type: 'enum', enum: SSOStatus, default: SSOStatus.PENDING })
+  @Index()
   status: SSOStatus;
 
   @Column({ nullable: true })
@@ -128,6 +129,7 @@ export class SSOConfig {
 }
 
 @Entity('sso_sessions')
+@Index(['userId', 'ssoConfigId'])
 export class SSOSession {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -150,6 +152,7 @@ export class SSOSession {
   authenticatedAt: Date;
 
   @Column({ type: 'timestamp with time zone', nullable: true })
+  @Index()
   expiresAt?: Date;
 
   @Column('jsonb', { nullable: true })

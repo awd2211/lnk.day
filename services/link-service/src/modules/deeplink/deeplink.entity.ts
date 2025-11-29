@@ -50,6 +50,7 @@ export class DeepLinkConfig {
   linkId: string;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column('jsonb', { default: {} })
@@ -84,6 +85,7 @@ export class DeepLinkConfig {
 }
 
 @Entity('deferred_deep_links')
+@Index(['linkId', 'isConverted'])
 export class DeferredDeepLink {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -111,6 +113,7 @@ export class DeferredDeepLink {
   ipAddress?: string;
 
   @Column({ default: false })
+  @Index()
   isConverted: boolean;
 
   @Column({ nullable: true })
@@ -120,5 +123,6 @@ export class DeferredDeepLink {
   createdAt: Date;
 
   @Column()
+  @Index()
   expiresAt: Date;
 }

@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 export enum TeamPlan {
@@ -15,6 +16,7 @@ export enum TeamPlan {
 }
 
 @Entity('teams')
+@Index(['plan', 'createdAt'])
 export class Team {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -23,12 +25,15 @@ export class Team {
   name: string;
 
   @Column({ unique: true })
+  @Index()
   slug: string;
 
   @Column()
+  @Index()
   ownerId: string;
 
   @Column({ type: 'enum', enum: TeamPlan, default: TeamPlan.FREE })
+  @Index()
   plan: TeamPlan;
 
   @CreateDateColumn()

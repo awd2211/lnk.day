@@ -1,0 +1,671 @@
+{
+  "common": {
+    "brand": "lnk.day",
+    "login": "Log in",
+    "signup": "Get Started for Free",
+    "learnMore": "Learn More",
+    "getStarted": "Get Started",
+    "startForFree": "Start for Free",
+    "contactSales": "Contact Sales",
+    "tryFree": "Try it free",
+    "email": "Email",
+    "password": "Password",
+    "name": "Full Name",
+    "company": "Company",
+    "message": "Message",
+    "submit": "Submit",
+    "send": "Send Message",
+    "backToHome": "Back to Home"
+  },
+  "nav": {
+    "products": "Products",
+    "solutions": "Solutions",
+    "pricing": "Pricing",
+    "resources": "Resources",
+    "urlShortener": "URL Shortener",
+    "qrCodes": "QR Codes",
+    "linkInBio": "Link-in-bio",
+    "analytics": "Analytics",
+    "campaigns": "Campaigns",
+    "enterprise": "Enterprise",
+    "marketing": "Marketing Teams",
+    "retail": "Retail & E-commerce",
+    "media": "Media & Publishing",
+    "tech": "Technology",
+    "blog": "Blog",
+    "guides": "Guides & Resources",
+    "api": "API & Developers",
+    "help": "Help Center"
+  },
+  "hero": {
+    "badge": "Trusted by millions of users worldwide",
+    "title": "Make every",
+    "titleHighlight": "connection",
+    "titleEnd": "count",
+    "subtitle": "Create short links, QR codes, and Link-in-bio pages. Track engagement and optimize your marketing campaigns with powerful analytics.",
+    "cta": "Start for Free",
+    "secondaryCta": "Watch Demo",
+    "inputPlaceholder": "Paste your long URL here",
+    "shortenButton": "Shorten",
+    "stats": {
+      "links": "Links Created",
+      "clicks": "Clicks Tracked",
+      "users": "Active Users"
+    }
+  },
+  "trustedBy": {
+    "title": "Trusted by leading brands worldwide"
+  },
+  "features": {
+    "title": "Everything you need to manage your links",
+    "subtitle": "Powerful tools to create, share, and track your links at scale",
+    "shortLinks": {
+      "title": "Short Links",
+      "description": "Create branded short links that are easy to share and remember. Custom domains, bulk creation, and API access included."
+    },
+    "qrCodes": {
+      "title": "QR Codes",
+      "description": "Generate dynamic QR codes that you can update anytime. Track scans, customize designs, and download in multiple formats."
+    },
+    "linkInBio": {
+      "title": "Link-in-bio",
+      "description": "Create beautiful landing pages to showcase all your links in one place. Perfect for social media profiles."
+    },
+    "analytics": {
+      "title": "Analytics",
+      "description": "Get detailed insights on clicks, locations, devices, and referrers. Make data-driven decisions to optimize your campaigns."
+    },
+    "campaigns": {
+      "title": "Campaigns",
+      "description": "Organize your links into campaigns. Set goals, track performance, and measure ROI across all your marketing efforts."
+    },
+    "integrations": {
+      "title": "Integrations",
+      "description": "Connect with your favorite tools. Zapier, HubSpot, Salesforce, and more. Automate your workflow with our powerful API."
+    }
+  },
+  "cta": {
+    "title": "Ready to take control of your links?",
+    "subtitle": "Join thousands of businesses using lnk.day to power their digital marketing.",
+    "button": "Get Started for Free"
+  },
+  "products": {
+    "urlShortener": {
+      "title": "URL Shortener",
+      "subtitle": "Create branded short links that drive results",
+      "description": "Transform long, ugly URLs into short, memorable links. Track every click and optimize your marketing with detailed analytics.",
+      "features": [
+        {
+          "title": "Custom Branded Links",
+          "description": "Use your own domain for a professional look that builds trust"
+        },
+        {
+          "title": "Bulk Link Creation",
+          "description": "Create thousands of links at once with CSV upload or API"
+        },
+        {
+          "title": "Link Management",
+          "description": "Edit destinations, set expiration dates, and organize with tags"
+        },
+        {
+          "title": "UTM Builder",
+          "description": "Automatically add UTM parameters for campaign tracking"
+        }
+      ]
+    },
+    "qrCodes": {
+      "title": "QR Codes",
+      "subtitle": "Dynamic QR codes that connect offline to online",
+      "description": "Create beautiful, customizable QR codes that you can update anytime without reprinting. Track scans and measure engagement.",
+      "features": [
+        {
+          "title": "Dynamic QR Codes",
+          "description": "Update the destination URL anytime without changing the code"
+        },
+        {
+          "title": "Custom Design",
+          "description": "Add your logo, choose colors, and match your brand identity"
+        },
+        {
+          "title": "Scan Analytics",
+          "description": "Track scans by location, device, and time for actionable insights"
+        },
+        {
+          "title": "Multiple Formats",
+          "description": "Download in PNG, SVG, or PDF for print and digital use"
+        }
+      ]
+    },
+    "linkInBio": {
+      "title": "Link-in-bio",
+      "subtitle": "One link to share everything",
+      "description": "Create a beautiful landing page that houses all your important links. Perfect for Instagram, TikTok, and other social platforms.",
+      "features": [
+        {
+          "title": "Beautiful Templates",
+          "description": "Choose from dozens of professionally designed templates"
+        },
+        {
+          "title": "Unlimited Links",
+          "description": "Add as many links as you need, organized your way"
+        },
+        {
+          "title": "Social Integration",
+          "description": "Connect your social profiles and display them prominently"
+        },
+        {
+          "title": "Performance Tracking",
+          "description": "See which links get the most clicks and optimize accordingly"
+        }
+      ]
+    },
+    "analytics": {
+      "title": "Analytics",
+      "subtitle": "Data-driven insights for smarter decisions",
+      "description": "Understand your audience with comprehensive analytics. Track clicks, measure engagement, and optimize your marketing strategy.",
+      "features": [
+        {
+          "title": "Real-time Data",
+          "description": "See clicks as they happen with live dashboards"
+        },
+        {
+          "title": "Geographic Insights",
+          "description": "Know where your audience is located with detailed geo data"
+        },
+        {
+          "title": "Device Breakdown",
+          "description": "Understand which devices and browsers your audience uses"
+        },
+        {
+          "title": "Referrer Tracking",
+          "description": "See which channels drive the most traffic to your links"
+        }
+      ]
+    },
+    "campaigns": {
+      "title": "Campaigns",
+      "subtitle": "Organize and track your marketing efforts",
+      "description": "Group your links into campaigns, set goals, and measure ROI. Get a complete view of your marketing performance across all channels.",
+      "features": [
+        {
+          "title": "Campaign Organization",
+          "description": "Group related links together for better management and reporting"
+        },
+        {
+          "title": "Goal Setting",
+          "description": "Set click and conversion targets to measure campaign success"
+        },
+        {
+          "title": "A/B Testing",
+          "description": "Test different destinations and optimize for better results"
+        },
+        {
+          "title": "ROI Tracking",
+          "description": "Measure return on investment with comprehensive analytics"
+        }
+      ]
+    }
+  },
+  "solutions": {
+    "enterprise": {
+      "title": "Enterprise Solutions",
+      "subtitle": "Scalable link management for large organizations",
+      "description": "Empower your entire organization with enterprise-grade link management. Advanced security, dedicated support, and custom integrations.",
+      "features": [
+        "Single Sign-On (SSO)",
+        "Advanced permissions and roles",
+        "Dedicated account manager",
+        "Custom SLA guarantees",
+        "API rate limit increases",
+        "Custom integrations"
+      ]
+    },
+    "marketing": {
+      "title": "Marketing Teams",
+      "subtitle": "Power your campaigns with smart links",
+      "description": "Create, manage, and track links across all your marketing channels. Drive more conversions with data-driven optimization.",
+      "features": [
+        "Campaign organization",
+        "A/B testing capabilities",
+        "UTM parameter management",
+        "Team collaboration tools",
+        "Performance dashboards",
+        "Integration with marketing tools"
+      ]
+    },
+    "retail": {
+      "title": "Retail & E-commerce",
+      "subtitle": "Connect customers to products seamlessly",
+      "description": "Use QR codes on packaging, create short links for promotions, and track customer engagement across all touchpoints.",
+      "features": [
+        "Product QR codes",
+        "Promotional short links",
+        "Shopping cart tracking",
+        "Inventory integration",
+        "Customer journey analytics",
+        "Mobile-optimized experiences"
+      ]
+    },
+    "media": {
+      "title": "Media & Publishing",
+      "subtitle": "Distribute content with trackable links",
+      "description": "Share articles, videos, and podcasts with branded links. Understand your audience and grow your readership.",
+      "features": [
+        "Content distribution tracking",
+        "Social sharing analytics",
+        "Newsletter link management",
+        "Audience insights",
+        "Subscription conversion tracking",
+        "Multi-platform analytics"
+      ]
+    },
+    "tech": {
+      "title": "Technology Companies",
+      "subtitle": "Integrate link management into your product",
+      "description": "Build link functionality into your apps with our powerful API. White-label solutions available for seamless integration.",
+      "features": [
+        "RESTful API access",
+        "SDK for popular languages",
+        "Webhook notifications",
+        "White-label options",
+        "High-volume support",
+        "Developer documentation"
+      ]
+    }
+  },
+  "about": {
+    "title": "About lnk.day",
+    "subtitle": "Empowering connections in the digital world",
+    "mission": {
+      "title": "Our Mission",
+      "description": "We believe every link is an opportunity to connect, engage, and grow. Our mission is to provide the tools that make those connections meaningful and measurable."
+    },
+    "story": {
+      "title": "Our Story",
+      "description": "Founded in 2024, lnk.day was born from a simple idea: link management should be powerful yet simple. Today, we serve millions of users worldwide, from individual creators to Fortune 500 companies."
+    },
+    "values": {
+      "title": "Our Values",
+      "items": [
+        {
+          "title": "Simplicity",
+          "description": "We make complex things simple and accessible to everyone"
+        },
+        {
+          "title": "Reliability",
+          "description": "Your links work when you need them, every single time"
+        },
+        {
+          "title": "Privacy",
+          "description": "We respect your data and never sell your information"
+        },
+        {
+          "title": "Innovation",
+          "description": "We continuously improve to stay ahead of your needs"
+        }
+      ]
+    },
+    "stats": {
+      "links": "500M+",
+      "linksLabel": "Links Created",
+      "clicks": "10B+",
+      "clicksLabel": "Clicks Tracked",
+      "users": "100K+",
+      "usersLabel": "Happy Users",
+      "uptime": "99.99%",
+      "uptimeLabel": "Uptime"
+    }
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "We'd love to hear from you",
+    "description": "Have a question, feedback, or need help? Our team is here to assist you.",
+    "form": {
+      "name": "Your Name",
+      "email": "Email Address",
+      "company": "Company (optional)",
+      "subject": "Subject",
+      "message": "Your Message",
+      "submit": "Send Message"
+    },
+    "info": {
+      "email": "support@lnk.day",
+      "sales": "sales@lnk.day",
+      "address": "San Francisco, CA"
+    },
+    "success": "Thank you! We'll get back to you within 24 hours."
+  },
+  "login": {
+    "title": "Welcome back",
+    "subtitle": "Sign in to your account to continue",
+    "email": "Email address",
+    "password": "Password",
+    "remember": "Remember me",
+    "forgot": "Forgot password?",
+    "submit": "Sign in",
+    "noAccount": "Don't have an account?",
+    "signUp": "Sign up for free",
+    "or": "Or continue with",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "signup": {
+    "title": "Create your account",
+    "subtitle": "Start your free trial today. No credit card required.",
+    "name": "Full name",
+    "email": "Email address",
+    "password": "Password",
+    "confirmPassword": "Confirm password",
+    "terms": "I agree to the Terms of Service and Privacy Policy",
+    "submit": "Create account",
+    "hasAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "or": "Or continue with",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last updated: January 2025",
+    "sections": [
+      {
+        "title": "Information We Collect",
+        "content": "We collect information you provide directly to us, such as when you create an account, use our services, or contact us for support."
+      },
+      {
+        "title": "How We Use Your Information",
+        "content": "We use the information we collect to provide, maintain, and improve our services, process transactions, and communicate with you."
+      },
+      {
+        "title": "Information Sharing",
+        "content": "We do not sell your personal information. We may share information with third-party service providers who assist us in operating our services."
+      },
+      {
+        "title": "Data Security",
+        "content": "We implement appropriate technical and organizational measures to protect your personal information against unauthorized access or disclosure."
+      },
+      {
+        "title": "Your Rights",
+        "content": "You have the right to access, correct, or delete your personal information. Contact us at privacy@lnk.day to exercise these rights."
+      }
+    ]
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "lastUpdated": "Last updated: January 2025",
+    "sections": [
+      {
+        "title": "Acceptance of Terms",
+        "content": "By accessing or using lnk.day, you agree to be bound by these Terms of Service and our Privacy Policy."
+      },
+      {
+        "title": "Use of Services",
+        "content": "You may use our services only for lawful purposes and in accordance with these terms. You agree not to use our services for spam, malware, or any illegal activities."
+      },
+      {
+        "title": "Account Responsibilities",
+        "content": "You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account."
+      },
+      {
+        "title": "Intellectual Property",
+        "content": "Our services and their contents are protected by copyright, trademark, and other laws. You may not copy, modify, or distribute our content without permission."
+      },
+      {
+        "title": "Limitation of Liability",
+        "content": "To the maximum extent permitted by law, lnk.day shall not be liable for any indirect, incidental, or consequential damages arising from your use of our services."
+      }
+    ]
+  },
+  "pricing": {
+    "title": "Simple, transparent pricing",
+    "subtitle": "Choose the plan that fits your needs. All plans include core features.",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save": "Save 20%",
+    "popular": "Most Popular",
+    "perMonth": "/month",
+    "free": {
+      "name": "Free",
+      "price": "$0",
+      "description": "For individuals getting started",
+      "cta": "Get Started",
+      "features": [
+        "50 short links/month",
+        "Basic analytics",
+        "1 custom QR code",
+        "1 Link-in-bio page"
+      ]
+    },
+    "starter": {
+      "name": "Starter",
+      "price": "$12",
+      "yearlyPrice": "$10",
+      "description": "For professionals and small teams",
+      "cta": "Start Free Trial",
+      "features": [
+        "1,000 short links/month",
+        "Advanced analytics",
+        "Unlimited QR codes",
+        "3 Link-in-bio pages",
+        "Custom branded links",
+        "API access"
+      ]
+    },
+    "pro": {
+      "name": "Pro",
+      "price": "$35",
+      "yearlyPrice": "$29",
+      "description": "For growing businesses",
+      "cta": "Start Free Trial",
+      "features": [
+        "10,000 short links/month",
+        "Full analytics suite",
+        "Unlimited QR codes",
+        "Unlimited Link-in-bio",
+        "Custom domains",
+        "Team collaboration",
+        "Priority support"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "price": "Custom",
+      "description": "For large organizations",
+      "cta": "Contact Sales",
+      "features": [
+        "Unlimited everything",
+        "SSO & advanced security",
+        "Dedicated account manager",
+        "Custom integrations",
+        "SLA guarantee",
+        "Onboarding & training"
+      ]
+    }
+  },
+  "developers": {
+    "title": "API & Developers",
+    "subtitle": "Build powerful integrations with our API",
+    "description": "Access the same platform that powers millions of links. Our RESTful API makes it easy to create, manage, and track links programmatically.",
+    "features": [
+      {
+        "title": "RESTful API",
+        "description": "Clean, well-documented endpoints for all link operations"
+      },
+      {
+        "title": "SDKs",
+        "description": "Official libraries for JavaScript, Python, Go, and more"
+      },
+      {
+        "title": "Webhooks",
+        "description": "Real-time notifications for link events and analytics"
+      },
+      {
+        "title": "Rate Limits",
+        "description": "Generous limits with options to increase for enterprise"
+      }
+    ],
+    "cta": "View Documentation"
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Insights, updates, and best practices",
+    "description": "Stay up to date with the latest news, product updates, and marketing tips from the lnk.day team.",
+    "comingSoon": "Our blog is coming soon. Subscribe to be notified when we launch.",
+    "subscribe": "Subscribe for updates"
+  },
+  "guides": {
+    "title": "Guides & Resources",
+    "subtitle": "Learn how to get the most out of lnk.day",
+    "description": "Comprehensive guides, tutorials, and best practices to help you master link management and drive better results.",
+    "categories": [
+      {
+        "title": "Getting Started",
+        "description": "Learn the basics of creating and managing links"
+      },
+      {
+        "title": "Analytics Deep Dive",
+        "description": "Understand your data and make better decisions"
+      },
+      {
+        "title": "API Integration",
+        "description": "Build custom solutions with our developer tools"
+      },
+      {
+        "title": "Best Practices",
+        "description": "Tips from experts to maximize your results"
+      }
+    ]
+  },
+  "help": {
+    "title": "Help Center",
+    "subtitle": "Find answers to your questions",
+    "description": "Search our knowledge base for answers, or contact our support team for personalized assistance.",
+    "search": "Search for help...",
+    "categories": [
+      {
+        "title": "Account & Billing",
+        "description": "Manage your account, subscriptions, and payments"
+      },
+      {
+        "title": "Link Management",
+        "description": "Create, edit, and organize your short links"
+      },
+      {
+        "title": "Analytics",
+        "description": "Understand your click data and reports"
+      },
+      {
+        "title": "API & Integrations",
+        "description": "Connect lnk.day with your other tools"
+      }
+    ],
+    "contact": "Still need help?",
+    "contactCta": "Contact Support"
+  },
+  "status": {
+    "title": "System Status",
+    "subtitle": "Real-time status of lnk.day services",
+    "allOperational": "All Systems Operational",
+    "services": [
+      {
+        "name": "Link Redirect Service",
+        "status": "operational"
+      },
+      {
+        "name": "API",
+        "status": "operational"
+      },
+      {
+        "name": "Dashboard",
+        "status": "operational"
+      },
+      {
+        "name": "Analytics",
+        "status": "operational"
+      }
+    ],
+    "uptime": "99.99% uptime over the last 90 days",
+    "subscribe": "Subscribe to status updates"
+  },
+  "careers": {
+    "title": "Careers at lnk.day",
+    "subtitle": "Join us in building the future of links",
+    "description": "We're a remote-first team passionate about building great products. Join us and help empower millions of users worldwide.",
+    "perks": [
+      {
+        "title": "Remote First",
+        "description": "Work from anywhere in the world"
+      },
+      {
+        "title": "Competitive Pay",
+        "description": "Top-of-market compensation and equity"
+      },
+      {
+        "title": "Health Benefits",
+        "description": "Comprehensive health, dental, and vision"
+      },
+      {
+        "title": "Learning Budget",
+        "description": "Annual budget for courses and conferences"
+      }
+    ],
+    "openings": "Open Positions",
+    "noOpenings": "No open positions at the moment. Check back soon or send us your resume.",
+    "sendResume": "Send your resume to careers@lnk.day"
+  },
+  "press": {
+    "title": "Press & Media",
+    "subtitle": "News and resources for journalists",
+    "description": "Find the latest news, press releases, and media resources about lnk.day.",
+    "contact": "For press inquiries, contact press@lnk.day",
+    "kit": "Download Press Kit",
+    "recentNews": "Recent News",
+    "comingSoon": "Press releases coming soon."
+  },
+  "cookies": {
+    "title": "Cookie Policy",
+    "lastUpdated": "Last updated: January 2025",
+    "sections": [
+      {
+        "title": "What Are Cookies",
+        "content": "Cookies are small text files stored on your device when you visit our website. They help us provide a better experience by remembering your preferences and analyzing site usage."
+      },
+      {
+        "title": "Types of Cookies We Use",
+        "content": "We use essential cookies for site functionality, analytics cookies to understand usage patterns, and preference cookies to remember your settings."
+      },
+      {
+        "title": "Managing Cookies",
+        "content": "You can control cookies through your browser settings. However, disabling certain cookies may affect site functionality."
+      },
+      {
+        "title": "Third-Party Cookies",
+        "content": "We may use third-party services like analytics providers that set their own cookies. These are governed by their respective privacy policies."
+      }
+    ]
+  },
+  "footer": {
+    "description": "The complete link management platform for modern businesses.",
+    "product": "Product",
+    "resources": "Resources",
+    "company": "Company",
+    "legal": "Legal",
+    "urlShortener": "URL Shortener",
+    "qrCodes": "QR Codes",
+    "linkInBio": "Link-in-bio",
+    "analytics": "Analytics",
+    "api": "API",
+    "blog": "Blog",
+    "guides": "Guides",
+    "helpCenter": "Help Center",
+    "status": "Status",
+    "about": "About",
+    "careers": "Careers",
+    "contact": "Contact",
+    "press": "Press",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "cookies": "Cookie Policy",
+    "copyright": "© 2025 lnk.day. All rights reserved."
+  }
+}

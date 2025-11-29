@@ -65,6 +65,7 @@ export enum WebhookStatus {
 }
 
 @Entity('webhook_endpoints')
+@Index(['teamId', 'enabled'])
 export class WebhookEndpoint {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -74,6 +75,7 @@ export class WebhookEndpoint {
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column()
@@ -89,9 +91,11 @@ export class WebhookEndpoint {
   events: WebhookEventType[];
 
   @Column({ type: 'enum', enum: WebhookStatus, default: WebhookStatus.ACTIVE })
+  @Index()
   status: WebhookStatus;
 
   @Column({ default: true })
+  @Index()
   enabled: boolean;
 
   @Column({ nullable: true })

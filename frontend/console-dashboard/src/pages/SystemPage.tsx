@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Server,
@@ -9,12 +10,32 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  FileText,
+  X,
+  Loader2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { systemService } from '@/lib/api';
 
 export default function SystemPage() {
+  const [showLogsDialog, setShowLogsDialog] = useState(false);
+  const [selectedService, setSelectedService] = useState<string>('');
+  const [logLevel, setLogLevel] = useState<string>('all');
+
   const { data: info, isLoading: infoLoading, refetch: refetchInfo } = useQuery({
     queryKey: ['system', 'info'],
     queryFn: () => systemService.getInfo().then((res) => res.data),
@@ -39,6 +60,19 @@ export default function SystemPage() {
   const { data: queues } = useQuery({
     queryKey: ['system', 'queues'],
     queryFn: () => systemService.getQueues().then((res) => res.data),
+  });
+
+  const { data: logs, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
+    queryKey: ['system', 'logs', selectedService, logLevel],
+    queryFn: async () => {
+      if (!selectedService) return null;
+      const params: any = { lines: 200 };
+      if (logLevel !== 'all') params.level = logLevel;
+      const res = await systemService.getServiceLogs(selectedService, params);
+      return res.data;
+    },
+    enabled: !!selectedService && showLogsDialog,
+    refetchInterval: showLogsDialog ? 5000 : false,
   });
 
   const formatBytes = (bytes: number) => {
@@ -166,6 +200,7 @@ export default function SystemPage() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">状态</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">延迟</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">版本</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -178,6 +213,19 @@ export default function SystemPage() {
                       {service.latency > 0 ? `${service.latency}ms` : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{service.version || '-'}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedService(service.name);
+                          setShowLogsDialog(true);
+                        }}
+                      >
+                        <FileText className="mr-1 h-4 w-4" />
+                        日志
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -283,6 +331,83 @@ export default function SystemPage() {
           </div>
         </div>
       </div>
+
+      {/* Log Viewer Dialog */}
+      <Dialog open={showLogsDialog} onOpenChange={setShowLogsDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {selectedService} 日志
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">日志级别:</span>
+              <Select value={logLevel} onValueChange={setLogLevel}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部</SelectItem>
+                  <SelectItem value="error">ERROR</SelectItem>
+                  <SelectItem value="warn">WARN</SelectItem>
+                  <SelectItem value="info">INFO</SelectItem>
+                  <SelectItem value="debug">DEBUG</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchLogs()}
+              disabled={logsLoading}
+            >
+              {logsLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              刷新
+            </Button>
+            <span className="text-sm text-gray-500">
+              {logs?.total || 0} 条日志 (每5秒自动刷新)
+            </span>
+          </div>
+
+          <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-[50vh] font-mono text-sm">
+            {logsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              </div>
+            ) : logs?.logs?.length ? (
+              <div className="space-y-1">
+                {logs.logs.map((log: string, index: number) => {
+                  // Remove ANSI color codes for display
+                  const cleanLog = log.replace(/\x1b\[[0-9;]*m/g, '');
+                  // Determine log level color
+                  let textColor = 'text-gray-300';
+                  if (cleanLog.includes('ERROR')) textColor = 'text-red-400';
+                  else if (cleanLog.includes('WARN')) textColor = 'text-yellow-400';
+                  else if (cleanLog.includes('LOG')) textColor = 'text-green-400';
+                  else if (cleanLog.includes('DEBUG')) textColor = 'text-blue-400';
+
+                  return (
+                    <div key={index} className={`${textColor} whitespace-pre-wrap break-all`}>
+                      {cleanLog}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-gray-500 text-center py-8">
+                暂无日志记录
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

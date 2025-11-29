@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Headers, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { CampaignService } from './campaign.service';
 import { CampaignStatus, UTMParams } from './entities/campaign.entity';
 

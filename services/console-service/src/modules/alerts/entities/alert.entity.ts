@@ -23,6 +23,9 @@ export enum AlertStatus {
 @Index(['severity'])
 @Index(['status'])
 @Index(['createdAt'])
+@Index(['status', 'severity'])
+@Index(['status', 'createdAt'])
+@Index(['ruleId'])
 export class Alert {
   @PrimaryGeneratedColumn('uuid')
   id: string;

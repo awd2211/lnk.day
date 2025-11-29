@@ -19,7 +19,11 @@ export class NotificationClientService {
       'NOTIFICATION_SERVICE_URL',
       'http://localhost:60020',
     );
-    this.internalApiKey = this.configService.get<string>('INTERNAL_API_KEY', 'internal-key');
+    const apiKey = this.configService.get<string>('INTERNAL_API_KEY');
+    if (!apiKey) {
+      throw new Error('INTERNAL_API_KEY environment variable is required');
+    }
+    this.internalApiKey = apiKey;
   }
 
   // ========== Billing Email Notifications ==========

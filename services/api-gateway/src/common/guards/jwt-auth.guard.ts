@@ -22,7 +22,10 @@ export class JwtAuthGuard implements CanActivate {
     const token = authHeader.substring(7);
 
     try {
-      const secret = this.configService.get('JWT_SECRET', 'your-secret-key');
+      const secret = this.configService.get('JWT_SECRET');
+      if (!secret) {
+        throw new Error('JWT_SECRET environment variable is required');
+      }
       const payload = jwt.verify(token, secret) as any;
 
       // Attach user info to request

@@ -70,6 +70,8 @@ export enum AuditStatus {
 @Index(['actorType', 'actorId'])
 @Index(['targetType', 'targetId'])
 @Index(['createdAt'])
+@Index(['action', 'createdAt'])
+@Index(['status'])
 export class AuditLog {
   @PrimaryGeneratedColumn('uuid')
   id: string;

@@ -17,6 +17,8 @@ import { BillingService } from './billing.service';
 import { Subscription, SubscriptionStatus, Invoice } from './entities/subscription.entity';
 import { PlanType } from '../quota/quota.entity';
 import { UpdateSubscriptionDto, CancelSubscriptionDto } from './dto/billing.dto';
+import { Team } from '../team/entities/team.entity';
+import { User } from '../user/entities/user.entity';
 
 @ApiTags('subscriptions')
 @Controller('subscriptions')
@@ -29,6 +31,10 @@ export class SubscriptionsController {
     private readonly subscriptionRepository: Repository<Subscription>,
     @InjectRepository(Invoice)
     private readonly invoiceRepository: Repository<Invoice>,
+    @InjectRepository(Team)
+    private readonly teamRepository: Repository<Team>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   @Get('stats')
@@ -78,34 +84,70 @@ export class SubscriptionsController {
     @Query('search') search?: string,
   ) {
     const skip = (page - 1) * limit;
-    const where: FindOptionsWhere<Subscription> = {};
 
-    if (plan) {
-      where.plan = plan as PlanType;
-    }
-    if (status) {
-      where.status = status as SubscriptionStatus;
-    }
-
+    // Build query with user info via team relationship
     const queryBuilder = this.subscriptionRepository
       .createQueryBuilder('sub')
-      .where(where);
+      .leftJoin('teams', 'team', 'team.id::text = sub."teamId"')
+      .leftJoin('users', 'owner', 'owner.id = team."ownerId"::uuid')
+      .select([
+        'sub.id as id',
+        'sub."teamId" as "teamId"',
+        'sub.plan as plan',
+        'sub.status as status',
+        'sub."billingCycle" as "billingCycle"',
+        'sub.amount as amount',
+        'sub.currency as currency',
+        'sub."currentPeriodStart" as "currentPeriodStart"',
+        'sub."currentPeriodEnd" as "currentPeriodEnd"',
+        'sub."trialEndsAt" as "trialEndsAt"',
+        'sub."cancelAtPeriodEnd" as "cancelAtPeriodEnd"',
+        'sub."createdAt" as "createdAt"',
+        'team."ownerId" as "userId"',
+        'owner.name as "userName"',
+        'owner.email as "userEmail"',
+        'team.name as "teamName"',
+      ]);
 
+    if (plan) {
+      queryBuilder.andWhere('sub.plan = :plan', { plan });
+    }
+    if (status) {
+      queryBuilder.andWhere('sub.status = :status', { status });
+    }
     if (search) {
-      queryBuilder.andWhere('sub.teamId ILIKE :search', { search: `%${search}%` });
+      queryBuilder.andWhere(
+        '(owner.name ILIKE :search OR owner.email ILIKE :search OR team.name ILIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
-    const [items, total] = await queryBuilder
-      .orderBy('sub.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit)
-      .getManyAndCount();
+    // Get total count
+    const total = await this.subscriptionRepository
+      .createQueryBuilder('sub')
+      .leftJoin('teams', 'team', 'team.id::text = sub."teamId"')
+      .leftJoin('users', 'owner', 'owner.id = team."ownerId"::uuid')
+      .where(plan ? 'sub.plan = :plan' : '1=1', { plan })
+      .andWhere(status ? 'sub.status = :status' : '1=1', { status })
+      .andWhere(
+        search
+          ? '(owner.name ILIKE :search OR owner.email ILIKE :search OR team.name ILIKE :search)'
+          : '1=1',
+        { search: `%${search}%` },
+      )
+      .getCount();
+
+    const items = await queryBuilder
+      .orderBy('sub."createdAt"', 'DESC')
+      .offset(skip)
+      .limit(limit)
+      .getRawMany();
 
     return {
       items,
       total,
-      page,
-      limit,
+      page: Number(page),
+      limit: Number(limit),
       totalPages: Math.ceil(total / limit),
     };
   }

@@ -61,8 +61,8 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         ),
       );
 
-      this.connection = await Promise.race([connectionPromise, timeoutPromise]);
-      this.channel = await this.connection.createChannel();
+      this.connection = await Promise.race([connectionPromise, timeoutPromise]) as any;
+      this.channel = await (this.connection as any).createChannel();
 
       // 设置错误处理
       this.connection.on('error', (err) => {
@@ -98,7 +98,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         this.channel = null;
       }
       if (this.connection) {
-        await this.connection.close();
+        await (this.connection as any).close();
         this.connection = null;
       }
       this.logger.log('RabbitMQ disconnected');

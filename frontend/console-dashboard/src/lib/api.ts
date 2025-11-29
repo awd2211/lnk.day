@@ -1,16 +1,20 @@
 import axios from 'axios';
 
-// Console dashboard directly accesses console-service
-const CONSOLE_SERVICE_URL = import.meta.env.VITE_CONSOLE_SERVICE_URL || 'http://localhost:60009/api/v1';
+// Console dashboard uses proxy in development, direct URL in production
+const CONSOLE_SERVICE_URL = import.meta.env.PROD
+  ? (import.meta.env.VITE_CONSOLE_SERVICE_URL || 'http://localhost:60009/api/v1')
+  : '/api/v1';
 
 export const api = axios.create({
   baseURL: CONSOLE_SERVICE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 api.interceptors.request.use((config) => {
+  console.log('API Request:', config.method?.toUpperCase(), config.url, config.data);
   const token = localStorage.getItem('console_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -19,8 +23,12 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response:', response.status, response.data);
+    return response;
+  },
   (error) => {
+    console.error('API Error:', error.response?.status, error.response?.data, error.message);
     if (error.response?.status === 401) {
       localStorage.removeItem('console_token');
       window.location.href = '/login';
@@ -31,8 +39,8 @@ api.interceptors.response.use(
 
 // Admin Auth
 export const adminAuthService = {
-  login: (email: string, password: string, rememberMe = false) =>
-    api.post('/admin/login', { email, password, rememberMe }),
+  login: (email: string, password: string, rememberMe = false, twoFactorCode?: string) =>
+    api.post('/admin/login', { email, password, rememberMe, twoFactorCode }),
   forgotPassword: (email: string) => api.post('/admin/forgot-password', { email }),
   resetPassword: (token: string, password: string) =>
     api.post('/admin/reset-password', { token, password }),
@@ -41,6 +49,20 @@ export const adminAuthService = {
   createAdmin: (data: any) => api.post('/admin', data),
   updateAdmin: (id: string, data: any) => api.put(`/admin/${id}`, data),
   deleteAdmin: (id: string) => api.delete(`/admin/${id}`),
+};
+
+// Admin Profile Management
+export const profileService = {
+  getProfile: () => api.get('/admin/me'),
+  updateProfile: (data: { name?: string; email?: string }) => api.put('/admin/me', data),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    api.put('/admin/me/password', data),
+
+  // Two-Factor Authentication
+  setupTwoFactor: () => api.post('/admin/me/2fa/setup'),
+  verifyTwoFactor: (code: string) => api.post('/admin/me/2fa/verify', { code }),
+  disableTwoFactor: (code: string) => api.delete('/admin/me/2fa', { data: { code } }),
+  regenerateBackupCodes: (code: string) => api.post('/admin/me/2fa/backup-codes', { code }),
 };
 
 // Dashboard
@@ -62,6 +84,10 @@ export const systemService = {
   testEmail: (data: { to: string }) => api.post('/system/test-email', data),
   getEmailSettings: () => api.get('/system/email-settings'),
   updateEmailSettings: (data: any) => api.put('/system/email-settings', data),
+  getEmailTemplates: () => api.get('/system/email-templates'),
+  updateEmailTemplate: (id: string, data: { subject: string; html: string }) =>
+    api.put(`/system/email-templates/${id}`, data),
+  resetEmailTemplate: (id: string) => api.post(`/system/email-templates/${id}/reset`),
   getQueues: () => api.get('/system/queues'),
   clearQueue: (queueName: string) => api.post(`/system/queues/${queueName}/clear`),
   getCache: () => api.get('/system/cache'),
@@ -69,6 +95,8 @@ export const systemService = {
   getDatabase: () => api.get('/system/database'),
   getLogs: (params?: { level?: string; service?: string; limit?: number }) =>
     api.get('/system/logs', { params }),
+  getServiceLogs: (serviceName: string, params?: { lines?: number; level?: string }) =>
+    api.get(`/system/services/${serviceName}/logs`, { params }),
   getBackups: () => api.get('/system/backups'),
   createBackup: () => api.post('/system/backups'),
   restoreBackup: (id: string) => api.post(`/system/backups/${id}/restore`),
@@ -148,7 +176,7 @@ export const subscriptionsService = {
     search?: string;
   }) => api.get('/proxy/subscriptions', { params }),
   getSubscription: (id: string) => api.get(`/proxy/subscriptions/${id}`),
-  changePlan: (id: string, data: { plan: string; billingCycle: 'monthly' | 'annual' }) =>
+  changePlan: (id: string, data: { plan: string; billingCycle: 'monthly' | 'yearly' }) =>
     api.patch(`/proxy/subscriptions/${id}/plan`, data),
   cancelSubscription: (id: string, data?: { immediately?: boolean }) =>
     api.post(`/proxy/subscriptions/${id}/cancel`, data),
@@ -302,6 +330,21 @@ export const landingPagesService = {
   deletePage: (id: string) => api.delete(`/proxy/pages/${id}`),
 };
 
+// Role Management
+export const rolesService = {
+  getTeamRoles: (teamId: string) => api.get(`/proxy/teams/${teamId}/roles`),
+  getAvailablePermissions: (teamId: string) => api.get(`/proxy/teams/${teamId}/roles/permissions`),
+  getRole: (teamId: string, roleId: string) => api.get(`/proxy/teams/${teamId}/roles/${roleId}`),
+  createRole: (teamId: string, data: { name: string; description?: string; color?: string; permissions: string[]; isDefault?: boolean }) =>
+    api.post(`/proxy/teams/${teamId}/roles`, data),
+  updateRole: (teamId: string, roleId: string, data: { name?: string; description?: string; color?: string; permissions?: string[]; isDefault?: boolean }) =>
+    api.put(`/proxy/teams/${teamId}/roles/${roleId}`, data),
+  deleteRole: (teamId: string, roleId: string) => api.delete(`/proxy/teams/${teamId}/roles/${roleId}`),
+  duplicateRole: (teamId: string, roleId: string, newName: string) =>
+    api.post(`/proxy/teams/${teamId}/roles/${roleId}/duplicate`, { name: newName }),
+  initializeDefaults: (teamId: string) => api.post(`/proxy/teams/${teamId}/roles/initialize`),
+};
+
 // Data Export
 export const exportService = {
   exportUsers: (data: { format?: string; filters?: any; fields?: string[] }) =>
@@ -317,4 +360,45 @@ export const exportService = {
   getJobs: (params?: { page?: number; limit?: number }) => api.get('/proxy/export/jobs', { params }),
   getJob: (id: string) => api.get(`/proxy/export/jobs/${id}`),
   downloadExport: (id: string) => api.get(`/proxy/export/jobs/${id}/download`, { responseType: 'blob' }),
+};
+
+// Integrations
+export const integrationsService = {
+  getStats: () => api.get('/proxy/integrations/stats'),
+  getIntegrations: (params?: { page?: number; limit?: number; type?: string; status?: string; search?: string }) =>
+    api.get('/proxy/integrations', { params }),
+  getIntegration: (id: string) => api.get(`/proxy/integrations/${id}`),
+  updateConfig: (id: string, config: Record<string, any>) =>
+    api.put(`/proxy/integrations/${id}/config`, config),
+  triggerSync: (id: string) => api.post(`/proxy/integrations/${id}/sync`),
+  toggleSync: (id: string, enabled: boolean) =>
+    api.patch(`/proxy/integrations/${id}/sync`, { enabled }),
+  disconnect: (id: string) => api.post(`/proxy/integrations/${id}/disconnect`),
+  getSyncLogs: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/proxy/integrations/${id}/logs`, { params }),
+};
+
+// Notifications
+export const notificationsService = {
+  getStats: () => api.get('/proxy/notifications/stats'),
+  getLogs: (params?: { page?: number; limit?: number; type?: string; status?: string; search?: string }) =>
+    api.get('/proxy/notifications/logs', { params }),
+  getLog: (id: string) => api.get(`/proxy/notifications/logs/${id}`),
+  resend: (id: string) => api.post(`/proxy/notifications/logs/${id}/resend`),
+  sendBroadcast: (data: { subject: string; content: string; type: string }) =>
+    api.post('/proxy/notifications/broadcast', data),
+
+  // Templates
+  getTemplates: (params?: { type?: string }) => api.get('/proxy/notifications/templates', { params }),
+  getTemplate: (id: string) => api.get(`/proxy/notifications/templates/${id}`),
+  updateTemplate: (id: string, data: any) => api.put(`/proxy/notifications/templates/${id}`, data),
+  resetTemplate: (id: string) => api.post(`/proxy/notifications/templates/${id}/reset`),
+
+  // Channels
+  getChannels: () => api.get('/proxy/notifications/channels'),
+  getChannel: (id: string) => api.get(`/proxy/notifications/channels/${id}`),
+  updateChannel: (id: string, data: any) => api.put(`/proxy/notifications/channels/${id}`, data),
+  toggleChannel: (id: string, enabled: boolean) =>
+    api.patch(`/proxy/notifications/channels/${id}`, { enabled }),
+  testChannel: (id: string) => api.post(`/proxy/notifications/channels/${id}/test`),
 };

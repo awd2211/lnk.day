@@ -12,7 +12,7 @@ import {
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { WebhookService } from './webhook.service';
 import { CreateWebhookDto, UpdateWebhookDto, FireWebhookDto } from './dto/webhook.dto';
 import { WebhookPlatform } from './entities/webhook.entity';
@@ -170,7 +170,7 @@ export class WebhookController {
 
   @Post('fire')
   @ApiOperation({ summary: '触发 Webhook (内部调用)' })
-  @ApiHeader({ name: 'x-internal-key', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', required: true })
   async fireWebhook(@Body() dto: FireWebhookDto) {
     const count = await this.webhookService.fireEvent(dto.event, dto.teamId, dto.data);
     return { fired: count };

@@ -25,7 +25,13 @@ export class WebhookService {
     private readonly webhookRepository: Repository<Webhook>,
     private readonly configService: ConfigService,
   ) {
-    this.defaultSecret = this.configService.get('WEBHOOK_SECRET', 'webhook-secret');
+    const configuredSecret = this.configService.get<string>('WEBHOOK_SECRET');
+    if (!configuredSecret) {
+      this.logger.warn('WEBHOOK_SECRET not configured, using random default');
+      this.defaultSecret = crypto.randomBytes(32).toString('hex');
+    } else {
+      this.defaultSecret = configuredSecret;
+    }
   }
 
   // ========== Webhook CRUD ==========

@@ -121,6 +121,7 @@ export interface BioSettings {
 }
 
 @Entity('bio_links')
+@Index(['teamId', 'status'])
 export class BioLink {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -130,9 +131,11 @@ export class BioLink {
   username: string;  // e.g., @johndoe -> lnk.day/johndoe
 
   @Column()
+  @Index()
   teamId: string;
 
   @Column()
+  @Index()
   userId: string;
 
   @Column({ nullable: true })
@@ -166,6 +169,7 @@ export class BioLink {
     enum: BioLinkStatus,
     default: BioLinkStatus.DRAFT,
   })
+  @Index()
   status: BioLinkStatus;
 
   @Column({ default: 0 })
@@ -189,6 +193,7 @@ export class BioLink {
 
 // Individual links within a bio page
 @Entity('bio_link_items')
+@Index(['bioLinkId', 'visible'])
 export class BioLinkItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -468,6 +473,7 @@ export class BioLinkItem {
 // Link click tracking
 @Entity('bio_link_clicks')
 @Index(['bioLinkId', 'timestamp'])
+@Index(['bioLinkId', 'eventType', 'timestamp'])
 export class BioLinkClick {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -477,6 +483,7 @@ export class BioLinkClick {
   bioLinkId: string;
 
   @Column({ nullable: true })
+  @Index()
   itemId?: string;  // Which link was clicked (null for page view)
 
   @Column({ default: 'page_view' })

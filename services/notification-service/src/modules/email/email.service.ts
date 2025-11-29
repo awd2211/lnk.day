@@ -82,4 +82,16 @@ export class EmailService {
       data: { alertType, details },
     });
   }
+
+  async sendTestEmail(to: string): Promise<void> {
+    await this.sendEmail({
+      to,
+      subject: 'lnk.day 测试邮件',
+      template: 'test',
+      data: {
+        message: '这是一封测试邮件，用于验证您的邮件配置是否正确。',
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
 }

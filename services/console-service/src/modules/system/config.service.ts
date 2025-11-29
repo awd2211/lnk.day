@@ -157,6 +157,122 @@ export class SystemConfigService {
     }
   }
 
+  // Email Template Management
+  async getEmailTemplates(): Promise<Record<string, { subject: string; html: string }>> {
+    const config = await this.getConfig('email_templates');
+    if (!config) {
+      // Return default templates
+      return this.getDefaultEmailTemplates();
+    }
+    return config.value as Record<string, { subject: string; html: string }>;
+  }
+
+  async updateEmailTemplate(templateId: string, data: { subject: string; html: string }): Promise<{ success: boolean; message: string }> {
+    const templates = await this.getEmailTemplates();
+    templates[templateId] = data;
+
+    await this.setConfig('email_templates', templates, {
+      description: '邮件模板配置',
+    });
+
+    // Notify notification-service to reload templates
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${this.notificationServiceUrl}/api/v1/config/reload`),
+      );
+      this.logger.log('Notification service templates reloaded');
+    } catch (error) {
+      this.logger.warn('Failed to reload notification service templates');
+    }
+
+    return { success: true, message: '模板已更新' };
+  }
+
+  async resetEmailTemplate(templateId: string): Promise<{ success: boolean; message: string }> {
+    const templates = await this.getEmailTemplates();
+    const defaults = this.getDefaultEmailTemplates();
+
+    if (defaults[templateId]) {
+      templates[templateId] = defaults[templateId];
+      await this.setConfig('email_templates', templates, {
+        description: '邮件模板配置',
+      });
+      return { success: true, message: '模板已重置为默认值' };
+    }
+
+    return { success: false, message: '未找到该模板' };
+  }
+
+  private getDefaultEmailTemplates(): Record<string, { subject: string; html: string }> {
+    return {
+      welcome: {
+        subject: '欢迎加入 lnk.day, {{name}}!',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #1a1a1a;">欢迎加入 lnk.day, {{name}}!</h1>
+  <p style="color: #666;">感谢您注册我们的服务。</p>
+</div>`,
+      },
+      'password-reset': {
+        subject: '重置密码 - lnk.day',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #1a1a1a;">重置密码</h1>
+  <p style="color: #666;">点击下面的链接重置您的密码：</p>
+  <a href="{{resetLink}}" style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">
+    重置密码
+  </a>
+</div>`,
+      },
+      'team-invite': {
+        subject: '{{inviterName}} 邀请您加入 {{teamName}}',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #1a1a1a;">团队邀请</h1>
+  <p style="color: #666;">{{inviterName}} 邀请您加入 {{teamName}}。</p>
+  <a href="{{inviteLink}}" style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">
+    接受邀请
+  </a>
+</div>`,
+      },
+      'link-milestone': {
+        subject: '恭喜！您的链接达到了 {{clicks}} 次点击',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #1a1a1a;">🎉 恭喜!</h1>
+  <p style="color: #666;">您的链接 "{{linkTitle}}" 已达到 {{clicks}} 次点击！</p>
+</div>`,
+      },
+      'weekly-report': {
+        subject: 'lnk.day 周报 - 您的链接表现如何？',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #1a1a1a;">lnk.day 周报</h1>
+  <p style="color: #666;">本周总点击量：{{totalClicks}}</p>
+  <p style="color: #666;">增长率：{{growth}}%</p>
+</div>`,
+      },
+      'security-alert': {
+        subject: '安全提醒 - lnk.day',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+  <h1 style="color: #dc2626;">⚠️ 安全提醒</h1>
+  <p style="color: #666;">检测到 {{alertType}}：{{details}}</p>
+</div>`,
+      },
+      test: {
+        subject: 'lnk.day 测试邮件',
+        html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 30px;">
+    <h1 style="color: #2563eb; margin: 0;">lnk.day</h1>
+  </div>
+  <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px;">
+    <h2 style="color: #1a1a1a; margin-top: 0;">✅ 测试邮件</h2>
+    <p style="color: #666;">{{message}}</p>
+    <p style="color: #999; font-size: 12px;">发送时间: {{timestamp}}</p>
+  </div>
+  <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+    如果您收到了这封邮件，说明您的邮件配置已正确设置。
+  </p>
+</div>`,
+      },
+    };
+  }
+
   // Internal method - returns unmasked settings for service-to-service communication
   async getEmailSettingsInternal(): Promise<EmailSettings | null> {
     const config = await this.getConfig('email');

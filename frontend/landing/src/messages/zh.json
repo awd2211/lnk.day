@@ -1,0 +1,671 @@
+{
+  "common": {
+    "brand": "lnk.day",
+    "login": "登录",
+    "signup": "免费开始",
+    "learnMore": "了解更多",
+    "getStarted": "立即开始",
+    "startForFree": "免费开始",
+    "contactSales": "联系销售",
+    "tryFree": "免费试用",
+    "email": "邮箱",
+    "password": "密码",
+    "name": "姓名",
+    "company": "公司",
+    "message": "留言",
+    "submit": "提交",
+    "send": "发送消息",
+    "backToHome": "返回首页"
+  },
+  "nav": {
+    "products": "产品",
+    "solutions": "解决方案",
+    "pricing": "定价",
+    "resources": "资源",
+    "urlShortener": "短链接",
+    "qrCodes": "二维码",
+    "linkInBio": "个人主页",
+    "analytics": "数据分析",
+    "campaigns": "营销活动",
+    "enterprise": "企业版",
+    "marketing": "营销团队",
+    "retail": "零售与电商",
+    "media": "媒体与出版",
+    "tech": "科技公司",
+    "blog": "博客",
+    "guides": "指南与资源",
+    "api": "API 开发者",
+    "help": "帮助中心"
+  },
+  "hero": {
+    "badge": "全球数百万用户的信赖之选",
+    "title": "让每一次",
+    "titleHighlight": "连接",
+    "titleEnd": "更有价值",
+    "subtitle": "创建短链接、二维码和个人主页。通过强大的分析功能追踪互动并优化您的营销活动。",
+    "cta": "免费开始",
+    "secondaryCta": "观看演示",
+    "inputPlaceholder": "在此粘贴您的长链接",
+    "shortenButton": "缩短",
+    "stats": {
+      "links": "已创建链接",
+      "clicks": "点击追踪",
+      "users": "活跃用户"
+    }
+  },
+  "trustedBy": {
+    "title": "全球领先品牌的共同选择"
+  },
+  "features": {
+    "title": "管理链接所需的一切",
+    "subtitle": "强大的工具，助您大规模创建、分享和追踪链接",
+    "shortLinks": {
+      "title": "短链接",
+      "description": "创建易于分享和记忆的品牌短链接。支持自定义域名、批量创建和 API 访问。"
+    },
+    "qrCodes": {
+      "title": "二维码",
+      "description": "生成可随时更新的动态二维码。追踪扫描数据、自定义设计，支持多种格式下载。"
+    },
+    "linkInBio": {
+      "title": "个人主页",
+      "description": "创建精美的落地页，将所有链接集中展示。社交媒体主页的完美选择。"
+    },
+    "analytics": {
+      "title": "数据分析",
+      "description": "获取点击、地理位置、设备和来源的详细洞察。用数据驱动决策，优化您的营销活动。"
+    },
+    "campaigns": {
+      "title": "营销活动",
+      "description": "将链接整理为营销活动。设定目标、追踪表现，衡量所有营销工作的投资回报率。"
+    },
+    "integrations": {
+      "title": "集成",
+      "description": "与您喜爱的工具连接。支持 Zapier、HubSpot、Salesforce 等。通过强大的 API 自动化您的工作流程。"
+    }
+  },
+  "cta": {
+    "title": "准备好掌控您的链接了吗？",
+    "subtitle": "加入数千家企业，使用 lnk.day 助力数字营销。",
+    "button": "免费开始"
+  },
+  "products": {
+    "urlShortener": {
+      "title": "短链接",
+      "subtitle": "创建驱动转化的品牌短链接",
+      "description": "将冗长的 URL 转换为简短易记的链接。追踪每次点击，通过详细分析优化您的营销效果。",
+      "features": [
+        {
+          "title": "自定义品牌链接",
+          "description": "使用您自己的域名，打造专业形象并建立信任"
+        },
+        {
+          "title": "批量创建链接",
+          "description": "通过 CSV 上传或 API 一次性创建数千个链接"
+        },
+        {
+          "title": "链接管理",
+          "description": "编辑目标地址、设置过期时间，使用标签整理"
+        },
+        {
+          "title": "UTM 构建器",
+          "description": "自动添加 UTM 参数用于活动追踪"
+        }
+      ]
+    },
+    "qrCodes": {
+      "title": "二维码",
+      "subtitle": "连接线下与线上的动态二维码",
+      "description": "创建精美、可定制的二维码，随时更新无需重印。追踪扫描数据，衡量互动效果。",
+      "features": [
+        {
+          "title": "动态二维码",
+          "description": "随时更新目标 URL，无需更改二维码本身"
+        },
+        {
+          "title": "自定义设计",
+          "description": "添加您的 Logo，选择颜色，匹配您的品牌形象"
+        },
+        {
+          "title": "扫描分析",
+          "description": "按位置、设备和时间追踪扫描数据，获取可操作洞察"
+        },
+        {
+          "title": "多种格式",
+          "description": "支持 PNG、SVG 或 PDF 下载，适用于印刷和数字场景"
+        }
+      ]
+    },
+    "linkInBio": {
+      "title": "个人主页",
+      "subtitle": "一个链接分享一切",
+      "description": "创建一个精美的落地页，汇集您所有重要的链接。Instagram、TikTok 等社交平台的完美选择。",
+      "features": [
+        {
+          "title": "精美模板",
+          "description": "从数十种专业设计的模板中选择"
+        },
+        {
+          "title": "无限链接",
+          "description": "添加任意数量的链接，按您的方式整理"
+        },
+        {
+          "title": "社交集成",
+          "description": "连接您的社交资料并突出显示"
+        },
+        {
+          "title": "效果追踪",
+          "description": "查看哪些链接获得最多点击，据此优化"
+        }
+      ]
+    },
+    "analytics": {
+      "title": "数据分析",
+      "subtitle": "数据驱动的智能决策",
+      "description": "通过全面的分析了解您的受众。追踪点击，衡量互动，优化您的营销策略。",
+      "features": [
+        {
+          "title": "实时数据",
+          "description": "通过实时仪表板查看点击发生情况"
+        },
+        {
+          "title": "地理洞察",
+          "description": "通过详细的地理数据了解受众位置"
+        },
+        {
+          "title": "设备分析",
+          "description": "了解受众使用的设备和浏览器"
+        },
+        {
+          "title": "来源追踪",
+          "description": "查看哪些渠道为您的链接带来最多流量"
+        }
+      ]
+    },
+    "campaigns": {
+      "title": "营销活动",
+      "subtitle": "组织和追踪您的营销工作",
+      "description": "将链接分组到活动中，设定目标，衡量投资回报率。全面了解您在所有渠道的营销表现。",
+      "features": [
+        {
+          "title": "活动组织",
+          "description": "将相关链接分组在一起，便于管理和报告"
+        },
+        {
+          "title": "目标设定",
+          "description": "设定点击和转化目标来衡量活动成功"
+        },
+        {
+          "title": "A/B 测试",
+          "description": "测试不同目标页面，优化获得更好效果"
+        },
+        {
+          "title": "ROI 追踪",
+          "description": "通过全面分析衡量投资回报率"
+        }
+      ]
+    }
+  },
+  "solutions": {
+    "enterprise": {
+      "title": "企业解决方案",
+      "subtitle": "为大型组织提供可扩展的链接管理",
+      "description": "为整个组织提供企业级链接管理能力。高级安全性、专属支持和自定义集成。",
+      "features": [
+        "单点登录 (SSO)",
+        "高级权限和角色",
+        "专属客户经理",
+        "自定义 SLA 保障",
+        "API 速率限制提升",
+        "自定义集成"
+      ]
+    },
+    "marketing": {
+      "title": "营销团队",
+      "subtitle": "用智能链接驱动您的营销活动",
+      "description": "在所有营销渠道中创建、管理和追踪链接。通过数据驱动的优化提高转化率。",
+      "features": [
+        "活动组织管理",
+        "A/B 测试功能",
+        "UTM 参数管理",
+        "团队协作工具",
+        "效果仪表板",
+        "营销工具集成"
+      ]
+    },
+    "retail": {
+      "title": "零售与电商",
+      "subtitle": "无缝连接客户与产品",
+      "description": "在包装上使用二维码，创建促销短链接，追踪客户在所有接触点的互动。",
+      "features": [
+        "产品二维码",
+        "促销短链接",
+        "购物车追踪",
+        "库存集成",
+        "客户旅程分析",
+        "移动端优化体验"
+      ]
+    },
+    "media": {
+      "title": "媒体与出版",
+      "subtitle": "用可追踪的链接分发内容",
+      "description": "使用品牌链接分享文章、视频和播客。了解您的受众，增长您的读者群。",
+      "features": [
+        "内容分发追踪",
+        "社交分享分析",
+        "新闻邮件链接管理",
+        "受众洞察",
+        "订阅转化追踪",
+        "多平台分析"
+      ]
+    },
+    "tech": {
+      "title": "科技公司",
+      "subtitle": "将链接管理集成到您的产品中",
+      "description": "通过我们强大的 API 将链接功能构建到您的应用中。白标解决方案实现无缝集成。",
+      "features": [
+        "RESTful API 访问",
+        "主流语言 SDK",
+        "Webhook 通知",
+        "白标选项",
+        "高流量支持",
+        "开发者文档"
+      ]
+    }
+  },
+  "about": {
+    "title": "关于 lnk.day",
+    "subtitle": "在数字世界中赋能连接",
+    "mission": {
+      "title": "我们的使命",
+      "description": "我们相信每一个链接都是连接、互动和成长的机会。我们的使命是提供让这些连接变得有意义和可衡量的工具。"
+    },
+    "story": {
+      "title": "我们的故事",
+      "description": "lnk.day 成立于 2024 年，源于一个简单的理念：链接管理应该强大而简单。如今，我们服务于全球数百万用户，从个人创作者到财富 500 强企业。"
+    },
+    "values": {
+      "title": "我们的价值观",
+      "items": [
+        {
+          "title": "简洁",
+          "description": "我们让复杂的事情变得简单，让每个人都能使用"
+        },
+        {
+          "title": "可靠",
+          "description": "您的链接在需要时始终可用，每一次都是"
+        },
+        {
+          "title": "隐私",
+          "description": "我们尊重您的数据，绝不出售您的信息"
+        },
+        {
+          "title": "创新",
+          "description": "我们持续改进，始终走在您需求的前面"
+        }
+      ]
+    },
+    "stats": {
+      "links": "5亿+",
+      "linksLabel": "已创建链接",
+      "clicks": "100亿+",
+      "clicksLabel": "点击追踪",
+      "users": "10万+",
+      "usersLabel": "满意用户",
+      "uptime": "99.99%",
+      "uptimeLabel": "正常运行时间"
+    }
+  },
+  "contact": {
+    "title": "联系我们",
+    "subtitle": "我们很乐意听到您的声音",
+    "description": "有问题、反馈或需要帮助？我们的团队随时为您服务。",
+    "form": {
+      "name": "您的姓名",
+      "email": "邮箱地址",
+      "company": "公司（可选）",
+      "subject": "主题",
+      "message": "您的留言",
+      "submit": "发送消息"
+    },
+    "info": {
+      "email": "support@lnk.day",
+      "sales": "sales@lnk.day",
+      "address": "旧金山，加利福尼亚"
+    },
+    "success": "感谢您！我们会在 24 小时内回复您。"
+  },
+  "login": {
+    "title": "欢迎回来",
+    "subtitle": "登录您的账户继续",
+    "email": "邮箱地址",
+    "password": "密码",
+    "remember": "记住我",
+    "forgot": "忘记密码？",
+    "submit": "登录",
+    "noAccount": "还没有账户？",
+    "signUp": "免费注册",
+    "or": "或通过以下方式继续",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "signup": {
+    "title": "创建您的账户",
+    "subtitle": "立即开始免费试用。无需信用卡。",
+    "name": "姓名",
+    "email": "邮箱地址",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "terms": "我同意服务条款和隐私政策",
+    "submit": "创建账户",
+    "hasAccount": "已有账户？",
+    "signIn": "登录",
+    "or": "或通过以下方式继续",
+    "google": "Google",
+    "github": "GitHub"
+  },
+  "privacy": {
+    "title": "隐私政策",
+    "lastUpdated": "最后更新：2025年1月",
+    "sections": [
+      {
+        "title": "我们收集的信息",
+        "content": "我们收集您直接提供给我们的信息，例如当您创建账户、使用我们的服务或联系我们获取支持时提供的信息。"
+      },
+      {
+        "title": "我们如何使用您的信息",
+        "content": "我们使用收集的信息来提供、维护和改进我们的服务，处理交易，以及与您沟通。"
+      },
+      {
+        "title": "信息共享",
+        "content": "我们不会出售您的个人信息。我们可能会与协助我们运营服务的第三方服务提供商共享信息。"
+      },
+      {
+        "title": "数据安全",
+        "content": "我们实施适当的技术和组织措施来保护您的个人信息免受未经授权的访问或披露。"
+      },
+      {
+        "title": "您的权利",
+        "content": "您有权访问、更正或删除您的个人信息。请联系 privacy@lnk.day 行使这些权利。"
+      }
+    ]
+  },
+  "terms": {
+    "title": "服务条款",
+    "lastUpdated": "最后更新：2025年1月",
+    "sections": [
+      {
+        "title": "条款接受",
+        "content": "访问或使用 lnk.day，即表示您同意受这些服务条款和我们的隐私政策的约束。"
+      },
+      {
+        "title": "服务使用",
+        "content": "您只能将我们的服务用于合法目的并遵守这些条款。您同意不将我们的服务用于垃圾邮件、恶意软件或任何非法活动。"
+      },
+      {
+        "title": "账户责任",
+        "content": "您有责任维护账户凭证的保密性，并对您账户下发生的所有活动负责。"
+      },
+      {
+        "title": "知识产权",
+        "content": "我们的服务及其内容受版权、商标和其他法律保护。未经许可，您不得复制、修改或分发我们的内容。"
+      },
+      {
+        "title": "责任限制",
+        "content": "在法律允许的最大范围内，lnk.day 不对因您使用我们的服务而产生的任何间接、附带或后果性损害负责。"
+      }
+    ]
+  },
+  "pricing": {
+    "title": "简单透明的定价",
+    "subtitle": "选择适合您需求的方案。所有方案均包含核心功能。",
+    "monthly": "按月付费",
+    "yearly": "按年付费",
+    "save": "节省 20%",
+    "popular": "最受欢迎",
+    "perMonth": "/月",
+    "free": {
+      "name": "免费版",
+      "price": "¥0",
+      "description": "适合刚起步的个人用户",
+      "cta": "立即开始",
+      "features": [
+        "每月 50 个短链接",
+        "基础分析",
+        "1 个自定义二维码",
+        "1 个个人主页"
+      ]
+    },
+    "starter": {
+      "name": "入门版",
+      "price": "¥79",
+      "yearlyPrice": "¥66",
+      "description": "适合专业人士和小团队",
+      "cta": "开始免费试用",
+      "features": [
+        "每月 1,000 个短链接",
+        "高级分析",
+        "无限二维码",
+        "3 个个人主页",
+        "品牌自定义链接",
+        "API 访问"
+      ]
+    },
+    "pro": {
+      "name": "专业版",
+      "price": "¥239",
+      "yearlyPrice": "¥199",
+      "description": "适合成长中的企业",
+      "cta": "开始免费试用",
+      "features": [
+        "每月 10,000 个短链接",
+        "完整分析套件",
+        "无限二维码",
+        "无限个人主页",
+        "自定义域名",
+        "团队协作",
+        "优先支持"
+      ]
+    },
+    "enterprise": {
+      "name": "企业版",
+      "price": "定制",
+      "description": "适合大型组织",
+      "cta": "联系销售",
+      "features": [
+        "无限制使用",
+        "SSO 与高级安全",
+        "专属客户经理",
+        "自定义集成",
+        "SLA 保障",
+        "入职培训"
+      ]
+    }
+  },
+  "developers": {
+    "title": "API 与开发者",
+    "subtitle": "使用我们的 API 构建强大的集成",
+    "description": "访问驱动数百万链接的同一平台。我们的 RESTful API 让您轻松以编程方式创建、管理和追踪链接。",
+    "features": [
+      {
+        "title": "RESTful API",
+        "description": "干净、文档完善的端点，支持所有链接操作"
+      },
+      {
+        "title": "SDK",
+        "description": "JavaScript、Python、Go 等语言的官方库"
+      },
+      {
+        "title": "Webhooks",
+        "description": "链接事件和分析的实时通知"
+      },
+      {
+        "title": "速率限制",
+        "description": "慷慨的限制，企业版可提升"
+      }
+    ],
+    "cta": "查看文档"
+  },
+  "blog": {
+    "title": "博客",
+    "subtitle": "洞察、更新和最佳实践",
+    "description": "了解 lnk.day 团队的最新新闻、产品更新和营销技巧。",
+    "comingSoon": "我们的博客即将上线。订阅以在发布时收到通知。",
+    "subscribe": "订阅更新"
+  },
+  "guides": {
+    "title": "指南与资源",
+    "subtitle": "学习如何充分利用 lnk.day",
+    "description": "全面的指南、教程和最佳实践，帮助您掌握链接管理并获得更好的效果。",
+    "categories": [
+      {
+        "title": "入门指南",
+        "description": "学习创建和管理链接的基础知识"
+      },
+      {
+        "title": "分析深入",
+        "description": "理解您的数据并做出更好的决策"
+      },
+      {
+        "title": "API 集成",
+        "description": "使用我们的开发者工具构建自定义解决方案"
+      },
+      {
+        "title": "最佳实践",
+        "description": "专家提示，帮助您最大化结果"
+      }
+    ]
+  },
+  "help": {
+    "title": "帮助中心",
+    "subtitle": "找到您问题的答案",
+    "description": "搜索我们的知识库获取答案，或联系我们的支持团队获得个性化帮助。",
+    "search": "搜索帮助...",
+    "categories": [
+      {
+        "title": "账户与计费",
+        "description": "管理您的账户、订阅和付款"
+      },
+      {
+        "title": "链接管理",
+        "description": "创建、编辑和组织您的短链接"
+      },
+      {
+        "title": "数据分析",
+        "description": "理解您的点击数据和报告"
+      },
+      {
+        "title": "API 与集成",
+        "description": "将 lnk.day 与您的其他工具连接"
+      }
+    ],
+    "contact": "还需要帮助？",
+    "contactCta": "联系支持"
+  },
+  "status": {
+    "title": "系统状态",
+    "subtitle": "lnk.day 服务的实时状态",
+    "allOperational": "所有系统正常运行",
+    "services": [
+      {
+        "name": "链接重定向服务",
+        "status": "operational"
+      },
+      {
+        "name": "API",
+        "status": "operational"
+      },
+      {
+        "name": "控制台",
+        "status": "operational"
+      },
+      {
+        "name": "数据分析",
+        "status": "operational"
+      }
+    ],
+    "uptime": "过去 90 天 99.99% 正常运行时间",
+    "subscribe": "订阅状态更新"
+  },
+  "careers": {
+    "title": "加入 lnk.day",
+    "subtitle": "与我们一起构建链接的未来",
+    "description": "我们是一支充满热情的远程优先团队，致力于打造优秀的产品。加入我们，帮助全球数百万用户。",
+    "perks": [
+      {
+        "title": "远程优先",
+        "description": "在世界任何地方工作"
+      },
+      {
+        "title": "有竞争力的薪资",
+        "description": "市场顶级薪酬和股权"
+      },
+      {
+        "title": "健康福利",
+        "description": "全面的医疗、牙科和视力保险"
+      },
+      {
+        "title": "学习预算",
+        "description": "年度课程和会议预算"
+      }
+    ],
+    "openings": "开放职位",
+    "noOpenings": "目前暂无开放职位。请稍后查看或发送您的简历。",
+    "sendResume": "发送简历至 careers@lnk.day"
+  },
+  "press": {
+    "title": "新闻与媒体",
+    "subtitle": "为记者提供的新闻和资源",
+    "description": "查找关于 lnk.day 的最新新闻、新闻稿和媒体资源。",
+    "contact": "媒体咨询请联系 press@lnk.day",
+    "kit": "下载媒体资料包",
+    "recentNews": "最新新闻",
+    "comingSoon": "新闻稿即将发布。"
+  },
+  "cookies": {
+    "title": "Cookie 政策",
+    "lastUpdated": "最后更新：2025年1月",
+    "sections": [
+      {
+        "title": "什么是 Cookie",
+        "content": "Cookie 是当您访问我们网站时存储在您设备上的小型文本文件。它们通过记住您的偏好和分析网站使用情况来帮助我们提供更好的体验。"
+      },
+      {
+        "title": "我们使用的 Cookie 类型",
+        "content": "我们使用必要 Cookie 实现网站功能，分析 Cookie 了解使用模式，偏好 Cookie 记住您的设置。"
+      },
+      {
+        "title": "管理 Cookie",
+        "content": "您可以通过浏览器设置控制 Cookie。但是，禁用某些 Cookie 可能会影响网站功能。"
+      },
+      {
+        "title": "第三方 Cookie",
+        "content": "我们可能会使用设置其自己 Cookie 的第三方服务（如分析提供商）。这些由其各自的隐私政策管理。"
+      }
+    ]
+  },
+  "footer": {
+    "description": "面向现代企业的完整链接管理平台。",
+    "product": "产品",
+    "resources": "资源",
+    "company": "公司",
+    "legal": "法律",
+    "urlShortener": "短链接",
+    "qrCodes": "二维码",
+    "linkInBio": "个人主页",
+    "analytics": "数据分析",
+    "api": "API",
+    "blog": "博客",
+    "guides": "使用指南",
+    "helpCenter": "帮助中心",
+    "status": "服务状态",
+    "about": "关于我们",
+    "careers": "加入我们",
+    "contact": "联系我们",
+    "press": "媒体合作",
+    "privacy": "隐私政策",
+    "terms": "服务条款",
+    "cookies": "Cookie 政策",
+    "copyright": "© 2025 lnk.day. 保留所有权利。"
+  }
+}

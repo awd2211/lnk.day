@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@lnk/nestjs-common';
 import { ModerationService, ModerationSettings } from './moderation.service';
 import {
   QueryFlaggedLinksDto,
@@ -177,7 +177,7 @@ export class ModerationController {
 
   // Internal endpoints for other services
   @Post('internal/flag')
-  @ApiHeader({ name: 'x-internal-key', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', required: true })
   @ApiOperation({ summary: 'Flag a link (internal)' })
   async internalFlag(
     @Body() body: {
@@ -198,7 +198,7 @@ export class ModerationController {
   }
 
   @Post('internal/unflag')
-  @ApiHeader({ name: 'x-internal-key', required: true })
+  @ApiHeader({ name: 'x-internal-api-key', required: true })
   @ApiOperation({ summary: 'Unflag a link (internal)' })
   async internalUnflag(@Body() body: { linkId: string }) {
     await this.moderationService.unflagLink(body.linkId);
