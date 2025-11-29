@@ -1,10 +1,26 @@
+// 可观测性
 export * from './metrics';
 export * from './tracing';
+export * from './logger';
+
+// 弹性
 export * from './circuit-breaker';
-export * from './health';
+export * from './timeout';
 export * from './http';
-export * from './config';
-export * from './notification';
+
+// 基础设施
+export * from './health';
 export * from './cache';
+export * from './config';
+
+// 认证和授权
+export * from './auth';
+export * from './permissions';
+
+// API
+export * from './swagger';
 export * from './version/version.module';
 export * from './version/version.service';
+
+// 通知
+export * from './notification';
