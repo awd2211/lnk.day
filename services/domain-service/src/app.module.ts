@@ -1,7 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import {
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  CircuitBreakerModule,
+} from '@lnk/nestjs-common';
 import { DomainModule } from './modules/domain/domain.module';
 import { HealthModule } from './modules/health/health.module';
 
@@ -11,6 +17,12 @@ import { HealthModule } from './modules/health/health.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    MetricsModule.forRoot({ serviceName: 'domain-service' }),
+    TracingModule.forRoot({
+      serviceName: 'domain-service',
+      jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    }),
+    CircuitBreakerModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -29,6 +41,12 @@ import { HealthModule } from './modules/health/health.module';
     }),
     DomainModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
   ],
 })
 export class AppModule {}

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule } from '@lnk/nestjs-common';
 
 import { RedisModule } from './common/redis/redis.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
@@ -27,6 +29,14 @@ import { HealthModule } from './modules/health/health.module';
       envFilePath: '.env',
     }),
     ScheduleModule.forRoot(),
+    MetricsModule.forRoot({
+      serviceName: 'link-service',
+    }),
+    TracingModule.forRoot({
+      serviceName: 'link-service',
+      jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    }),
+    CircuitBreakerModule,
     RedisModule,
     RabbitMQModule,
     TypeOrmModule.forRootAsync({
@@ -59,6 +69,12 @@ import { HealthModule } from './modules/health/health.module';
     RedirectRulesModule,
     LinkTemplateModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
   ],
 })
 export class AppModule {}

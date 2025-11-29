@@ -1,6 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import {
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  CircuitBreakerModule,
+} from '@lnk/nestjs-common';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { TemplateModule } from './modules/template/template.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
@@ -12,6 +19,12 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MetricsModule.forRoot({ serviceName: 'campaign-service' }),
+    TracingModule.forRoot({
+      serviceName: 'campaign-service',
+      jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    }),
+    CircuitBreakerModule,
     RabbitMQModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -35,6 +48,12 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
     GoalsModule,
     CampaignAnalyticsModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
   ],
 })
 export class AppModule {}

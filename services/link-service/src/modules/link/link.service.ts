@@ -81,9 +81,13 @@ export class LinkService {
     await this.redisService.setLink(savedLink);
 
     // 发布链接创建事件
-    await this.linkEventService.publishLinkCreated(savedLink.id, savedLink.shortCode, {
+    await this.linkEventService.publishLinkCreated({
+      linkId: savedLink.id,
+      shortCode: savedLink.shortCode,
       originalUrl: savedLink.originalUrl,
-      domain: savedLink.domain,
+      userId: savedLink.userId,
+      teamId: savedLink.teamId,
+      customDomain: savedLink.domain,
     });
 
     return savedLink;
@@ -196,9 +200,18 @@ export class LinkService {
     await this.redisService.setLink(savedLink);
 
     // 发布链接更新事件
-    await this.linkEventService.publishLinkUpdated(savedLink.id, savedLink.shortCode, {
-      oldShortCode: oldShortCode !== savedLink.shortCode ? oldShortCode : undefined,
-      originalUrl: savedLink.originalUrl,
+    const changes: Record<string, { old: any; new: any }> = {
+      originalUrl: { old: link.originalUrl, new: savedLink.originalUrl },
+    };
+    if (oldShortCode !== savedLink.shortCode) {
+      changes.shortCode = { old: oldShortCode, new: savedLink.shortCode };
+    }
+    await this.linkEventService.publishLinkUpdated({
+      linkId: savedLink.id,
+      shortCode: savedLink.shortCode,
+      changes,
+      userId: savedLink.userId,
+      teamId: savedLink.teamId,
     });
 
     return savedLink;
@@ -208,6 +221,7 @@ export class LinkService {
     const link = await this.findOne(id);
     const shortCode = link.shortCode;
     const linkId = link.id;
+    const userId = link.userId;
 
     await this.linkRepository.remove(link);
 
@@ -215,7 +229,12 @@ export class LinkService {
     await this.redisService.deleteLink(shortCode);
 
     // 发布链接删除事件
-    await this.linkEventService.publishLinkDeleted(linkId, shortCode);
+    await this.linkEventService.publishLinkDeleted({
+      linkId,
+      shortCode,
+      userId,
+      teamId: link.teamId,
+    });
   }
 
   async incrementClicks(id: string): Promise<void> {

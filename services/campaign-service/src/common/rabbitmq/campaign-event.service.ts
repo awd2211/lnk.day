@@ -24,6 +24,13 @@ export interface GoalReachedData {
   userId: string;
 }
 
+export interface CampaignLinkEventData {
+  campaignId: string;
+  linkId: string;
+  shortCode: string;
+  teamId: string;
+}
+
 @Injectable()
 export class CampaignEventService {
   private readonly logger = new Logger(CampaignEventService.name);
@@ -60,7 +67,29 @@ export class CampaignEventService {
     await this.publish(event, ROUTING_KEYS.CAMPAIGN_GOAL_REACHED);
   }
 
-  private async publish(event: CampaignCreatedEvent | CampaignGoalReachedEvent, routingKey: string): Promise<void> {
+  async publishCampaignLinkAdded(data: CampaignLinkEventData): Promise<void> {
+    const event = {
+      id: uuidv4(),
+      type: 'campaign.link.added',
+      timestamp: new Date().toISOString(),
+      source: this.serviceName,
+      data,
+    };
+    await this.publish(event, 'campaign.link.added');
+  }
+
+  async publishCampaignLinkRemoved(data: CampaignLinkEventData): Promise<void> {
+    const event = {
+      id: uuidv4(),
+      type: 'campaign.link.removed',
+      timestamp: new Date().toISOString(),
+      source: this.serviceName,
+      data,
+    };
+    await this.publish(event, 'campaign.link.removed');
+  }
+
+  private async publish(event: any, routingKey: string): Promise<void> {
     if (!this.channel) {
       this.logger.debug(`Skipping event publish (no channel): ${event.type}`);
       return;

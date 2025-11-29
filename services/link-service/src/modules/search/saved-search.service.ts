@@ -19,10 +19,10 @@ import {
 } from './dto/saved-search.dto';
 import { SearchService } from './search.service';
 import {
-  NotificationClientService,
+  LinkNotificationService,
   SavedSearchNotificationData,
   NewMatchNotificationData,
-} from '../../common/notification/notification-client.service';
+} from '../../common/notification/link-notification.service';
 
 @Injectable()
 export class SavedSearchService {
@@ -32,7 +32,7 @@ export class SavedSearchService {
     @InjectRepository(SavedSearch)
     private readonly savedSearchRepository: Repository<SavedSearch>,
     private readonly searchService: SearchService,
-    private readonly notificationClient: NotificationClientService,
+    private readonly notificationClient: LinkNotificationService,
   ) {}
 
   async create(

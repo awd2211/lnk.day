@@ -1,14 +1,19 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+const logger = new Logger('Bootstrap');
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
+  app.enableShutdownHooks();
+  app.enableVersioning({
+    type: VersioningType.URI,
+    prefix: 'api/v',
+    defaultVersion: '1',
+  });
   app.enableCors();
-  app.setGlobalPrefix('api');
-
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -30,8 +35,23 @@ async function bootstrap() {
   const port = process.env.PORT || 60014;
   await app.listen(port);
 
-  console.log(`Domain Service running on port ${port}`);
-  console.log(`Swagger docs: http://localhost:${port}/docs`);
+  logger.log(`Domain Service running on port ${port}`);
+  logger.log(`Swagger docs: http://localhost:${port}/docs`);
+
+  const shutdown = async (signal: string) => {
+    logger.log(`Received ${signal}, starting graceful shutdown...`);
+    try {
+      await app.close();
+      logger.log('Application closed successfully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 bootstrap();

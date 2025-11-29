@@ -9,9 +9,16 @@
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:generate": "npm run build && npm run typeorm -- -d ./dist/database/data-source.js migration:generate",
+    "migration:create": "npm run typeorm -- migration:create",
+    "migration:run": "npm run build && npm run typeorm -- -d ./dist/database/data-source.js migration:run",
+    "migration:revert": "npm run build && npm run typeorm -- -d ./dist/database/data-source.js migration:revert",
+    "migration:show": "npm run build && npm run typeorm -- -d ./dist/database/data-source.js migration:show"
   },
   "dependencies": {
+    "@lnk/nestjs-common": "workspace:*",
     "@lnk/shared-types": "workspace:*",
     "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/common": "^10.3.0",

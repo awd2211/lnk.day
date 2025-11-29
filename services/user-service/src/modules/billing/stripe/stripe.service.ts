@@ -14,7 +14,7 @@ import {
 } from '../entities/subscription.entity';
 import { PlanType } from '../../quota/quota.entity';
 import { QuotaService } from '../../quota/quota.service';
-import { NotificationClientService } from '../../../common/notification/notification-client.service';
+import { BillingNotificationService } from '../../../common/notification/billing-notification.service';
 
 // Price IDs from Stripe Dashboard (should be configured in env)
 interface StripePriceConfig {
@@ -41,7 +41,7 @@ export class StripeService {
     private readonly paymentMethodRepository: Repository<PaymentMethod>,
     private readonly quotaService: QuotaService,
     private readonly configService: ConfigService,
-    private readonly notificationService: NotificationClientService,
+    private readonly notificationService: BillingNotificationService,
   ) {
     const stripeSecretKey = this.configService.get('STRIPE_SECRET_KEY');
     if (stripeSecretKey) {

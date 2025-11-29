@@ -23,8 +23,19 @@ export interface LinkCreatedData {
 export interface LinkUpdatedData {
   linkId: string;
   shortCode: string;
-  changes: Record<string, { old: any; new: any }>;
+  changes: Record<string, any>;
   userId: string;
+  teamId?: string;
+  campaignId?: string;
+  previousCampaignId?: string;
+}
+
+export interface LinkDeletedData {
+  linkId: string;
+  shortCode: string;
+  userId: string;
+  teamId?: string;
+  campaignId?: string;
 }
 
 @Injectable()
@@ -63,13 +74,13 @@ export class LinkEventService {
     await this.publish(event, ROUTING_KEYS.LINK_UPDATED);
   }
 
-  async publishLinkDeleted(linkId: string, shortCode: string, userId: string): Promise<void> {
+  async publishLinkDeleted(data: LinkDeletedData): Promise<void> {
     const event: LinkDeletedEvent = {
       id: uuidv4(),
       type: 'link.deleted',
       timestamp: new Date().toISOString(),
       source: this.serviceName,
-      data: { linkId, shortCode, userId },
+      data,
     };
     await this.publish(event, ROUTING_KEYS.LINK_DELETED);
   }

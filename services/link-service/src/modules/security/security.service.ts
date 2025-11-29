@@ -5,7 +5,7 @@ import { Repository, LessThan, In } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { UrlScanResult } from './entities/url-scan-result.entity';
 import { Link, LinkStatus } from '../link/entities/link.entity';
-import { NotificationClientService } from '../../common/notification/notification-client.service';
+import { NotificationClientService } from '@lnk/nestjs-common';
 
 export interface SafeBrowsingResult {
   safe: boolean;

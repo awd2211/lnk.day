@@ -1,5 +1,6 @@
 import { Module, Global, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import * as amqplib from 'amqplib';
 import { CampaignEventService } from './campaign-event.service';
 import { LinkEventConsumer } from './link-event.consumer';
@@ -10,12 +11,13 @@ import {
   CAMPAIGN_EVENTS_EXCHANGE,
   CAMPAIGN_LINK_EVENTS_QUEUE,
 } from './rabbitmq.constants';
+import { Campaign } from '../../modules/campaign/entities/campaign.entity';
 
 export { RABBITMQ_CONNECTION, RABBITMQ_CHANNEL };
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, TypeOrmModule.forFeature([Campaign])],
   providers: [
     {
       provide: RABBITMQ_CONNECTION,

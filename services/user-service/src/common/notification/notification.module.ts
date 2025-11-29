@@ -1,9 +1,11 @@
 import { Module, Global } from '@nestjs/common';
-import { NotificationClientService } from './notification-client.service';
+import { NotificationModule as SharedNotificationModule } from '@lnk/nestjs-common';
+import { BillingNotificationService } from './billing-notification.service';
 
 @Global()
 @Module({
-  providers: [NotificationClientService],
-  exports: [NotificationClientService],
+  imports: [SharedNotificationModule],
+  providers: [BillingNotificationService],
+  exports: [BillingNotificationService],
 })
 export class NotificationModule {}

@@ -9,6 +9,7 @@
     "start:prod": "node dist/main"
   },
   "dependencies": {
+    "@lnk/nestjs-common": "workspace:*",
     "@lnk/shared-types": "workspace:*",
     "@nestjs/bull": "^10.0.1",
     "@nestjs/common": "^10.3.0",

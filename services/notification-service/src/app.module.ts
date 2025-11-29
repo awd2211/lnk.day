@@ -2,6 +2,13 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import {
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  CircuitBreakerModule,
+} from '@lnk/nestjs-common';
 import { EmailModule } from './modules/email/email.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
@@ -14,6 +21,12 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MetricsModule.forRoot({ serviceName: 'notification-service' }),
+    TracingModule.forRoot({
+      serviceName: 'notification-service',
+      jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
+    }),
+    CircuitBreakerModule,
     RabbitMQModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -48,6 +61,12 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
     TeamsModule,
     SmsModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
   ],
 })
 export class AppModule {}
