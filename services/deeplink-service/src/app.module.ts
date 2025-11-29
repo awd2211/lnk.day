@@ -8,10 +8,12 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { DeepLinkModule } from './modules/deeplink/deeplink.module';
 import { HealthModule } from './modules/health/health.module';
-import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -23,6 +25,9 @@ import { AuthModule } from './modules/auth/auth.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -41,7 +46,6 @@ import { AuthModule } from './modules/auth/auth.module';
     }),
     DeepLinkModule,
     HealthModule,
-    AuthModule,
   ],
   providers: [
     {

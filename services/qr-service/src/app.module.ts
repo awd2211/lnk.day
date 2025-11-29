@@ -8,12 +8,14 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { QrModule } from './modules/qr/qr.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { GS1Module } from './modules/gs1/gs1.module';
 import { HealthModule } from './modules/health/health.module';
-import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +27,9 @@ import { AuthModule } from './modules/auth/auth.module';
     }),
     CircuitBreakerModule,
     VersionModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -45,7 +50,6 @@ import { AuthModule } from './modules/auth/auth.module';
     TrackingModule,
     GS1Module,
     HealthModule,
-    AuthModule,
   ],
   providers: [
     {

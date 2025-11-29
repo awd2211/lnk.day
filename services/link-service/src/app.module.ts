@@ -3,13 +3,21 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule, VersionModule } from '@lnk/nestjs-common';
+import {
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  CircuitBreakerModule,
+  VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
+} from '@lnk/nestjs-common';
 
 import { RedisModule } from './common/redis/redis.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { NotificationModule } from './common/notification/notification.module';
 import { LinkModule } from './modules/link/link.module';
-import { AuthModule } from './modules/auth/auth.module';
 import { FolderModule } from './modules/folder/folder.module';
 import { ABTestModule } from './modules/abtest/abtest.module';
 import { SearchModule } from './modules/search/search.module';
@@ -39,6 +47,9 @@ import { HealthModule } from './modules/health/health.module';
     }),
     CircuitBreakerModule,
     VersionModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     RedisModule,
     RabbitMQModule,
     TypeOrmModule.forRootAsync({
@@ -58,7 +69,6 @@ import { HealthModule } from './modules/health/health.module';
       }),
     }),
     NotificationModule,
-    AuthModule,
     LinkModule,
     FolderModule,
     ABTestModule,

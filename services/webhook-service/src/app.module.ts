@@ -3,11 +3,19 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule, VersionModule } from '@lnk/nestjs-common';
+import {
+  MetricsModule,
+  MetricsInterceptor,
+  TracingModule,
+  VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
+  CircuitBreakerModule,
+} from '@lnk/nestjs-common';
 
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { HealthModule } from './modules/health/health.module';
-import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -21,6 +29,10 @@ import { AuthModule } from './modules/auth/auth.module';
       serviceName: 'webhook-service',
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
+    CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -39,7 +51,6 @@ import { AuthModule } from './modules/auth/auth.module';
     }),
     WebhookModule,
     HealthModule,
-    AuthModule,
   ],
   providers: [
     {

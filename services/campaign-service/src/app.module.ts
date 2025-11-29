@@ -8,6 +8,9 @@ import {
   TracingModule,
   CircuitBreakerModule,
   VersionModule,
+  AuthModule,
+  TimeoutModule,
+  LoggerModule,
 } from '@lnk/nestjs-common';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { TemplateModule } from './modules/template/template.module';
@@ -16,7 +19,6 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
-import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -28,6 +30,9 @@ import { AuthModule } from './modules/auth/auth.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    TimeoutModule,
+    LoggerModule,
+    AuthModule.forValidation(),
     RabbitMQModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -51,7 +56,6 @@ import { AuthModule } from './modules/auth/auth.module';
     GoalsModule,
     CampaignAnalyticsModule,
     HealthModule,
-    AuthModule,
   ],
   providers: [
     {
