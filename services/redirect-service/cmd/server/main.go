@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -17,6 +18,9 @@ import (
 	"github.com/lnkday/redirect-service/internal/handler"
 	"github.com/lnkday/redirect-service/internal/service"
 )
+
+// Version information
+const Version = "1.0.0"
 
 func main() {
 	// Load .env file
@@ -72,7 +76,12 @@ func main() {
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(fiber.Map{
+			"status":    "ok",
+			"service":   "redirect-service",
+			"version":   Version,
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
 	})
 
 	// Redirect routes

@@ -103,7 +103,12 @@ app.include_router(cohorts, prefix="/api/cohorts", tags=["cohorts"])
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "analytics-service"}
+    return {
+        "status": "ok",
+        "service": "analytics-service",
+        "version": app.version,
+        "timestamp": __import__("datetime").datetime.now().isoformat(),
+    }
 
 
 if __name__ == "__main__":

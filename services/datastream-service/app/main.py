@@ -70,7 +70,12 @@ app.include_router(streams.router, prefix="/api", tags=["data-streams"])
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "datastream-service"}
+    return {
+        "status": "ok",
+        "service": "datastream-service",
+        "version": app.version,
+        "timestamp": __import__("datetime").datetime.now().isoformat(),
+    }
 
 
 if __name__ == "__main__":
