@@ -306,20 +306,20 @@ export default function AuditLogsPage() {
 
   // Export columns for audit logs
   const exportColumns = [
-    { key: 'timestamp', label: '时间' },
-    { key: 'actor.name', label: '操作者' },
-    { key: 'actor.type', label: '操作者类型' },
-    { key: 'actor.email', label: '邮箱' },
-    { key: 'actor.ip', label: 'IP地址' },
-    { key: 'action', label: '操作' },
-    { key: 'actionCategory', label: '类别' },
-    { key: 'resource.type', label: '资源类型' },
-    { key: 'resource.name', label: '资源名称' },
-    { key: 'status', label: '状态' },
+    { key: 'timestamp', header: '时间' },
+    { key: 'actor.name', header: '操作者' },
+    { key: 'actor.type', header: '操作者类型' },
+    { key: 'actor.email', header: '邮箱' },
+    { key: 'actor.ip', header: 'IP地址' },
+    { key: 'action', header: '操作' },
+    { key: 'actionCategory', header: '类别' },
+    { key: 'resource.type', header: '资源类型' },
+    { key: 'resource.name', header: '资源名称' },
+    { key: 'status', header: '状态' },
   ];
 
   const prepareExportData = () => {
-    return data?.items?.map((log) => ({
+    return data?.items?.map((log: AuditLog) => ({
       timestamp: formatDate(log.timestamp),
       'actor.name': log.actor.name,
       'actor.type': actorTypeConfig[log.actor.type]?.label || log.actor.type,
@@ -475,7 +475,7 @@ export default function AuditLogsPage() {
                   </td>
                 </tr>
               ) : data?.items?.length ? (
-                data.items.map((log) => {
+                data.items.map((log: AuditLog) => {
                   const CategoryIcon = actionCategoryConfig[log.actionCategory]?.icon || FileText;
                   return (
                     <tr key={log.id} className="hover:bg-gray-50">

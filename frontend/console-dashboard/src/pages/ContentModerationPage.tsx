@@ -301,7 +301,7 @@ export default function ContentModerationPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked && data?.items) {
-      setSelectedIds(data.items.filter((l) => l.status === 'pending').map((l) => l.id));
+      setSelectedIds(data.items.filter((l: FlaggedLink) => l.status === 'pending').map((l: FlaggedLink) => l.id));
     } else {
       setSelectedIds([]);
     }
@@ -319,8 +319,8 @@ export default function ContentModerationPage() {
     return new Date(date).toLocaleString('zh-CN');
   };
 
-  const pendingItems = data?.items?.filter((l) => l.status === 'pending') || [];
-  const allPendingSelected = pendingItems.length > 0 && pendingItems.every((l) => selectedIds.includes(l.id));
+  const pendingItems = data?.items?.filter((l: FlaggedLink) => l.status === 'pending') || [];
+  const allPendingSelected = pendingItems.length > 0 && pendingItems.every((l: FlaggedLink) => selectedIds.includes(l.id));
 
   return (
     <div className="space-y-6">
@@ -516,7 +516,7 @@ export default function ContentModerationPage() {
                   </td>
                 </tr>
               ) : data?.items?.length ? (
-                data.items.map((link) => (
+                data.items.map((link: FlaggedLink) => (
                   <tr key={link.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4">
                       <Checkbox

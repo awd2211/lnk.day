@@ -31,7 +31,11 @@ api.interceptors.response.use(
 
 // Admin Auth
 export const adminAuthService = {
-  login: (email: string, password: string) => api.post('/admin/login', { email, password }),
+  login: (email: string, password: string, rememberMe = false) =>
+    api.post('/admin/login', { email, password, rememberMe }),
+  forgotPassword: (email: string) => api.post('/admin/forgot-password', { email }),
+  resetPassword: (token: string, password: string) =>
+    api.post('/admin/reset-password', { token, password }),
   getAdmins: () => api.get('/admin'),
   getAdmin: (id: string) => api.get(`/admin/${id}`),
   createAdmin: (data: any) => api.post('/admin', data),
@@ -274,24 +278,24 @@ export const domainsService = {
 
 // QR Codes
 export const qrCodesService = {
-  getQRCodes: (teamId: string, params?: { page?: number; limit?: number }) =>
-    api.get('/proxy/qrcodes', { params: { teamId, ...params } }),
+  getQRCodes: (params?: { page?: number; limit?: number; style?: string; teamId?: string }) =>
+    api.get('/proxy/qrcodes', { params }),
   getQRCode: (id: string) => api.get(`/proxy/qrcodes/${id}`),
   deleteQRCode: (id: string) => api.delete(`/proxy/qrcodes/${id}`),
 };
 
 // Deep Links
 export const deepLinksService = {
-  getDeepLinks: (teamId: string, params?: { page?: number; limit?: number }) =>
-    api.get('/proxy/deeplinks', { params: { teamId, ...params } }),
+  getDeepLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string }) =>
+    api.get('/proxy/deeplinks', { params }),
   getDeepLink: (id: string) => api.get(`/proxy/deeplinks/${id}`),
   deleteDeepLink: (id: string) => api.delete(`/proxy/deeplinks/${id}`),
 };
 
 // Landing Pages
 export const landingPagesService = {
-  getPages: (teamId: string, params?: { status?: string }) =>
-    api.get('/proxy/pages', { params: { teamId, ...params } }),
+  getPages: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }) =>
+    api.get('/proxy/pages', { params }),
   getPage: (id: string) => api.get(`/proxy/pages/${id}`),
   deletePage: (id: string) => api.delete(`/proxy/pages/${id}`),
 };

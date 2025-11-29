@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { Shield, AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
@@ -12,8 +13,18 @@ export default function LoginPage() {
   const { login, isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load remembered email
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem('console_remembered_email');
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -33,7 +44,13 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
+      // Save or remove remembered email
+      if (rememberMe) {
+        localStorage.setItem('console_remembered_email', email);
+      } else {
+        localStorage.removeItem('console_remembered_email');
+      }
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || '登录失败，请检查邮箱和密码');
@@ -84,6 +101,24 @@ export default function LoginPage() {
               className="mt-1"
               required
             />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label htmlFor="rememberMe" className="text-sm font-normal cursor-pointer">
+                记住我
+              </Label>
+            </div>
+            <Link
+              to="/forgot-password"
+              className="text-sm text-primary hover:underline"
+            >
+              忘记密码？
+            </Link>
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? '登录中...' : '登录'}

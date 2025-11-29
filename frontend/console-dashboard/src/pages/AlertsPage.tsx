@@ -151,7 +151,7 @@ export default function AlertsPage() {
       const response = await alertsService.getAlerts({
         status: statusFilter === 'all' ? undefined : statusFilter
       });
-      return response.data as Alert[];
+      return (response.data?.alerts || []) as Alert[];
     },
   });
 
@@ -160,7 +160,7 @@ export default function AlertsPage() {
     queryKey: ['alert-rules'],
     queryFn: async () => {
       const response = await alertsService.getRules();
-      return response.data as AlertRule[];
+      return (response.data?.rules || []) as AlertRule[];
     },
   });
 
@@ -596,7 +596,7 @@ export default function AlertsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {rules.map((rule) => (
+                  {(rules || []).map((rule) => (
                     <tr key={rule.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
@@ -624,7 +624,7 @@ export default function AlertsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-1">
-                          {rule.channels.map((c) => (
+                          {(rule.channels || []).map((c) => (
                             <Badge key={c} variant="outline" className="text-xs">
                               {c}
                             </Badge>

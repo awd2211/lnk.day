@@ -266,14 +266,14 @@ export default function LinksPage() {
 
   // Export columns
   const exportColumns = [
-    { key: 'shortCode', label: '短链接' },
-    { key: 'originalUrl', label: '原始URL' },
-    { key: 'title', label: '标题' },
-    { key: 'clicks', label: '点击数' },
-    { key: 'status', label: '状态' },
-    { key: 'teamName', label: '团队' },
-    { key: 'createdBy', label: '创建者' },
-    { key: 'createdAt', label: '创建时间' },
+    { key: 'shortCode', header: '短链接' },
+    { key: 'originalUrl', header: '原始URL' },
+    { key: 'title', header: '标题' },
+    { key: 'clicks', header: '点击数' },
+    { key: 'status', header: '状态' },
+    { key: 'teamName', header: '团队' },
+    { key: 'createdBy', header: '创建者' },
+    { key: 'createdAt', header: '创建时间' },
   ];
 
   const prepareExportData = () => {

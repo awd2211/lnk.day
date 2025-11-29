@@ -57,7 +57,6 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { proxyService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
-import { exportConfigs } from '@/lib/export';
 
 interface Campaign {
   id: string;
@@ -116,23 +115,20 @@ const TYPE_CONFIG: Record<string, { label: string }> = {
   other: { label: '其他' },
 };
 
-// Add campaign export config
-const campaignExportConfig = {
-  filename: 'campaigns',
-  columns: [
-    { key: 'name', label: '活动名称' },
-    { key: 'status', label: '状态', transform: (v: string) => STATUS_CONFIG[v]?.label || v },
-    { key: 'type', label: '类型', transform: (v: string) => TYPE_CONFIG[v]?.label || v },
-    { key: 'teamName', label: '团队' },
-    { key: 'totalLinks', label: '链接数' },
-    { key: 'totalClicks', label: '点击数' },
-    { key: 'conversions', label: '转化数' },
-    { key: 'budget', label: '预算', transform: (v?: number) => v ? `¥${v}` : '-' },
-    { key: 'startDate', label: '开始日期', transform: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
-    { key: 'endDate', label: '结束日期', transform: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
-    { key: 'createdAt', label: '创建时间', transform: (v: string) => new Date(v).toLocaleString() },
-  ],
-};
+// Add campaign export columns
+const campaignExportColumns = [
+  { key: 'name', header: '活动名称' },
+  { key: 'status', header: '状态', formatter: (v: string) => STATUS_CONFIG[v]?.label || v },
+  { key: 'type', header: '类型', formatter: (v: string) => TYPE_CONFIG[v]?.label || v },
+  { key: 'teamName', header: '团队' },
+  { key: 'totalLinks', header: '链接数' },
+  { key: 'totalClicks', header: '点击数' },
+  { key: 'conversions', header: '转化数' },
+  { key: 'budget', header: '预算', formatter: (v?: number) => v ? `¥${v}` : '-' },
+  { key: 'startDate', header: '开始日期', formatter: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
+  { key: 'endDate', header: '结束日期', formatter: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
+  { key: 'createdAt', header: '创建时间', formatter: (v: string) => new Date(v).toLocaleString() },
+];
 
 export default function CampaignsPage() {
   const [search, setSearch] = useState('');
@@ -266,7 +262,7 @@ export default function CampaignsPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked && data?.items) {
-      setSelectedIds(data.items.map((c) => c.id));
+      setSelectedIds(data.items.map((c: Campaign) => c.id));
     } else {
       setSelectedIds([]);
     }
@@ -368,8 +364,8 @@ export default function CampaignsPage() {
             {data?.items && (
               <ExportButton
                 data={data.items}
-                config={campaignExportConfig}
-                buttonText="导出"
+                columns={campaignExportColumns}
+                filename="campaigns"
               />
             )}
           </div>
@@ -488,7 +484,7 @@ export default function CampaignsPage() {
                     </td>
                   </tr>
                 ) : (
-                  data?.items?.map((campaign) => {
+                  data?.items?.map((campaign: Campaign) => {
                     const statusConfig = STATUS_CONFIG[campaign.status];
                     const typeConfig = TYPE_CONFIG[campaign.type];
                     const goalProgress = getGoalProgress(campaign);
@@ -533,13 +529,13 @@ export default function CampaignsPage() {
                         </td>
                         <td className="p-3">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color}`}
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusConfig?.bgColor || 'bg-gray-100'} ${statusConfig?.color || 'text-gray-600'}`}
                           >
-                            {statusConfig.label}
+                            {statusConfig?.label || campaign.status}
                           </span>
                         </td>
                         <td className="p-3">
-                          <Badge variant="outline">{typeConfig.label}</Badge>
+                          <Badge variant="outline">{typeConfig?.label || campaign.type}</Badge>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-1">
@@ -641,15 +637,15 @@ export default function CampaignsPage() {
                     <p className="text-sm text-muted-foreground">状态</p>
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_CONFIG[selectedCampaign.status].bgColor
-                      } ${STATUS_CONFIG[selectedCampaign.status].color}`}
+                        STATUS_CONFIG[selectedCampaign.status]?.bgColor || 'bg-gray-100'
+                      } ${STATUS_CONFIG[selectedCampaign.status]?.color || 'text-gray-600'}`}
                     >
-                      {STATUS_CONFIG[selectedCampaign.status].label}
+                      {STATUS_CONFIG[selectedCampaign.status]?.label || selectedCampaign.status}
                     </span>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">类型</p>
-                    <p className="font-medium">{TYPE_CONFIG[selectedCampaign.type].label}</p>
+                    <p className="font-medium">{TYPE_CONFIG[selectedCampaign.type]?.label || selectedCampaign.type}</p>
                   </div>
                 </div>
 

@@ -267,8 +267,8 @@ export default function TeamsPage() {
       premium: { label: '高级版', variant: 'default' },
       enterprise: { label: '企业版', variant: 'default' },
     };
-    const config = plans[plan] || plans.free;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = plans[plan] ?? plans.free;
+    return <Badge variant={config!.variant}>{config!.label}</Badge>;
   };
 
   const getRoleBadge = (role: string) => {
@@ -278,8 +278,8 @@ export default function TeamsPage() {
       member: { label: '成员', variant: 'outline' },
       viewer: { label: '查看者', variant: 'outline' },
     };
-    const config = roles[role] || roles.member;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = roles[role] ?? roles.member;
+    return <Badge variant={config!.variant}>{config!.label}</Badge>;
   };
 
   const filteredTeams = data?.items?.filter((team: Team) =>

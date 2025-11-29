@@ -13,7 +13,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,10 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, [token]);
 
-  const login = async (email: string, password: string) => {
-    const { data } = await adminAuthService.login(email, password);
+  const login = async (email: string, password: string, rememberMe = false) => {
+    const { data } = await adminAuthService.login(email, password, rememberMe);
     localStorage.setItem('console_token', data.accessToken);
     localStorage.setItem('console_admin', JSON.stringify(data.admin));
+    if (rememberMe) {
+      localStorage.setItem('console_remember_me', 'true');
+    } else {
+      localStorage.removeItem('console_remember_me');
+    }
     setToken(data.accessToken);
     setAdmin(data.admin);
   };
