@@ -16,6 +16,7 @@ import {
 
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
     WebhookModule,
     HealthModule,
+    RabbitMQModule,
   ],
   providers: [
     {

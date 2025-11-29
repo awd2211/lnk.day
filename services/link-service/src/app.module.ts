@@ -30,6 +30,7 @@ import { RedirectRulesModule } from './modules/redirect-rules/redirect-rules.mod
 import { LinkTemplateModule } from './modules/link-template/link-template.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { HealthModule } from './modules/health/health.module';
+import { LinkSagaModule } from './saga/saga.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { HealthModule } from './modules/health/health.module';
     LinkTemplateModule,
     ModerationModule,
     HealthModule,
+    LinkSagaModule,
   ],
   providers: [
     {

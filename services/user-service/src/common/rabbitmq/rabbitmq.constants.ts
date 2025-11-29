@@ -1,0 +1,8 @@
+import { EXCHANGES, QUEUES } from '@lnk/shared-types';
+
+export const RABBITMQ_CONNECTION = 'RABBITMQ_CONNECTION';
+export const RABBITMQ_CHANNEL = 'RABBITMQ_CHANNEL';
+
+// Re-export from shared types
+export const USER_EVENTS_EXCHANGE = EXCHANGES.USER_EVENTS;
+export const NOTIFICATION_EVENTS_EXCHANGE = EXCHANGES.NOTIFICATION_EVENTS;

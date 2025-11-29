@@ -28,6 +28,8 @@ import { PrivacyModule } from './modules/privacy/privacy.module';
 import { LdapModule } from './modules/auth/ldap/ldap.module';
 import { NotificationModule } from './common/notification/notification.module';
 import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
+import { UserSagaModule } from './saga/saga.module';
 
 @Module({
   imports: [
@@ -89,6 +91,8 @@ import { HealthModule } from './modules/health/health.module';
     PrivacyModule,
     LdapModule,
     HealthModule,
+    RabbitMQModule,
+    UserSagaModule,
   ],
   providers: [
     {

@@ -19,6 +19,7 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
+import { CampaignSagaModule } from './saga/saga.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
     GoalsModule,
     CampaignAnalyticsModule,
     HealthModule,
+    CampaignSagaModule,
   ],
   providers: [
     {
