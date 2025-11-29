@@ -1,0 +1,127 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'lnk-day-monitor'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:60040']
+
+  # API Gateway
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # User Service
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['localhost:60002']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Link Service
+  - job_name: 'link-service'
+    static_configs:
+      - targets: ['localhost:60003']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Campaign Service
+  - job_name: 'campaign-service'
+    static_configs:
+      - targets: ['localhost:60004']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # QR Service
+  - job_name: 'qr-service'
+    static_configs:
+      - targets: ['localhost:60005']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Page Service
+  - job_name: 'page-service'
+    static_configs:
+      - targets: ['localhost:60007']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Deeplink Service
+  - job_name: 'deeplink-service'
+    static_configs:
+      - targets: ['localhost:60008']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Console Service
+  - job_name: 'console-service'
+    static_configs:
+      - targets: ['localhost:60009']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Domain Service
+  - job_name: 'domain-service'
+    static_configs:
+      - targets: ['localhost:60014']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Notification Service
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['localhost:60020']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Redirect Service (Go)
+  - job_name: 'redirect-service'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  # Analytics Service (Python)
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['localhost:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Infrastructure - Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:60031']
+    metrics_path: /metrics
+
+  # Infrastructure - PostgreSQL (via pg_exporter if available)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['localhost:9187']
+    metrics_path: /metrics
+
+  # Infrastructure - ClickHouse
+  - job_name: 'clickhouse'
+    static_configs:
+      - targets: ['localhost:60032']
+    metrics_path: /metrics
+
+  # Infrastructure - RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['localhost:15692']
+    metrics_path: /metrics

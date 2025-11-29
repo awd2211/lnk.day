@@ -78,7 +78,7 @@ services:
       MINIO_ROOT_PASSWORD: minio123
     volumes:
       - minio_data:/data
-    command: server /data --address ":60006" --console-address ":60007"
+    command: server /data --address ":60006" --console-address ":60015"
 
   meilisearch:
     image: getmeili/meilisearch:latest
@@ -112,6 +112,90 @@ services:
       timeout: 5s
       retries: 5
 
+  # ===================
+  # 监控和可观测性
+  # ===================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lnk-prometheus
+    network_mode: host
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.listen-address=:60040'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:60040/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lnk-grafana
+    network_mode: host
+    environment:
+      GF_SERVER_HTTP_PORT: 60041
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:latest
+    container_name: lnk-loki
+    network_mode: host
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:60042/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: lnk-promtail
+    network_mode: host
+    volumes:
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: lnk-jaeger
+    network_mode: host
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: ":60045"
+      COLLECTOR_OTLP_ENABLED: "true"
+      QUERY_BASE_PATH: /jaeger
+      # Jaeger ports:
+      # 60044 - UI
+      # 4317 - OTLP gRPC
+      # 4318 - OTLP HTTP
+      # 6831 - Jaeger Thrift UDP
+      # 14268 - Jaeger Thrift HTTP
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:60044/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:
@@ -120,3 +204,6 @@ volumes:
   minio_data:
   meilisearch_data:
   rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:

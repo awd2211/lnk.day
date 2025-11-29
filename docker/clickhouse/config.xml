@@ -38,4 +38,13 @@
     </profiles>
 
     <skip_check_for_incorrect_settings>1</skip_check_for_incorrect_settings>
+
+    <!-- Prometheus metrics -->
+    <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>60032</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+    </prometheus>
 </clickhouse>
