@@ -47,11 +47,30 @@ cd services/user-service && pnpm test
 ### Non-Node.js services
 
 ```bash
-# Redirect service (Go) - runs on port 8080
+# Redirect service (Go)
 cd services/redirect-service && go run cmd/main.go
 
 # Analytics service (Python)
-cd services/analytics-service && uvicorn app.main:app --reload
+cd services/analytics-service && source venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 60050
+```
+
+### PM2 commands (production-like)
+
+```bash
+# Start all services with PM2
+pm2 start /path/to/service/dist/main.js --name service-name
+
+# List running services
+pm2 list
+
+# View logs
+pm2 logs service-name
+
+# Restart service
+pm2 restart service-name
+
+# Save PM2 configuration
+pm2 save
 ```
 
 ## Architecture
@@ -61,25 +80,49 @@ cd services/analytics-service && uvicorn app.main:app --reload
 ```
 lnk.day/
 ├── frontend/           # React apps (Vite + TypeScript)
-│   ├── user-portal/        # Main user-facing app (port 60010)
-│   └── console-dashboard/  # Admin console
+│   ├── user-portal/        # User-facing app → api-gateway
+│   └── console-dashboard/  # Admin console → console-service
 ├── services/           # Backend microservices
-│   ├── user-service/       # NestJS - auth, users, teams
-│   ├── link-service/       # NestJS - link CRUD
-│   ├── campaign-service/   # NestJS - marketing campaigns
-│   ├── qr-service/         # NestJS - QR code generation
-│   ├── page-service/       # NestJS - landing pages
-│   ├── deeplink-service/   # NestJS - mobile deep links
-│   ├── notification-service/ # NestJS - email/notifications
-│   ├── console-service/    # NestJS - admin APIs
-│   ├── redirect-service/   # Go (Fiber) - high-perf redirects
-│   ├── analytics-service/  # Python (FastAPI) - ClickHouse analytics
-│   └── datastream-service/ # Data export to BigQuery/S3/etc
+│   ├── api-gateway/        # Unified entry for user-portal
+│   ├── user-service/       # Auth, users, teams
+│   ├── link-service/       # Link CRUD, folders, templates
+│   ├── campaign-service/   # Marketing campaigns, goals
+│   ├── qr-service/         # QR code generation
+│   ├── page-service/       # Landing pages, bio-links
+│   ├── deeplink-service/   # Mobile deep links
+│   ├── notification-service/ # Email, SMS, webhooks
+│   ├── console-service/    # Admin APIs
+│   ├── domain-service/     # Custom domain management
+│   ├── webhook-service/    # Webhook automation (Make, n8n, etc.)
+│   ├── integration-service/ # Third-party integrations (Zapier, HubSpot, Salesforce, Shopify)
+│   ├── redirect-service/   # Go - high-perf redirects
+│   ├── analytics-service/  # Python - ClickHouse analytics
+│   └── datastream-service/ # Data export
 ├── packages/           # Shared packages
-│   ├── shared-types/       # TypeScript types shared across services
-│   ├── eslint-config/      # Shared ESLint configuration
-│   └── tsconfig/           # Shared TypeScript configuration
-└── docker/             # Docker configs for infrastructure
+│   ├── shared-types/       # TypeScript types
+│   ├── eslint-config/      # Shared ESLint config
+│   └── tsconfig/           # Shared TypeScript config
+└── docker/             # Docker configs
+```
+
+### API Routing Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       Frontend Apps                          │
+├─────────────────────────────┬───────────────────────────────┤
+│     user-portal (60010)     │   console-dashboard (60011)   │
+└──────────────┬──────────────┴───────────────┬───────────────┘
+               │                              │
+               ▼                              ▼
+┌──────────────────────────┐    ┌─────────────────────────────┐
+│   api-gateway (60000)    │    │   console-service (60009)   │
+│   Unified user API       │    │   Admin APIs                │
+└──────────────┬───────────┘    └─────────────────────────────┘
+               │
+    ┌──────────┼──────────┬───────────┬───────────┐
+    ▼          ▼          ▼           ▼           ▼
+ user-svc   link-svc  campaign-svc  qr-svc   page-svc ...
 ```
 
 ### Tech Stack by Service Type
@@ -87,13 +130,14 @@ lnk.day/
 - **Frontend**: React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS + TanStack Query
 - **NestJS Services**: TypeScript + TypeORM + PostgreSQL + Redis
 - **Redirect Service**: Go + Fiber + Redis (optimized for <100ms latency)
-- **Analytics Service**: Python + FastAPI + ClickHouse + Celery
+- **Analytics Service**: Python + FastAPI + ClickHouse
 
-### Service Ports
+### Service Ports (all 60000+)
 
 | Service | Port | Tech |
 |---------|------|------|
-| api-gateway | 3000 | NestJS |
+| api-gateway | 60000 | NestJS |
+| datastream-service | 60001 | Python |
 | user-service | 60002 | NestJS |
 | link-service | 60003 | NestJS |
 | campaign-service | 60004 | NestJS |
@@ -102,27 +146,44 @@ lnk.day/
 | deeplink-service | 60008 | NestJS |
 | console-service | 60009 | NestJS |
 | user-portal | 60010 | Vite |
+| console-dashboard | 60011 | Vite |
 | domain-service | 60014 | NestJS |
+| webhook-service | 60017 | NestJS |
+| integration-service | 60016 | NestJS |
 | notification-service | 60020 | NestJS |
-| redirect-service | 8080 | Go |
-| analytics-service | 8000 | FastAPI |
+| analytics-service | 60050 | FastAPI |
+| redirect-service | 60080 | Go |
 
-### Infrastructure (docker-compose)
+### Infrastructure Ports (docker-compose)
 
-| Service | Port |
-|---------|------|
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| ClickHouse | 8123 (HTTP), 9000 (TCP) |
-| MinIO | 9100 (API), 9101 (Console) |
-| RabbitMQ | 5672 (AMQP), 15672 (Management) |
-| Meilisearch | 7700 |
+| Service | Port | Credentials |
+|---------|------|-------------|
+| PostgreSQL | 60030 | postgres/postgres |
+| Redis | 60031 | - |
+| ClickHouse TCP | 60032 | - |
+| Kafka | 60033 | - |
+| ClickHouse HTTP | 60034 | - |
+| Meilisearch | 60035 | meilisearch-master-key-change-in-production |
+| RabbitMQ AMQP | 60036 | rabbit/rabbit123 |
+| RabbitMQ Management | 60037 | rabbit/rabbit123 |
+| Prometheus | 60040 | - |
+| Grafana | 60041 | admin/admin123 |
+| Loki | 60042 | - |
+| Jaeger UI | 60044 | - |
+| MinIO API | 60006 | minio/minio123 |
+| MinIO Console | 60007 | minio/minio123 |
 
 ### Cross-Service Communication
 
-- REST APIs for synchronous communication
-- RabbitMQ for async messaging between services
-- Shared types via `@lnk/shared-types` package
+- **Synchronous**: REST APIs via api-gateway
+- **Asynchronous**: RabbitMQ for event-driven messaging
+- **Shared types**: `@lnk/shared-types` package
+
+### RabbitMQ Exchanges & Queues
+
+- `click.events` - Click tracking events
+- `link.events` - Link CRUD events
+- `notification.events` - Notification triggers
 
 ## Development Guidelines
 
@@ -130,3 +191,4 @@ lnk.day/
 - NestJS services follow modular structure: `src/modules/{feature}/{feature}.module.ts`
 - All services use workspace dependencies: `@lnk/shared-types`, `@lnk/eslint-config`, `@lnk/tsconfig`
 - Environment variables are defined in `.env` (copy from `.env.example`)
+- All ports should be in the 60000+ range for consistency

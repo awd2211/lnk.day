@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # ClickHouse
     CLICKHOUSE_HOST: str = "localhost"
-    CLICKHOUSE_PORT: int = 60032
+    CLICKHOUSE_PORT: int = 60034  # TCP port (HTTP is 60032)
     CLICKHOUSE_DATABASE: str = "lnk_analytics"
     CLICKHOUSE_USER: str = "default"
     CLICKHOUSE_PASSWORD: str = ""

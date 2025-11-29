@@ -6,7 +6,13 @@ from app.models.analytics import AnalyticsQuery, AnalyticsResponse
 
 class AnalyticsService:
     def __init__(self):
-        self.client = get_clickhouse_client()
+        # Don't create a persistent connection - create fresh one for each request
+        pass
+
+    @property
+    def client(self):
+        """Get a fresh ClickHouse client for each request"""
+        return get_clickhouse_client()
 
     def get_link_analytics(self, link_id: str, start_date: datetime, end_date: datetime) -> AnalyticsResponse:
         # Total clicks
@@ -36,7 +42,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT count() as total
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -48,8 +54,8 @@ class AnalyticsService:
     def _get_unique_clicks(self, link_id: str, start_date: datetime, end_date: datetime) -> int:
         result = self.client.execute(
             """
-            SELECT uniq(ip) as unique_clicks
-            FROM clicks
+            SELECT uniq(visitor_ip) as unique_clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -62,7 +68,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT toStartOfDay(timestamp) as date, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -77,7 +83,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT country, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -93,12 +99,12 @@ class AnalyticsService:
     def _get_device_distribution(self, link_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
         result = self.client.execute(
             """
-            SELECT device, count() as clicks
-            FROM clicks
+            SELECT device_type, count() as clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-            GROUP BY device
+            GROUP BY device_type
             ORDER BY clicks DESC
             """,
             {"link_id": link_id, "start_date": start_date, "end_date": end_date}
@@ -110,7 +116,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT browser, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -126,13 +132,13 @@ class AnalyticsService:
     def _get_top_referers(self, link_id: str, start_date: datetime, end_date: datetime) -> List[Dict]:
         result = self.client.execute(
             """
-            SELECT referer, count() as clicks
-            FROM clicks
+            SELECT referrer, count() as clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-              AND referer != ''
-            GROUP BY referer
+              AND referrer != ''
+            GROUP BY referrer
             ORDER BY clicks DESC
             LIMIT 10
             """,
@@ -148,9 +154,9 @@ class AnalyticsService:
             """
             SELECT
                 count() as total_clicks,
-                uniq(ip) as unique_visitors,
+                uniq(visitor_ip) as unique_visitors,
                 uniq(link_id) as active_links
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             """,
@@ -176,13 +182,16 @@ class AnalyticsService:
 
     def get_team_analytics(self, start_date: datetime, end_date: datetime) -> Dict:
         """Get comprehensive team analytics data for dashboard"""
+        # Get a single client for all queries in this method
+        client = get_clickhouse_client()
+
         # Total and unique clicks
-        totals = self.client.execute(
+        totals = client.execute(
             """
             SELECT
                 count() as total_clicks,
-                uniq(ip) as unique_visitors
-            FROM clicks
+                uniq(visitor_ip) as unique_visitors
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             """,
@@ -191,20 +200,20 @@ class AnalyticsService:
 
         # Today's clicks
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        today_clicks = self.client.execute(
+        today_clicks = client.execute(
             """
             SELECT count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(today)s
             """,
             {"today": today}
         )
 
         # Time series (clicks by day)
-        time_series = self.client.execute(
+        time_series = client.execute(
             """
             SELECT toDate(timestamp) as date, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY date
@@ -214,23 +223,23 @@ class AnalyticsService:
         )
 
         # Device distribution
-        devices = self.client.execute(
+        devices = client.execute(
             """
-            SELECT device, count() as clicks
-            FROM clicks
+            SELECT device_type, count() as clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-            GROUP BY device
+            GROUP BY device_type
             ORDER BY clicks DESC
             """,
             {"start_date": start_date, "end_date": end_date}
         )
 
         # Browser distribution
-        browsers = self.client.execute(
+        browsers = client.execute(
             """
             SELECT browser, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY browser
@@ -241,10 +250,10 @@ class AnalyticsService:
         )
 
         # Country distribution
-        countries = self.client.execute(
+        countries = client.execute(
             """
             SELECT country, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY country
@@ -255,14 +264,14 @@ class AnalyticsService:
         )
 
         # Referrer distribution
-        referrers = self.client.execute(
+        referrers = client.execute(
             """
-            SELECT referer, count() as clicks
-            FROM clicks
+            SELECT referrer, count() as clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-              AND referer != ''
-            GROUP BY referer
+              AND referrer != ''
+            GROUP BY referrer
             ORDER BY clicks DESC
             LIMIT 10
             """,
@@ -270,13 +279,13 @@ class AnalyticsService:
         )
 
         # Hourly activity heatmap
-        hourly_activity = self.client.execute(
+        hourly_activity = client.execute(
             """
             SELECT
                 toDayOfWeek(timestamp) as day_of_week,
                 toHour(timestamp) as hour,
                 count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY day_of_week, hour
@@ -327,7 +336,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT toStartOfHour(timestamp) as hour, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -346,7 +355,7 @@ class AnalyticsService:
                 toDayOfWeek(timestamp) as day_of_week,
                 toHour(timestamp) as hour,
                 count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -374,7 +383,7 @@ class AnalyticsService:
                 toDayOfWeek(timestamp) as day_of_week,
                 toHour(timestamp) as hour,
                 count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY day_of_week, hour
@@ -396,7 +405,7 @@ class AnalyticsService:
         result = self.client.execute(
             """
             SELECT os, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -414,8 +423,8 @@ class AnalyticsService:
         # Country distribution
         countries = self.client.execute(
             """
-            SELECT country, count() as clicks, uniq(ip) as unique_visitors
-            FROM clicks
+            SELECT country, count() as clicks, uniq(visitor_ip) as unique_visitors
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -430,7 +439,7 @@ class AnalyticsService:
         cities = self.client.execute(
             """
             SELECT country, city, count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -465,12 +474,12 @@ class AnalyticsService:
         """Get detailed device distribution"""
         result = self.client.execute(
             """
-            SELECT device, count() as clicks, uniq(ip) as unique_visitors
-            FROM clicks
+            SELECT device_type, count() as clicks, uniq(visitor_ip) as unique_visitors
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-            GROUP BY device
+            GROUP BY device_type
             ORDER BY clicks DESC
             """,
             {"link_id": link_id, "start_date": start_date, "end_date": end_date}
@@ -490,8 +499,8 @@ class AnalyticsService:
         """Get detailed browser distribution"""
         result = self.client.execute(
             """
-            SELECT browser, count() as clicks, uniq(ip) as unique_visitors
-            FROM clicks
+            SELECT browser, count() as clicks, uniq(visitor_ip) as unique_visitors
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
@@ -518,11 +527,11 @@ class AnalyticsService:
         direct_count = self.client.execute(
             """
             SELECT count() as clicks
-            FROM clicks
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-              AND (referer = '' OR referer IS NULL)
+              AND (referrer = '' OR referrer IS NULL)
             """,
             {"link_id": link_id, "start_date": start_date, "end_date": end_date}
         )
@@ -530,13 +539,13 @@ class AnalyticsService:
         # Top referrers
         referrers = self.client.execute(
             """
-            SELECT referer, count() as clicks, uniq(ip) as unique_visitors
-            FROM clicks
+            SELECT referrer, count() as clicks, uniq(visitor_ip) as unique_visitors
+            FROM link_events
             WHERE link_id = %(link_id)s
               AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
-              AND referer != ''
-            GROUP BY referer
+              AND referrer != ''
+            GROUP BY referrer
             ORDER BY clicks DESC
             LIMIT %(limit)s
             """,
