@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const CONSOLE_SERVICE_URL = import.meta.env.VITE_CONSOLE_SERVICE_URL || 'http://localhost:60001';
+// Console dashboard directly accesses console-service
+const CONSOLE_SERVICE_URL = import.meta.env.VITE_CONSOLE_SERVICE_URL || 'http://localhost:60009/api/v1';
 
 export const api = axios.create({
   baseURL: CONSOLE_SERVICE_URL,
@@ -221,4 +222,93 @@ export const alertsService = {
   updateRule: (id: string, data: any) => api.put(`/alerts/rules/${id}`, data),
   deleteRule: (id: string) => api.delete(`/alerts/rules/${id}`),
   toggleRule: (id: string, enabled: boolean) => api.patch(`/alerts/rules/${id}/toggle`, { enabled }),
+};
+
+// Billing / Invoices
+export const billingService = {
+  getInvoices: (params?: { page?: number; limit?: number; teamId?: string; status?: string }) =>
+    api.get('/proxy/billing/invoices', { params }),
+  getInvoice: (id: string) => api.get(`/proxy/billing/invoices/${id}`),
+  refundInvoice: (id: string, data: { amount?: number; reason?: string }) =>
+    api.post(`/proxy/billing/invoices/${id}/refund`, data),
+  resendInvoice: (id: string) => api.post(`/proxy/billing/invoices/${id}/resend`),
+  getRevenue: (params?: { startDate?: string; endDate?: string; groupBy?: string }) =>
+    api.get('/proxy/billing/revenue', { params }),
+  getPlans: () => api.get('/proxy/billing/plans'),
+  updatePlan: (id: string, data: any) => api.put(`/proxy/billing/plans/${id}`, data),
+};
+
+// API Keys
+export const apiKeysService = {
+  getApiKeys: (params?: { page?: number; limit?: number; teamId?: string; userId?: string; status?: string }) =>
+    api.get('/proxy/apikeys', { params }),
+  getApiKey: (id: string) => api.get(`/proxy/apikeys/${id}`),
+  revokeApiKey: (id: string, reason?: string) => api.post(`/proxy/apikeys/${id}/revoke`, { reason }),
+  regenerateApiKey: (id: string) => api.post(`/proxy/apikeys/${id}/regenerate`),
+  getUsage: (params?: { startDate?: string; endDate?: string; keyId?: string; teamId?: string }) =>
+    api.get('/proxy/apikeys/usage', { params }),
+};
+
+// Webhooks
+export const webhooksService = {
+  getWebhooks: (params?: { page?: number; limit?: number; teamId?: string; status?: string }) =>
+    api.get('/proxy/webhooks', { params }),
+  getWebhook: (id: string) => api.get(`/proxy/webhooks/${id}`),
+  updateWebhook: (id: string, data: any) => api.put(`/proxy/webhooks/${id}`, data),
+  deleteWebhook: (id: string) => api.delete(`/proxy/webhooks/${id}`),
+  testWebhook: (id: string) => api.post(`/proxy/webhooks/${id}/test`),
+  getLogs: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/proxy/webhooks/${id}/logs`, { params }),
+  retryWebhook: (id: string, logId: string) => api.post(`/proxy/webhooks/${id}/retry`, { logId }),
+};
+
+// Domains
+export const domainsService = {
+  getDomains: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get('/proxy/domains', { params }),
+  getDomain: (id: string) => api.get(`/proxy/domains/${id}`),
+  updateDomain: (id: string, data: { status?: string }) => api.patch(`/proxy/domains/${id}`, data),
+  deleteDomain: (id: string) => api.delete(`/proxy/domains/${id}`),
+  verifyDomain: (id: string) => api.post(`/proxy/domains/${id}/verify`),
+};
+
+// QR Codes
+export const qrCodesService = {
+  getQRCodes: (teamId: string, params?: { page?: number; limit?: number }) =>
+    api.get('/proxy/qrcodes', { params: { teamId, ...params } }),
+  getQRCode: (id: string) => api.get(`/proxy/qrcodes/${id}`),
+  deleteQRCode: (id: string) => api.delete(`/proxy/qrcodes/${id}`),
+};
+
+// Deep Links
+export const deepLinksService = {
+  getDeepLinks: (teamId: string, params?: { page?: number; limit?: number }) =>
+    api.get('/proxy/deeplinks', { params: { teamId, ...params } }),
+  getDeepLink: (id: string) => api.get(`/proxy/deeplinks/${id}`),
+  deleteDeepLink: (id: string) => api.delete(`/proxy/deeplinks/${id}`),
+};
+
+// Landing Pages
+export const landingPagesService = {
+  getPages: (teamId: string, params?: { status?: string }) =>
+    api.get('/proxy/pages', { params: { teamId, ...params } }),
+  getPage: (id: string) => api.get(`/proxy/pages/${id}`),
+  deletePage: (id: string) => api.delete(`/proxy/pages/${id}`),
+};
+
+// Data Export
+export const exportService = {
+  exportUsers: (data: { format?: string; filters?: any; fields?: string[] }) =>
+    api.post('/proxy/export/users', data),
+  exportTeams: (data: { format?: string; filters?: any; fields?: string[] }) =>
+    api.post('/proxy/export/teams', data),
+  exportLinks: (data: { format?: string; teamId?: string; filters?: any; fields?: string[] }) =>
+    api.post('/proxy/export/links', data),
+  exportAnalytics: (data: { format?: string; startDate?: string; endDate?: string; teamId?: string; linkId?: string }) =>
+    api.post('/proxy/export/analytics', data),
+  exportInvoices: (data: { format?: string; startDate?: string; endDate?: string; status?: string }) =>
+    api.post('/proxy/export/invoices', data),
+  getJobs: (params?: { page?: number; limit?: number }) => api.get('/proxy/export/jobs', { params }),
+  getJob: (id: string) => api.get(`/proxy/export/jobs/${id}`),
+  downloadExport: (id: string) => api.get(`/proxy/export/jobs/${id}/download`, { responseType: 'blob' }),
 };

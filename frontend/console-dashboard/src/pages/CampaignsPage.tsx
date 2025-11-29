@@ -138,7 +138,7 @@ export default function CampaignsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [teamFilter, setTeamFilter] = useState<string>('');
+  const [teamFilter, setTeamFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
@@ -184,7 +184,7 @@ export default function CampaignsPage() {
     queryKey: ['campaigns', { page, statusFilter, typeFilter, teamFilter, search }],
     queryFn: async () => {
       try {
-        const res = await proxyService.getCampaigns(teamFilter || 'all', {
+        const res = await proxyService.getCampaigns(teamFilter, {
           status: statusFilter !== 'all' ? statusFilter : undefined,
         });
         return res.data;
@@ -417,7 +417,7 @@ export default function CampaignsPage() {
                 <SelectValue placeholder="选择团队" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部团队</SelectItem>
+                <SelectItem value="all">全部团队</SelectItem>
                 {teamsData?.items?.map((team: { id: string; name: string }) => (
                   <SelectItem key={team.id} value={team.id}>
                     {team.name}

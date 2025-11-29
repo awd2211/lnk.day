@@ -180,7 +180,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (config) {
-      setFormData(config);
+      // Merge with defaultConfig to ensure all properties exist
+      setFormData({
+        general: { ...defaultConfig.general, ...config.general },
+        api: { ...defaultConfig.api, ...config.api },
+        email: { ...defaultConfig.email, ...config.email },
+        security: { ...defaultConfig.security, ...config.security },
+        features: { ...defaultConfig.features, ...config.features },
+      });
     }
   }, [config]);
 
