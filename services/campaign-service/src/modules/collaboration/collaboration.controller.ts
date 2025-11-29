@@ -8,14 +8,17 @@ import {
   Param,
   Headers,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CollaborationService } from './collaboration.service';
 import { CollaboratorRole, CommentType } from './collaboration.entity';
 
 @ApiTags('campaign-collaboration')
 @Controller('campaigns/:campaignId')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class CollaborationController {
   constructor(private readonly collaborationService: CollaborationService) {}
 

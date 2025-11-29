@@ -6,9 +6,10 @@ import {
   CampaignAnalyticsController,
   TeamAnalyticsController,
 } from './campaign-analytics.controller';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Campaign])],
+  imports: [TypeOrmModule.forFeature([Campaign]), AuthModule],
   controllers: [CampaignAnalyticsController, TeamAnalyticsController],
   providers: [CampaignAnalyticsService],
   exports: [CampaignAnalyticsService],

@@ -7,6 +7,7 @@ import {
 } from './collaboration.entity';
 import { CollaborationService } from './collaboration.service';
 import { CollaborationController } from './collaboration.controller';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CollaborationController } from './collaboration.controller';
       CampaignComment,
       CampaignActivityLog,
     ]),
+    AuthModule,
   ],
   controllers: [CollaborationController],
   providers: [CollaborationService],

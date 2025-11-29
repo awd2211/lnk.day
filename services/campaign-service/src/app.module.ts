@@ -7,6 +7,7 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
 } from '@lnk/nestjs-common';
 import { CampaignModule } from './modules/campaign/campaign.module';
 import { TemplateModule } from './modules/template/template.module';
@@ -15,10 +16,12 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    VersionModule,
     MetricsModule.forRoot({ serviceName: 'campaign-service' }),
     TracingModule.forRoot({
       serviceName: 'campaign-service',
@@ -48,6 +51,7 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
     GoalsModule,
     CampaignAnalyticsModule,
     HealthModule,
+    AuthModule,
   ],
   providers: [
     {

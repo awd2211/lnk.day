@@ -8,12 +8,16 @@ import {
   Param,
   Headers,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GoalsService, CreateGoalDto } from './goals.service';
 import { GoalType, GoalStatus, NotificationChannels } from './entities/campaign-goal.entity';
 
 @ApiTags('campaign-goals')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('campaigns/:campaignId/goals')
 export class GoalsController {
   constructor(private readonly goalsService: GoalsService) {}

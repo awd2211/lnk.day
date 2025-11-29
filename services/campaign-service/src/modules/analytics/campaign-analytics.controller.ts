@@ -7,12 +7,16 @@ import {
   Headers,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Response } from 'express';
 import { CampaignAnalyticsService } from './campaign-analytics.service';
 
 @ApiTags('campaign-analytics')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('campaigns')
 export class CampaignAnalyticsController {
   constructor(private readonly analyticsService: CampaignAnalyticsService) {}
