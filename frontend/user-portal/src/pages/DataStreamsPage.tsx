@@ -71,7 +71,7 @@ import {
   type DataStreamDestination,
   type BackfillRequest,
 } from '@/hooks/useDataStreams';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -569,7 +569,7 @@ export default function DataStreamsPage() {
                             onChange={(e) =>
                               setFormData({
                                 ...formData,
-                                delivery: { ...formData.delivery, batchSize: parseInt(e.target.value) },
+                                delivery: { mode: formData.delivery?.mode || 'batch', ...formData.delivery, batchSize: parseInt(e.target.value) },
                               })
                             }
                           />
@@ -583,7 +583,7 @@ export default function DataStreamsPage() {
                             onChange={(e) =>
                               setFormData({
                                 ...formData,
-                                delivery: { ...formData.delivery, batchIntervalSeconds: parseInt(e.target.value) },
+                                delivery: { mode: formData.delivery?.mode || 'batch', ...formData.delivery, batchIntervalSeconds: parseInt(e.target.value) },
                               })
                             }
                           />

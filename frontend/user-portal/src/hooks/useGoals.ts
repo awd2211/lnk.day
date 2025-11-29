@@ -21,7 +21,7 @@ export type GoalType =
   | 'social_shares'
   | 'custom';
 
-export type GoalStatus = 'active' | 'reached' | 'failed' | 'paused';
+export type GoalStatus = 'active' | 'reached' | 'failed' | 'paused' | 'completed';
 
 export type AttributionModel = 'first_touch' | 'last_touch' | 'linear' | 'time_decay';
 
@@ -75,25 +75,40 @@ export interface GoalProjection {
   lastCalculatedAt?: string;
 }
 
+export interface GoalMilestone {
+  id: string;
+  percentage: number;
+  name?: string;
+  reached: boolean;
+  reachedAt?: string;
+}
+
 export interface Goal {
   id: string;
   campaignId: string;
   teamId: string;
   name: string;
+  description?: string;
   type: GoalType;
   target: number;
+  targetValue?: number; // Alias for target
   current: number;
+  currentValue?: number; // Alias for current
   currency?: string;
   status: GoalStatus;
   thresholds: NotificationThreshold[];
   notifications: NotificationChannels;
   deadline?: string;
+  endDate?: string; // Alias for deadline
+  startDate?: string;
   enabled: boolean;
   metadata: GoalMetadata;
   history: GoalHistory[];
   projection?: GoalProjection;
   startValue?: number;
   baselineValue?: number;
+  milestones?: GoalMilestone[];
+  reachedMilestones?: number;
   createdAt: string;
   updatedAt: string;
   reachedAt?: string;
@@ -581,6 +596,7 @@ export function formatGoalValue(value: number, type: GoalType, currency?: string
 export const GOAL_STATUS_CONFIG: Record<GoalStatus, { label: string; color: string; bgColor: string }> = {
   active: { label: '进行中', color: 'text-blue-600', bgColor: 'bg-blue-100' },
   reached: { label: '已达成', color: 'text-green-600', bgColor: 'bg-green-100' },
+  completed: { label: '已完成', color: 'text-green-600', bgColor: 'bg-green-100' },
   failed: { label: '未达成', color: 'text-red-600', bgColor: 'bg-red-100' },
   paused: { label: '已暂停', color: 'text-gray-600', bgColor: 'bg-gray-100' },
 };

@@ -101,7 +101,7 @@ function GoalCard({
 }) {
   const goalType = goalTypes.find(t => t.value === goal.type);
   const Icon = goalType?.icon || Target;
-  const daysLeft = Math.ceil((new Date(goal.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const daysLeft = goal.endDate ? Math.ceil((new Date(goal.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
   const isOverdue = daysLeft < 0 && goal.status === 'active';
 
   const getStatusBadge = () => {
@@ -125,7 +125,7 @@ function GoalCard({
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${goal.progress >= 100 ? 'bg-green-100 text-green-600' : 'bg-muted'}`}>
+            <div className={`p-2 rounded-lg ${(goal.progress ?? 0) >= 100 ? 'bg-green-100 text-green-600' : 'bg-muted'}`}>
               <Icon className="h-5 w-5" />
             </div>
             <div>
@@ -180,13 +180,13 @@ function GoalCard({
             <div className="flex justify-between text-sm">
               <span>进度</span>
               <span className="font-medium">
-                {goal.currentValue.toLocaleString()} / {goal.targetValue.toLocaleString()}
-                <span className="text-muted-foreground ml-1">({goal.progress.toFixed(1)}%)</span>
+                {(goal.currentValue ?? goal.current ?? 0).toLocaleString()} / {(goal.targetValue ?? goal.target ?? 0).toLocaleString()}
+                <span className="text-muted-foreground ml-1">({(goal.progress ?? 0).toFixed(1)}%)</span>
               </span>
             </div>
             <Progress
-              value={Math.min(goal.progress, 100)}
-              className={`h-2 ${goal.progress >= 100 ? '[&>div]:bg-green-500' : goal.progress >= 75 ? '[&>div]:bg-yellow-500' : ''}`}
+              value={Math.min(goal.progress ?? 0, 100)}
+              className={`h-2 ${(goal.progress ?? 0) >= 100 ? '[&>div]:bg-green-500' : (goal.progress ?? 0) >= 75 ? '[&>div]:bg-yellow-500' : ''}`}
             />
           </div>
 
@@ -195,13 +195,13 @@ function GoalCard({
             <div className="flex gap-1">
               {goal.milestones.map((milestone) => (
                 <div
-                  key={milestone}
+                  key={milestone.id}
                   className={`flex-1 h-1 rounded ${
-                    goal.reachedMilestones?.includes(milestone)
+                    milestone.reached
                       ? 'bg-green-500'
                       : 'bg-gray-200'
                   }`}
-                  title={`${milestone}%`}
+                  title={`${milestone.percentage}%`}
                 />
               ))}
             </div>
@@ -211,7 +211,7 @@ function GoalCard({
         <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            {new Date(goal.startDate).toLocaleDateString()} - {new Date(goal.endDate).toLocaleDateString()}
+            {goal.startDate ? new Date(goal.startDate).toLocaleDateString() : '-'} - {goal.endDate ? new Date(goal.endDate).toLocaleDateString() : '-'}
           </span>
           {goal.status === 'active' && (
             <span className={daysLeft < 7 ? 'text-red-600 font-medium' : ''}>
@@ -272,7 +272,16 @@ export default function GoalsPage() {
       return;
     }
 
-    createGoal.mutate(formData, {
+    createGoal.mutate({
+      name: formData.name,
+      campaignId: formData.campaignId,
+      type: formData.type,
+      target: formData.targetValue,
+      deadline: formData.endDate,
+      metadata: {
+        description: formData.description,
+      },
+    }, {
       onSuccess: () => {
         toast({ title: '目标已创建' });
         setIsCreateOpen(false);
@@ -286,7 +295,14 @@ export default function GoalsPage() {
 
     updateGoal.mutate({
       id: editingGoal.id,
-      data: formData,
+      data: {
+        name: formData.name,
+        target: formData.targetValue,
+        deadline: formData.endDate,
+        metadata: {
+          description: formData.description,
+        },
+      },
     }, {
       onSuccess: () => {
         toast({ title: '目标已更新' });
@@ -326,15 +342,15 @@ export default function GoalsPage() {
   const openEditDialog = (goal: Goal) => {
     setFormData({
       name: goal.name,
-      description: goal.description || '',
+      description: goal.description || goal.metadata?.description || '',
       campaignId: goal.campaignId || '',
       type: goal.type,
-      targetValue: goal.targetValue,
-      startDate: goal.startDate.split('T')[0],
-      endDate: goal.endDate.split('T')[0],
-      notifyOnComplete: goal.notifyOnComplete,
-      notifyOnMilestone: goal.notifyOnMilestone,
-      milestones: goal.milestones,
+      targetValue: goal.targetValue ?? goal.target ?? 0,
+      startDate: goal.startDate ? goal.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
+      endDate: goal.endDate ? goal.endDate.split('T')[0] : goal.deadline ? goal.deadline.split('T')[0] : new Date().toISOString().split('T')[0],
+      notifyOnComplete: goal.thresholds?.some(t => t.percentage === 100) ?? true,
+      notifyOnMilestone: (goal.thresholds?.length ?? 0) > 1,
+      milestones: goal.milestones?.map(m => m.percentage) ?? [25, 50, 75, 100],
     });
     setEditingGoal(goal);
   };
@@ -570,12 +586,11 @@ export default function GoalsPage() {
             icon={Target}
             title="还没有目标"
             description="创建目标来追踪您的营销进度"
-            action={
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                创建第一个目标
-              </Button>
-            }
+            action={{
+              label: '创建第一个目标',
+              onClick: () => setIsCreateOpen(true),
+              icon: Plus,
+            }}
           />
         ) : (
           <div className="space-y-8">

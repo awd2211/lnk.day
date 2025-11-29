@@ -66,7 +66,7 @@ import {
   type CreateCampaignTemplateDto,
 } from '@/hooks/useCampaignTemplates';
 import { CampaignType, CAMPAIGN_TYPE_CONFIG, CHANNEL_OPTIONS } from '@/hooks/useCampaigns';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';

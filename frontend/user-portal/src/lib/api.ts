@@ -10,9 +10,48 @@ const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 
 interface ExtendedAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retryCount?: number;
+  _isRetry?: boolean;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Token refresh state
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+const subscribeTokenRefresh = (callback: (token: string) => void) => {
+  refreshSubscribers.push(callback);
+};
+
+const onTokenRefreshed = (token: string) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const response = await axios.post(`${API_GATEWAY_URL}/v1/auth/refresh`, { refreshToken });
+    const newAccessToken = response.data.accessToken;
+    const newRefreshToken = response.data.refreshToken;
+
+    localStorage.setItem('token', newAccessToken);
+    if (newRefreshToken) {
+      localStorage.setItem('refreshToken', newRefreshToken);
+    }
+
+    return newAccessToken;
+  } catch {
+    // Refresh failed, clear tokens
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    return null;
+  }
+};
 
 const isRetryableError = (error: AxiosError) => {
   // Network error (no response)
@@ -44,11 +83,52 @@ const createApiClient = (baseURL: string) => {
     async (error: AxiosError) => {
       const config = error.config as ExtendedAxiosRequestConfig;
 
-      // Handle 401 - unauthorized
-      if (error.response?.status === 401) {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
-        return Promise.reject(error);
+      // Handle 401 - unauthorized (try token refresh)
+      if (error.response?.status === 401 && !config._isRetry) {
+        // Skip refresh for auth endpoints
+        if (config.url?.includes('/v1/auth/')) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
+
+        if (isRefreshing) {
+          // Wait for the token refresh to complete
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh((newToken: string) => {
+              config.headers.Authorization = `Bearer ${newToken}`;
+              config._isRetry = true;
+              resolve(client(config));
+            });
+            // Timeout after 10 seconds
+            setTimeout(() => reject(error), 10000);
+          });
+        }
+
+        isRefreshing = true;
+
+        try {
+          const newToken = await refreshAccessToken();
+          isRefreshing = false;
+
+          if (newToken) {
+            onTokenRefreshed(newToken);
+            config.headers.Authorization = `Bearer ${newToken}`;
+            config._isRetry = true;
+            return client(config);
+          } else {
+            // Refresh failed
+            window.location.href = '/login';
+            return Promise.reject(error);
+          }
+        } catch (refreshError) {
+          isRefreshing = false;
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          return Promise.reject(error);
+        }
       }
 
       // Skip retry for non-retryable errors or if no config
@@ -97,6 +177,7 @@ export const qrApi = api;
 export const authService = {
   login: (email: string, password: string) => api.post('/v1/auth/login', { email, password }),
   register: (data: { name: string; email: string; password: string }) => api.post('/v1/auth/register', data),
+  refreshToken: (refreshToken: string) => api.post('/v1/auth/refresh', { refreshToken }),
   me: () => api.get('/v1/api/users/me'),
   updateProfile: (data: any) => api.put('/v1/api/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>

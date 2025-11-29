@@ -118,7 +118,6 @@ export default function RedirectRulesPage() {
       if (editingRule) {
         await updateRule.mutateAsync({
           id: editingRule.id,
-          linkId: selectedLinkId,
           data: ruleData,
         });
         toast({ title: '规则已更新' });

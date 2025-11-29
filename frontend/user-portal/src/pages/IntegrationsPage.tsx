@@ -538,12 +538,11 @@ export default function IntegrationsPage() {
                 icon={Bell}
                 title="还没有通知渠道"
                 description="添加通知渠道以接收重要事件通知"
-                action={
-                  <Button onClick={() => setIsCreateChannelOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    添加第一个渠道
-                  </Button>
-                }
+                action={{
+                  label: '添加第一个渠道',
+                  onClick: () => setIsCreateChannelOpen(true),
+                  icon: Plus,
+                }}
               />
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -48,7 +48,7 @@ export default function DashboardPage() {
   const { data: trends } = useClickTrends('7d');
 
   // Generate mock trends data if API fails
-  const trendData = trends || Array.from({ length: 7 }, (_, i) => ({
+  const trendData = (trends?.data && Array.isArray(trends.data) ? trends.data : null) || Array.from({ length: 7 }, (_, i) => ({
     date: format(subDays(new Date(), 6 - i), 'MM/dd'),
     clicks: Math.floor(Math.random() * 500) + 100,
   }));

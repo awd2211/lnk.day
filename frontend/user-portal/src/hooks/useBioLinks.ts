@@ -18,7 +18,12 @@ export type BlockType =
   | 'divider'
   | 'image'
   | 'video'
-  | 'contact_form';
+  | 'contact_form'
+  | 'social'
+  | 'email'
+  | 'contact'
+  | 'spotify'
+  | 'youtube';
 
 // ========== Block-specific content types ==========
 
@@ -207,6 +212,8 @@ export interface BioLinkBlock {
   isVisible: boolean;
   sortOrder: number;
   clicks?: number;
+  // Generic content for flexible block types
+  content?: Record<string, any>;
   // Type-specific content
   embed?: EmbedContent;
   product?: ProductContent;
@@ -499,6 +506,13 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, { label: string; icon: string;
   subscribe: { label: '邮件订阅', icon: 'mail', description: '添加邮件订阅表单', category: 'interactive' },
   contact_form: { label: '联系表单', icon: 'message-square', description: '添加联系表单', category: 'interactive' },
   map: { label: '地图', icon: 'map-pin', description: '嵌入地图位置', category: 'interactive' },
+
+  // 社交和联系
+  social: { label: '社交链接', icon: 'share-2', description: '添加社交媒体链接', category: 'basic' },
+  email: { label: '邮箱', icon: 'at-sign', description: '添加邮箱链接', category: 'basic' },
+  contact: { label: '联系方式', icon: 'phone', description: '添加联系方式', category: 'basic' },
+  spotify: { label: 'Spotify', icon: 'music', description: '嵌入 Spotify 内容', category: 'audio' },
+  youtube: { label: 'YouTube', icon: 'youtube', description: '嵌入 YouTube 视频', category: 'media' },
 };
 
 // Block categories

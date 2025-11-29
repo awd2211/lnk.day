@@ -327,12 +327,11 @@ export default function FoldersPage() {
             icon={FolderIcon}
             title="还没有文件夹"
             description="创建文件夹来整理您的短链接"
-            action={
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <FolderPlus className="h-4 w-4 mr-2" />
-                创建第一个文件夹
-              </Button>
-            }
+            action={{
+              label: '创建第一个文件夹',
+              onClick: () => setIsCreateOpen(true),
+              icon: FolderPlus,
+            }}
           />
         ) : (
           <div className="space-y-8">

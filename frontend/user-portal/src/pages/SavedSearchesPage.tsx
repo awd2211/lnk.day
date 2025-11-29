@@ -101,10 +101,10 @@ const operatorOptions: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-function getOperators(field: string) {
-  if (['clicks'].includes(field)) return operatorOptions.number;
-  if (['tags'].includes(field)) return operatorOptions.array;
-  return operatorOptions.string;
+function getOperators(field: string): { value: string; label: string }[] {
+  if (['clicks'].includes(field)) return operatorOptions.number!;
+  if (['tags'].includes(field)) return operatorOptions.array!;
+  return operatorOptions.string!;
 }
 
 function FilterBuilder({
@@ -120,7 +120,13 @@ function FilterBuilder({
 
   const updateFilter = (index: number, updates: Partial<SearchFilter>) => {
     const newFilters = [...filters];
-    newFilters[index] = { ...newFilters[index], ...updates };
+    const current = newFilters[index];
+    if (!current) return;
+    newFilters[index] = {
+      field: updates.field ?? current.field,
+      operator: updates.operator ?? current.operator,
+      value: updates.value ?? current.value,
+    };
     onChange(newFilters);
   };
 
@@ -130,7 +136,7 @@ function FilterBuilder({
 
   return (
     <div className="space-y-3">
-      {filters.map((filter, index) => (
+      {filters.map((filter: SearchFilter, index: number) => (
         <div key={index} className="flex gap-2 items-start">
           <Select
             value={filter.field}
@@ -156,7 +162,7 @@ function FilterBuilder({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {getOperators(filter.field).map((op) => (
+              {getOperators(filter.field || 'title').map((op) => (
                 <SelectItem key={op.value} value={op.value}>
                   {op.label}
                 </SelectItem>
@@ -538,12 +544,11 @@ export default function SavedSearchesPage() {
             icon={Search}
             title="还没有保存的搜索"
             description="保存常用的搜索条件以便快速访问"
-            action={
-              <Button onClick={() => setIsCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                保存第一个搜索
-              </Button>
-            }
+            action={{
+              label: '保存第一个搜索',
+              onClick: () => setIsCreateOpen(true),
+              icon: Plus,
+            }}
           />
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

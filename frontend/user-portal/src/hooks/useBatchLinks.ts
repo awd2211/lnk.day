@@ -646,9 +646,12 @@ export const EXPORT_FIELD_CATEGORIES = {
   },
 } as const;
 
-export const EXPORT_FIELDS = Object.values(EXPORT_FIELD_CATEGORIES).flatMap((cat) => cat.fields);
+type CategoryFields = typeof EXPORT_FIELD_CATEGORIES[keyof typeof EXPORT_FIELD_CATEGORIES]['fields'];
+type ExportField = CategoryFields[number];
 
-export type ExportFieldKey = (typeof EXPORT_FIELDS)[number]['key'];
+export const EXPORT_FIELDS: ExportField[] = Object.values(EXPORT_FIELD_CATEGORIES).flatMap((cat) => [...cat.fields]);
+
+export type ExportFieldKey = ExportField['key'];
 
 // ========== Export Presets ==========
 
@@ -669,7 +672,7 @@ export const EXPORT_PRESETS = [
     id: 'full',
     name: '完整导出',
     description: '所有可用字段',
-    fields: EXPORT_FIELDS.map((f) => f.key),
+    fields: EXPORT_FIELDS.map((f) => f.key) as unknown as readonly ExportFieldKey[],
   },
   {
     id: 'migration',

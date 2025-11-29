@@ -51,6 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const { data } = await api.post('/v1/auth/login', { email, password });
     localStorage.setItem('token', data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
     setToken(data.accessToken);
     setUser(data.user);
   };
@@ -58,12 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (name: string, email: string, password: string) => {
     const { data } = await api.post('/v1/auth/register', { name, email, password });
     localStorage.setItem('token', data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
     setToken(data.accessToken);
     setUser(data.user);
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     setToken(null);
     setUser(null);
   };

@@ -367,9 +367,9 @@ export default function BioLinkEditorPage() {
                           <EyeOff className="h-3 w-3 text-muted-foreground" />
                         )}
                       </div>
-                      {block.content.title && (
+                      {block.content?.title && (
                         <p className="truncate text-xs text-muted-foreground">
-                          {block.content.title}
+                          {block.content?.title}
                         </p>
                       )}
                     </div>
@@ -808,7 +808,7 @@ export default function BioLinkEditorPage() {
                               borderColor: localBioLink.theme.buttonColor,
                             }}
                           >
-                            {block.content.title || '链接'}
+                            {block.content?.title || '链接'}
                           </button>
                         )}
 
@@ -817,7 +817,7 @@ export default function BioLinkEditorPage() {
                             className="text-center text-lg font-bold"
                             style={{ color: localBioLink.theme.textColor }}
                           >
-                            {block.content.text}
+                            {block.content?.text}
                           </h2>
                         )}
 
@@ -826,7 +826,7 @@ export default function BioLinkEditorPage() {
                             className="text-center text-sm"
                             style={{ color: localBioLink.theme.textColor }}
                           >
-                            {block.content.text}
+                            {block.content?.text}
                           </p>
                         )}
 
@@ -892,10 +892,10 @@ export default function BioLinkEditorPage() {
                     <div>
                       <Label>标题</Label>
                       <Input
-                        value={editingBlock.content.title || ''}
+                        value={editingBlock.content?.title || ''}
                         onChange={(e) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, title: e.target.value },
+                            content: { ...(editingBlock.content || {}), title: e.target.value },
                           })
                         }
                         className="mt-1"
@@ -904,10 +904,10 @@ export default function BioLinkEditorPage() {
                     <div>
                       <Label>链接 URL</Label>
                       <Input
-                        value={editingBlock.content.url || ''}
+                        value={editingBlock.content?.url || ''}
                         onChange={(e) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, url: e.target.value },
+                            content: { ...(editingBlock.content || {}), url: e.target.value },
                           })
                         }
                         placeholder="https://..."
@@ -922,10 +922,10 @@ export default function BioLinkEditorPage() {
                     <Label>文本</Label>
                     {editingBlock.type === 'text' ? (
                       <Textarea
-                        value={editingBlock.content.text || ''}
+                        value={editingBlock.content?.text || ''}
                         onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, text: e.target.value },
+                            content: { ...(editingBlock.content || {}), text: e.target.value },
                           })
                         }
                         className="mt-1"
@@ -933,10 +933,10 @@ export default function BioLinkEditorPage() {
                       />
                     ) : (
                       <Input
-                        value={editingBlock.content.text || ''}
+                        value={editingBlock.content?.text || ''}
                         onChange={(e) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, text: e.target.value },
+                            content: { ...(editingBlock.content || {}), text: e.target.value },
                           })
                         }
                         className="mt-1"
@@ -950,10 +950,10 @@ export default function BioLinkEditorPage() {
                     <div>
                       <Label>图片 URL</Label>
                       <Input
-                        value={editingBlock.content.url || ''}
+                        value={editingBlock.content?.url || ''}
                         onChange={(e) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, url: e.target.value },
+                            content: { ...(editingBlock.content || {}), url: e.target.value },
                           })
                         }
                         placeholder="https://..."
@@ -963,10 +963,10 @@ export default function BioLinkEditorPage() {
                     <div>
                       <Label>替代文字</Label>
                       <Input
-                        value={editingBlock.content.alt || ''}
+                        value={editingBlock.content?.alt || ''}
                         onChange={(e) =>
                           updateBlock(editingBlock.id, {
-                            content: { ...editingBlock.content, alt: e.target.value },
+                            content: { ...(editingBlock.content || {}), alt: e.target.value },
                           })
                         }
                         className="mt-1"
@@ -979,10 +979,10 @@ export default function BioLinkEditorPage() {
                   <div>
                     <Label>YouTube 视频 ID</Label>
                     <Input
-                      value={editingBlock.content.videoId || ''}
+                      value={editingBlock.content?.videoId || ''}
                       onChange={(e) =>
                         updateBlock(editingBlock.id, {
-                          content: { ...editingBlock.content, videoId: e.target.value },
+                          content: { ...(editingBlock.content || {}), videoId: e.target.value },
                         })
                       }
                       placeholder="例如: dQw4w9WgXcQ"

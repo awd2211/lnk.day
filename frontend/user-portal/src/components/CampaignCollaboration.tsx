@@ -64,7 +64,7 @@ import {
   type CampaignCollaborator,
 } from '@/hooks/useCampaignComments';
 import { useTeamMembers } from '@/hooks/useTeam';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -681,7 +681,7 @@ function CollaboratorsPanel({ campaignId }: { campaignId: string }) {
                   {availableMembers.length > 0 ? (
                     availableMembers.map((member) => (
                       <SelectItem key={member.userId} value={member.userId}>
-                        {member.userName} ({member.userEmail})
+                        {member.name} ({member.email})
                       </SelectItem>
                     ))
                   ) : (
