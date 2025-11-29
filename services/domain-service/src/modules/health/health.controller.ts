@@ -1,9 +1,13 @@
 import { Controller, Get } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { VersionService } from '@lnk/nestjs-common';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly versionService: VersionService,
+  ) {}
 
   @Get()
   async check() {
@@ -11,6 +15,7 @@ export class HealthController {
     return {
       status: dbHealthy ? 'ok' : 'degraded',
       service: 'domain-service',
+      version: this.versionService.getVersion(),
       timestamp: new Date().toISOString(),
       checks: {
         database: dbHealthy ? 'healthy' : 'unhealthy',

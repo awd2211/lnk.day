@@ -3,15 +3,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule } from '@lnk/nestjs-common';
+import { MetricsModule, MetricsInterceptor, TracingModule, VersionModule } from '@lnk/nestjs-common';
 
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    VersionModule,
     MetricsModule.forRoot({
       serviceName: 'webhook-service',
     }),
@@ -37,6 +39,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
     WebhookModule,
     HealthModule,
+    AuthModule,
   ],
   providers: [
     {

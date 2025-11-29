@@ -12,11 +12,14 @@ import {
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WebhookService } from './webhook.service';
 import { CreateWebhookDto, UpdateWebhookDto, FireWebhookDto } from './dto/webhook.dto';
 import { WebhookPlatform } from './entities/webhook.entity';
 
 @ApiTags('webhooks')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('webhooks')
 export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}

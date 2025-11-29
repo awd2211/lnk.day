@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule } from '@lnk/nestjs-common';
+import { MetricsModule, MetricsInterceptor, TracingModule, VersionModule } from '@lnk/nestjs-common';
 
 import { ZapierModule } from './modules/zapier/zapier.module';
 import { HubSpotModule } from './modules/hubspot/hubspot.module';
@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    VersionModule,
     MetricsModule.forRoot({
       serviceName: 'integration-service',
     }),

@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Res, Get, Query, Param, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Response } from 'express';
 import { QrService, QrOptions, GradientConfig, EyeStyle, TextLabelConfig } from './qr.service';
 import {
@@ -158,6 +159,8 @@ class GenerateTypedQrDto {
 import { QrLimitService } from './qr-limit.service';
 
 @ApiTags('qr')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('qr')
 export class QrController {
   constructor(

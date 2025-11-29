@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DeepLinkService } from './deeplink.service';
 
 @ApiTags('deeplinks')
 @Controller('deeplinks')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class DeepLinkController {
   constructor(private readonly deepLinkService: DeepLinkService) {}
 

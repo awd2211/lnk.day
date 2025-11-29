@@ -1,9 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { VersionService } from '@lnk/nestjs-common';
 
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
+  constructor(private readonly versionService: VersionService) {}
   @Get()
   @ApiOperation({ summary: '健康检查' })
   check() {
@@ -11,7 +13,7 @@ export class HealthController {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       service: 'integration-service',
-      version: '1.0.0',
+      version: this.versionService.getVersion(),
     };
   }
 

@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule, HttpRetryModule } from '@lnk/nestjs-common';
+import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule, HttpRetryModule, VersionModule } from '@lnk/nestjs-common';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
@@ -25,6 +25,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     }),
     CircuitBreakerModule,
     HttpRetryModule,
+    VersionModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

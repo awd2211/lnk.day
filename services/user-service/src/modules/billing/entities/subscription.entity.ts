@@ -139,6 +139,15 @@ export class Invoice {
   @Column({ nullable: true })
   pdfUrl?: string;
 
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  refundedAt?: Date;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  refundAmount?: number;
+
+  @Column({ nullable: true })
+  refundReason?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

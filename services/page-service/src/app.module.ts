@@ -7,6 +7,7 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
 } from '@lnk/nestjs-common';
 import { PageModule } from './modules/page/page.module';
 import { TemplateModule } from './modules/template/template.module';
@@ -17,6 +18,7 @@ import { HealthModule } from './modules/health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    VersionModule,
     MetricsModule.forRoot({ serviceName: 'page-service' }),
     TracingModule.forRoot({
       serviceName: 'page-service',

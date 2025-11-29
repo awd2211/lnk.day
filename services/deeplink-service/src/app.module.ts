@@ -7,13 +7,16 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
 } from '@lnk/nestjs-common';
 import { DeepLinkModule } from './modules/deeplink/deeplink.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    VersionModule,
     MetricsModule.forRoot({ serviceName: 'deeplink-service' }),
     TracingModule.forRoot({
       serviceName: 'deeplink-service',
@@ -38,6 +41,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
     DeepLinkModule,
     HealthModule,
+    AuthModule,
   ],
   providers: [
     {

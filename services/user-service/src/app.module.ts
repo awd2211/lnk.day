@@ -9,6 +9,7 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
   serviceConfigPresets,
 } from '@lnk/nestjs-common';
 
@@ -51,6 +52,7 @@ import { HealthModule } from './modules/health/health.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    VersionModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

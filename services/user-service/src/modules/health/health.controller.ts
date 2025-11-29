@@ -2,12 +2,14 @@ import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { VersionService } from '@lnk/nestjs-common';
 
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly configService: ConfigService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly versionService: VersionService,
   ) {}
 
   @Get()
@@ -17,7 +19,7 @@ export class HealthController {
       status: dbHealthy ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       service: 'user-service',
-      version: '1.0.0',
+      version: this.versionService.getVersion(),
       checks: {
         database: dbHealthy ? 'healthy' : 'unhealthy',
       },

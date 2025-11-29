@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { VersionService } from '@lnk/nestjs-common';
 import axios from 'axios';
 
 export interface ServiceHealth {
@@ -13,7 +14,10 @@ export interface ServiceHealth {
 export class HealthService {
   private readonly services: { name: string; url: string }[];
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly versionService: VersionService,
+  ) {
     this.services = [
       { name: 'user-service', url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60001') },
       { name: 'link-service', url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60002') },
@@ -27,6 +31,7 @@ export class HealthService {
   async checkHealth(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     timestamp: string;
+    version: string;
     services: ServiceHealth[];
   }> {
     const results = await Promise.all(
@@ -44,6 +49,7 @@ export class HealthService {
     return {
       status,
       timestamp: new Date().toISOString(),
+      version: this.versionService.getVersion(),
       services: results,
     };
   }

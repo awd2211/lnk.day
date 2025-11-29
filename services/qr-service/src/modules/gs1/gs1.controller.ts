@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 import { GS1Service, GS1ParseResult, GS1DigitalLink } from './gs1.service';
 import {
@@ -14,6 +15,8 @@ import {
 } from './dto/gs1.dto';
 
 @ApiTags('gs1')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('gs1')
 export class GS1Controller {
   constructor(private readonly gs1Service: GS1Service) {}

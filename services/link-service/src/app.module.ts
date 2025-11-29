@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule } from '@lnk/nestjs-common';
+import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule, VersionModule } from '@lnk/nestjs-common';
 
 import { RedisModule } from './common/redis/redis.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
@@ -20,6 +20,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SecurityModule } from './modules/security/security.module';
 import { RedirectRulesModule } from './modules/redirect-rules/redirect-rules.module';
 import { LinkTemplateModule } from './modules/link-template/link-template.module';
+import { ModerationModule } from './modules/moderation/moderation.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { HealthModule } from './modules/health/health.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    VersionModule,
     RedisModule,
     RabbitMQModule,
     TypeOrmModule.forRootAsync({
@@ -68,6 +70,7 @@ import { HealthModule } from './modules/health/health.module';
     SecurityModule,
     RedirectRulesModule,
     LinkTemplateModule,
+    ModerationModule,
     HealthModule,
   ],
   providers: [

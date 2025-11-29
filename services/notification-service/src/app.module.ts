@@ -8,6 +8,7 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
 } from '@lnk/nestjs-common';
 import { EmailModule } from './modules/email/email.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
@@ -17,6 +18,7 @@ import { TeamsModule } from './modules/teams/teams.module';
 import { SmsModule } from './modules/sms/sms.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
+import { NotificationConfigModule } from './modules/config/config.module';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    VersionModule,
     RabbitMQModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -61,6 +64,7 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
     TeamsModule,
     SmsModule,
     HealthModule,
+    NotificationConfigModule,
   ],
   providers: [
     {

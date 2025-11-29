@@ -7,11 +7,13 @@ import {
   MetricsInterceptor,
   TracingModule,
   CircuitBreakerModule,
+  VersionModule,
 } from '@lnk/nestjs-common';
 import { QrModule } from './modules/qr/qr.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { GS1Module } from './modules/gs1/gs1.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { HealthModule } from './modules/health/health.module';
       jaegerEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     }),
     CircuitBreakerModule,
+    VersionModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -42,6 +45,7 @@ import { HealthModule } from './modules/health/health.module';
     TrackingModule,
     GS1Module,
     HealthModule,
+    AuthModule,
   ],
   providers: [
     {
