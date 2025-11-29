@@ -5,6 +5,27 @@ import { ConfigService } from '@nestjs/config';
 
 import { UserService } from '../../user/user.service';
 
+export interface JwtPayload {
+  sub: string;
+  email: string;
+  role?: string;         // 用于 admin 用户
+  teamId?: string;
+  teamRole?: string;     // OWNER | ADMIN | MEMBER | VIEWER
+  permissions?: string[];
+  iat?: number;
+  exp?: number;
+}
+
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  name?: string;
+  teamId?: string;
+  teamRole?: string;
+  permissions: string[];
+  isConsoleAdmin?: boolean;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -18,14 +39,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string; role?: string }) {
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     // 对于来自 console-service 的 admin 用户 (有 SUPER_ADMIN 或 ADMIN 角色)
     // 即使用户不在 user-service 数据库中也信任它
-    if (payload.role && ['SUPER_ADMIN', 'ADMIN'].includes(payload.role)) {
+    if (payload.role && ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(payload.role)) {
       return {
         id: payload.sub,
         email: payload.email,
-        role: payload.role,
+        teamRole: payload.role,
+        permissions: [], // Admin 用户不使用常规权限系统
         isConsoleAdmin: true,
       };
     }
@@ -35,6 +57,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
-    return user;
+
+    // 返回包含权限信息的用户对象
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      teamId: payload.teamId || user.teamId,
+      teamRole: payload.teamRole || undefined,
+      permissions: payload.permissions || [],
+    };
   }
 }

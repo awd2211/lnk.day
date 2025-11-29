@@ -716,4 +716,69 @@ export class ProxyService {
       headers: auth ? { Authorization: auth } : {},
     });
   }
+
+  // ==================== Role Management ====================
+  async getTeamRoles(teamId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getAvailablePermissions(teamId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/permissions`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getTeamRole(teamId: string, roleId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/${roleId}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async createTeamRole(teamId: string, data: { name: string; description?: string; color?: string; permissions: string[]; isDefault?: boolean }, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateTeamRole(teamId: string, roleId: string, data: { name?: string; description?: string; color?: string; permissions?: string[]; isDefault?: boolean }, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/${roleId}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async deleteTeamRole(teamId: string, roleId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/${roleId}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async duplicateTeamRole(teamId: string, roleId: string, newName: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/${roleId}/duplicate`, {
+      method: 'POST',
+      data: { name: newName },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async initializeDefaultRoles(teamId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/roles/initialize`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateTeamMemberRole(teamId: string, memberId: string, data: { role?: string; customRoleId?: string }, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/members/${memberId}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
 }

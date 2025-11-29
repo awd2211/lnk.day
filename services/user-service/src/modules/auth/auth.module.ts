@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UserModule } from '../user/user.module';
+import { TeamModule } from '../team/team.module';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { OAuthModule } from './oauth/oauth.module';
 import { TwoFactorModule } from './2fa/two-factor.module';
@@ -15,6 +16,7 @@ import { TwoFactorModule } from './2fa/two-factor.module';
 @Module({
   imports: [
     UserModule,
+    forwardRef(() => TeamModule),
     PassportModule,
     TypeOrmModule.forFeature([PasswordResetToken]),
     JwtModule.registerAsync({

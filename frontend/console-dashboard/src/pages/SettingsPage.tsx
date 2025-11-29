@@ -428,45 +428,25 @@ export default function SettingsPage() {
               发送测试邮件
             </Button>
           </div>
-          <div className="max-w-xl space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="smtpHost">SMTP 服务器</Label>
-                <Input
-                  id="smtpHost"
-                  value={formData.email.smtpHost}
-                  onChange={(e) => updateFormData('email', 'smtpHost', e.target.value)}
-                  placeholder="smtp.example.com"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="smtpPort">SMTP 端口</Label>
-                <Input
-                  id="smtpPort"
-                  type="number"
-                  value={formData.email.smtpPort}
-                  onChange={(e) => updateFormData('email', 'smtpPort', parseInt(e.target.value) || 587)}
-                />
-              </div>
-            </div>
+          <div className="max-w-xl space-y-6">
+            {/* Provider Selection */}
             <div className="grid gap-2">
-              <Label htmlFor="smtpUser">SMTP 用户名</Label>
-              <Input
-                id="smtpUser"
-                value={formData.email.smtpUser}
-                onChange={(e) => updateFormData('email', 'smtpUser', e.target.value)}
-              />
+              <Label>邮件服务提供商</Label>
+              <Select
+                value={formData.email.provider}
+                onValueChange={(value: 'smtp' | 'mailgun') => updateFormData('email', 'provider', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="smtp">SMTP</SelectItem>
+                  <SelectItem value="mailgun">Mailgun</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="smtpPassword">SMTP 密码</Label>
-              <Input
-                id="smtpPassword"
-                type="password"
-                value={formData.email.smtpPassword}
-                onChange={(e) => updateFormData('email', 'smtpPassword', e.target.value)}
-                placeholder="••••••••"
-              />
-            </div>
+
+            {/* Common Settings */}
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="fromName">发件人名称</Label>
@@ -486,16 +466,127 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-              <div>
-                <Label>使用 TLS/SSL</Label>
-                <p className="text-xs text-gray-500">加密邮件传输</p>
+
+            {/* SMTP Settings */}
+            {formData.email.provider === 'smtp' && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <h4 className="font-medium">SMTP 配置</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="smtpHost">SMTP 服务器</Label>
+                    <Input
+                      id="smtpHost"
+                      value={formData.email.smtp?.host || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        email: { ...prev.email, smtp: { ...prev.email.smtp, host: e.target.value } }
+                      }))}
+                      placeholder="smtp.example.com"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="smtpPort">SMTP 端口</Label>
+                    <Input
+                      id="smtpPort"
+                      type="number"
+                      value={formData.email.smtp?.port || 587}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        email: { ...prev.email, smtp: { ...prev.email.smtp, port: parseInt(e.target.value) || 587 } }
+                      }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="smtpUser">SMTP 用户名</Label>
+                  <Input
+                    id="smtpUser"
+                    value={formData.email.smtp?.user || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, smtp: { ...prev.email.smtp, user: e.target.value } }
+                    }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="smtpPass">SMTP 密码</Label>
+                  <Input
+                    id="smtpPass"
+                    type="password"
+                    value={formData.email.smtp?.pass || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, smtp: { ...prev.email.smtp, pass: e.target.value } }
+                    }))}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>使用 TLS/SSL</Label>
+                    <p className="text-xs text-gray-500">加密邮件传输</p>
+                  </div>
+                  <Switch
+                    checked={formData.email.smtp?.secure ?? true}
+                    onCheckedChange={(checked) => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, smtp: { ...prev.email.smtp, secure: checked } }
+                    }))}
+                  />
+                </div>
               </div>
-              <Switch
-                checked={formData.email.smtpSecure}
-                onCheckedChange={(checked) => updateFormData('email', 'smtpSecure', checked)}
-              />
-            </div>
+            )}
+
+            {/* Mailgun Settings */}
+            {formData.email.provider === 'mailgun' && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <h4 className="font-medium">Mailgun 配置</h4>
+                <div className="grid gap-2">
+                  <Label htmlFor="mailgunApiKey">API Key</Label>
+                  <Input
+                    id="mailgunApiKey"
+                    type="password"
+                    value={formData.email.mailgun?.apiKey || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, apiKey: e.target.value } }
+                    }))}
+                    placeholder="key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                  <p className="text-xs text-gray-500">在 Mailgun 控制台的 API Security 中获取</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="mailgunDomain">发送域名</Label>
+                  <Input
+                    id="mailgunDomain"
+                    value={formData.email.mailgun?.domain || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, domain: e.target.value } }
+                    }))}
+                    placeholder="mg.yourdomain.com"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>服务区域</Label>
+                  <Select
+                    value={formData.email.mailgun?.region || 'us'}
+                    onValueChange={(value: 'us' | 'eu') => setFormData(prev => ({
+                      ...prev,
+                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, region: value } }
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="us">美国 (api.mailgun.net)</SelectItem>
+                      <SelectItem value="eu">欧洲 (api.eu.mailgun.net)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

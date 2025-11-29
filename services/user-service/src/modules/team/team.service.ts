@@ -206,4 +206,62 @@ export class TeamService {
     };
     return priorities[role] || 0;
   }
+
+  // ========== 权限相关 ==========
+
+  /**
+   * 获取用户在指定团队的成员信息
+   */
+  async getMemberByUserId(teamId: string, userId: string): Promise<TeamMember | null> {
+    return this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+      relations: ['customRole'],
+    });
+  }
+
+  /**
+   * 获取用户的当前团队成员身份（通过 user.teamId）
+   */
+  async getUserTeamMembership(userId: string, teamId?: string): Promise<{
+    teamId: string | null;
+    teamRole: TeamMemberRole | null;
+    permissions: string[];
+  } | null> {
+    // 如果没有指定 teamId，尝试从用户获取
+    if (!teamId) {
+      const user = await this.userService.findOne(userId);
+      teamId = user?.teamId;
+    }
+
+    if (!teamId) {
+      return null;
+    }
+
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+      relations: ['customRole'],
+    });
+
+    if (!member) {
+      return null;
+    }
+
+    // 获取权限
+    let permissions: string[] = [];
+
+    if (member.customRole) {
+      // 使用自定义角色的权限
+      permissions = member.customRole.permissions || [];
+    } else {
+      // 使用预设角色权限
+      const { PRESET_ROLE_PERMISSIONS } = await import('./entities/custom-role.entity');
+      permissions = PRESET_ROLE_PERMISSIONS[member.role] || [];
+    }
+
+    return {
+      teamId,
+      teamRole: member.role,
+      permissions,
+    };
+  }
 }

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
 import { UserService } from '../user/user.service';
+import { TeamService } from '../team/team.service';
 import { EmailService } from '../email/email.service';
 import { TokenBlacklistService } from '../redis/token-blacklist.service';
 import { LoginDto } from './dto/login.dto';
@@ -17,6 +18,8 @@ import { PasswordResetToken } from './entities/password-reset-token.entity';
 export class AuthService {
   constructor(
     private readonly userService: UserService,
+    @Inject(forwardRef(() => TeamService))
+    private readonly teamService: TeamService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
@@ -27,7 +30,7 @@ export class AuthService {
 
   async register(registerDto: RegisterDto) {
     const user = await this.userService.create(registerDto);
-    const tokens = this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokensWithPermissions(user.id, user.email);
 
     // 发送欢迎邮件
     await this.emailService.sendWelcomeEmail(user.email, user.name);
@@ -59,17 +62,58 @@ export class AuthService {
     // 更新最后登录时间
     await this.userService.updateLastLogin(user.id);
 
-    const tokens = this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokensWithPermissions(user.id, user.email, user.teamId);
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        teamId: user.teamId,
       },
       ...tokens,
     };
   }
 
+  /**
+   * 生成包含权限信息的 JWT
+   */
+  private async generateTokensWithPermissions(userId: string, email: string, teamId?: string) {
+    // 获取用户的团队成员身份和权限
+    let teamRole: string | null = null;
+    let permissions: string[] = [];
+
+    if (teamId) {
+      const membership = await this.teamService.getUserTeamMembership(userId, teamId);
+      if (membership) {
+        teamRole = membership.teamRole;
+        permissions = membership.permissions;
+      }
+    }
+
+    const payload = {
+      sub: userId,
+      email,
+      teamId: teamId || null,
+      teamRole,
+      permissions,
+    };
+
+    const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
+    const refreshExpiresIn = this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');
+
+    return {
+      accessToken: this.jwtService.sign(payload, { expiresIn: accessExpiresIn }),
+      refreshToken: this.jwtService.sign(
+        { sub: userId, email }, // refresh token 不包含权限，刷新时重新获取
+        { expiresIn: refreshExpiresIn },
+      ),
+      expiresIn: this.parseExpiresIn(accessExpiresIn),
+    };
+  }
+
+  /**
+   * 生成简单 JWT（不包含权限，用于向后兼容）
+   */
   private generateTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
     const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
@@ -115,8 +159,8 @@ export class AuthService {
       // 将旧 token 加入黑名单 (30天TTL)
       await this.tokenBlacklistService.addToBlacklist(refreshToken);
 
-      // 生成新的 tokens
-      return this.generateTokens(user.id, user.email);
+      // 生成新的 tokens（包含最新权限）
+      return this.generateTokensWithPermissions(user.id, user.email, user.teamId);
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
