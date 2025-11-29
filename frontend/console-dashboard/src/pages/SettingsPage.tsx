@@ -57,13 +57,21 @@ interface SystemConfig {
     apiKeyExpiry: number;
   };
   email: {
-    smtpHost: string;
-    smtpPort: number;
-    smtpUser: string;
-    smtpPassword: string;
-    smtpSecure: boolean;
+    provider: 'smtp' | 'mailgun';
     fromName: string;
     fromEmail: string;
+    smtp: {
+      host: string;
+      port: number;
+      user: string;
+      pass: string;
+      secure: boolean;
+    };
+    mailgun: {
+      apiKey: string;
+      domain: string;
+      region: 'us' | 'eu';
+    };
   };
   security: {
     passwordMinLength: number;
@@ -100,13 +108,21 @@ const defaultConfig: SystemConfig = {
     apiKeyExpiry: 365,
   },
   email: {
-    smtpHost: '',
-    smtpPort: 587,
-    smtpUser: '',
-    smtpPassword: '',
-    smtpSecure: true,
+    provider: 'smtp',
     fromName: 'lnk.day',
     fromEmail: 'noreply@lnk.day',
+    smtp: {
+      host: '',
+      port: 587,
+      user: '',
+      pass: '',
+      secure: true,
+    },
+    mailgun: {
+      apiKey: '',
+      domain: '',
+      region: 'us',
+    },
   },
   security: {
     passwordMinLength: 8,
