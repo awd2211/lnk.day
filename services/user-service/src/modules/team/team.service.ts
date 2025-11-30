@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Team } from './entities/team.entity';
+import { Team, TeamStatus } from './entities/team.entity';
 import { TeamMember, TeamMemberRole } from './entities/team-member.entity';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
@@ -52,6 +52,12 @@ export class TeamService {
   async remove(id: string): Promise<void> {
     const team = await this.findOne(id);
     await this.teamRepository.remove(team);
+  }
+
+  async updateStatus(id: string, status: TeamStatus): Promise<Team> {
+    const team = await this.findOne(id);
+    team.status = status;
+    return this.teamRepository.save(team);
   }
 
   // ========== 成员管理 ==========

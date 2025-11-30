@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
-import { User } from './entities/user.entity';
+import { User, UserStatus } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -75,5 +75,17 @@ export class UserService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.updatePassword(id, hashedPassword);
+  }
+
+  async suspendUser(id: string, reason?: string): Promise<User> {
+    const user = await this.findOne(id);
+    user.status = UserStatus.SUSPENDED;
+    return this.userRepository.save(user);
+  }
+
+  async unsuspendUser(id: string): Promise<User> {
+    const user = await this.findOne(id);
+    user.status = UserStatus.ACTIVE;
+    return this.userRepository.save(user);
   }
 }

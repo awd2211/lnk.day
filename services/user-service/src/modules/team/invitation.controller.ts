@@ -7,7 +7,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 
@@ -19,7 +18,15 @@ import {
   DeclineInvitationDto,
   InvitationQueryDto,
 } from './dto/team-invitation.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 
 @ApiTags('team-invitations')
 @Controller()
@@ -29,68 +36,73 @@ export class InvitationController {
   // ========== 团队邀请管理（需要团队管理权限）==========
 
   @Post('teams/:teamId/invitations')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_INVITE)
   @ApiBearerAuth()
   @ApiOperation({ summary: '发送团队邀请' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   async createInvitation(
     @Param('teamId') teamId: string,
     @Body() dto: CreateInvitationDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.invitationService.createInvitation(teamId, dto, req.user.id);
+    return this.invitationService.createInvitation(teamId, dto, user.sub);
   }
 
   @Post('teams/:teamId/invitations/bulk')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_INVITE)
   @ApiBearerAuth()
   @ApiOperation({ summary: '批量发送团队邀请' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   async bulkInvite(
     @Param('teamId') teamId: string,
     @Body() dto: BulkInviteDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.invitationService.bulkInvite(teamId, dto, req.user.id);
+    return this.invitationService.bulkInvite(teamId, dto, user.sub);
   }
 
   @Get('teams/:teamId/invitations')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取团队邀请列表' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   async getTeamInvitations(
     @Param('teamId') teamId: string,
     @Query() query: InvitationQueryDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.invitationService.getTeamInvitations(teamId, req.user.id, query);
+    return this.invitationService.getTeamInvitations(teamId, user.sub, query);
   }
 
   @Post('teams/:teamId/invitations/:invitationId/resend')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_INVITE)
   @ApiBearerAuth()
   @ApiOperation({ summary: '重发邀请' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   @ApiParam({ name: 'invitationId', description: '邀请ID' })
   async resendInvitation(
     @Param('invitationId') invitationId: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.invitationService.resendInvitation(invitationId, req.user.id);
+    return this.invitationService.resendInvitation(invitationId, user.sub);
   }
 
   @Delete('teams/:teamId/invitations/:invitationId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_INVITE)
   @ApiBearerAuth()
   @ApiOperation({ summary: '撤销邀请' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   @ApiParam({ name: 'invitationId', description: '邀请ID' })
   async revokeInvitation(
     @Param('invitationId') invitationId: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.invitationService.revokeInvitation(invitationId, req.user.id);
+    await this.invitationService.revokeInvitation(invitationId, user.sub);
     return { success: true, message: '邀请已撤销' };
   }
 
@@ -100,8 +112,8 @@ export class InvitationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取我收到的邀请列表' })
-  async getMyInvitations(@Query() query: InvitationQueryDto, @Request() req: any) {
-    return this.invitationService.getUserInvitations(req.user.id, query);
+  async getMyInvitations(@Query() query: InvitationQueryDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.invitationService.getUserInvitations(user.sub, query);
   }
 
   @Get('invitations/:token')
@@ -132,8 +144,8 @@ export class InvitationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '接受邀请' })
-  async acceptInvitation(@Body() dto: AcceptInvitationDto, @Request() req: any) {
-    const member = await this.invitationService.acceptInvitation(dto.token, req.user.id);
+  async acceptInvitation(@Body() dto: AcceptInvitationDto, @CurrentUser() user: AuthenticatedUser) {
+    const member = await this.invitationService.acceptInvitation(dto.token, user.sub);
     return {
       success: true,
       message: '已成功加入团队',
@@ -149,40 +161,41 @@ export class InvitationController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '拒绝邀请' })
-  async declineInvitation(@Body() dto: DeclineInvitationDto, @Request() req: any) {
-    await this.invitationService.declineInvitation(dto.token, req.user.id, dto.reason);
+  async declineInvitation(@Body() dto: DeclineInvitationDto, @CurrentUser() user: AuthenticatedUser) {
+    await this.invitationService.declineInvitation(dto.token, user.sub, dto.reason);
     return { success: true, message: '已拒绝邀请' };
   }
 
   // ========== 统计 ==========
 
   @Get('teams/:teamId/invitations/stats')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取团队邀请统计' })
   @ApiParam({ name: 'teamId', description: '团队ID' })
   async getInvitationStats(
     @Param('teamId') teamId: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const { data: pending } = await this.invitationService.getTeamInvitations(
       teamId,
-      req.user.id,
+      user.sub,
       { status: 'PENDING' as any, page: 1, limit: 1000 },
     );
     const { data: accepted } = await this.invitationService.getTeamInvitations(
       teamId,
-      req.user.id,
+      user.sub,
       { status: 'ACCEPTED' as any, page: 1, limit: 1000 },
     );
     const { data: declined } = await this.invitationService.getTeamInvitations(
       teamId,
-      req.user.id,
+      user.sub,
       { status: 'DECLINED' as any, page: 1, limit: 1000 },
     );
     const { data: expired } = await this.invitationService.getTeamInvitations(
       teamId,
-      req.user.id,
+      user.sub,
       { status: 'EXPIRED' as any, page: 1, limit: 1000 },
     );
 

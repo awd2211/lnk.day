@@ -15,6 +15,11 @@ export enum TeamPlan {
   ENTERPRISE = 'ENTERPRISE',
 }
 
+export enum TeamStatus {
+  ACTIVE = 'active',
+  SUSPENDED = 'suspended',
+}
+
 @Entity('teams')
 @Index(['plan', 'createdAt'])
 export class Team {
@@ -35,6 +40,10 @@ export class Team {
   @Column({ type: 'enum', enum: TeamPlan, default: TeamPlan.FREE })
   @Index()
   plan: TeamPlan;
+
+  @Column({ type: 'enum', enum: TeamStatus, default: TeamStatus.ACTIVE })
+  @Index()
+  status: TeamStatus;
 
   @CreateDateColumn()
   createdAt: Date;

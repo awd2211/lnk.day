@@ -4,17 +4,17 @@ import {
   Get,
   Body,
   UseGuards,
-  Req,
   HttpCode,
   HttpStatus,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
-import { Request } from 'express';
 
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,8 +22,7 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 
 @ApiTags('auth')
 @Controller('auth')

@@ -6,14 +6,20 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
   UseGuards,
   Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 
 import { SSOService } from './sso.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import {
   CreateSAMLConfigDto,
   CreateOIDCConfigDto,
@@ -31,19 +37,23 @@ export class SSOController {
   // ========== Config Management ==========
 
   @Get('configs')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_VIEW)
   @ApiOperation({ summary: '获取 SSO 配置列表' })
-  getConfigs(@Headers('x-team-id') teamId: string) {
+  getConfigs(@ScopedTeamId() teamId: string) {
     return this.ssoService.getConfigs(teamId);
   }
 
   @Get('configs/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_VIEW)
   @ApiOperation({ summary: '获取单个 SSO 配置' })
   getConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
   ) {
     return this.ssoService.getConfig(teamId, configId);
@@ -52,33 +62,39 @@ export class SSOController {
   // ========== SAML ==========
 
   @Post('saml/config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '创建 SAML 配置' })
   createSAMLConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateSAMLConfigDto,
   ) {
     return this.ssoService.createSAMLConfig(teamId, dto);
   }
 
   @Post('saml/config/import-metadata')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '从 IdP Metadata 创建 SAML 配置' })
   createSAMLConfigFromMetadata(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: ImportIdPMetadataDto,
   ) {
     return this.ssoService.createSAMLConfigFromMetadata(teamId, dto);
   }
 
   @Put('saml/config/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '更新 SAML 配置' })
   updateSAMLConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
     @Body() dto: UpdateSAMLConfigDto,
   ) {
@@ -86,18 +102,22 @@ export class SSOController {
   }
 
   @Get('saml/metadata')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_VIEW)
   @ApiOperation({ summary: '获取 SAML SP 元数据' })
-  getSAMLMetadata(@Headers('x-team-id') teamId: string) {
+  getSAMLMetadata(@ScopedTeamId() teamId: string) {
     return this.ssoService.getSAMLMetadata(teamId);
   }
 
   @Get('saml/metadata/download')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_VIEW)
   @ApiOperation({ summary: '下载 SAML SP 元数据 XML' })
-  async downloadSAMLMetadata(@Headers('x-team-id') teamId: string) {
+  async downloadSAMLMetadata(@ScopedTeamId() teamId: string) {
     const metadata = await this.ssoService.getSAMLMetadata(teamId);
     return {
       contentType: 'application/xml',
@@ -129,11 +149,13 @@ export class SSOController {
   // ========== OIDC ==========
 
   @Post('oidc/config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '创建 OIDC 配置' })
   createOIDCConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateOIDCConfigDto,
   ) {
     return this.ssoService.createOIDCConfig(teamId, dto);
@@ -148,11 +170,13 @@ export class SSOController {
   // ========== LDAP ==========
 
   @Post('ldap/config')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '创建 LDAP 配置' })
   createLDAPConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateLDAPConfigDto,
   ) {
     return this.ssoService.createLDAPConfig(teamId, dto);
@@ -161,11 +185,13 @@ export class SSOController {
   // ========== Common Operations ==========
 
   @Put('configs/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '更新 SSO 配置' })
   updateConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
     @Body() dto: UpdateSSOConfigDto,
   ) {
@@ -173,33 +199,39 @@ export class SSOController {
   }
 
   @Post('configs/:id/activate')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '激活 SSO 配置' })
   activateConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
   ) {
     return this.ssoService.activateConfig(teamId, configId);
   }
 
   @Post('configs/:id/deactivate')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '停用 SSO 配置' })
   deactivateConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
   ) {
     return this.ssoService.deactivateConfig(teamId, configId);
   }
 
   @Delete('configs/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '删除 SSO 配置' })
   async deleteConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
   ) {
     await this.ssoService.deleteConfig(teamId, configId);
@@ -207,11 +239,13 @@ export class SSOController {
   }
 
   @Post('configs/:id/test')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: '测试 SSO 连接' })
   testConnection(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') configId: string,
   ) {
     return this.ssoService.testConnection(teamId, configId);

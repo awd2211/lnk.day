@@ -5,20 +5,20 @@ import {
   Put,
   Delete,
   Body,
-  Headers,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 
 import { LdapService } from './ldap.service';
 import { LdapConfig, LdapSecurityProtocol } from './ldap-config.entity';
-
-// Placeholder auth guard
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 
 // DTOs
 class CreateLdapConfigDto {
@@ -80,16 +80,18 @@ class LdapAuthenticateDto {
 
 @ApiTags('ldap')
 @Controller('auth/ldap')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class LdapController {
   constructor(private readonly ldapService: LdapService) {}
 
   // ========== Configuration Endpoints ==========
 
   @Get('config')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_VIEW)
   @ApiOperation({ summary: 'Get LDAP configuration' })
-  async getConfig(@Headers('x-team-id') teamId: string) {
+  async getConfig(@ScopedTeamId() teamId: string) {
     const config = await this.ldapService.getConfig(teamId);
 
     if (!config) {
@@ -123,11 +125,11 @@ export class LdapController {
   }
 
   @Post('config')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: 'Create LDAP configuration' })
   async createConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateLdapConfigDto,
   ) {
     const config = await this.ldapService.createConfig(teamId, dto);
@@ -139,11 +141,11 @@ export class LdapController {
   }
 
   @Put('config')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: 'Update LDAP configuration' })
   async updateConfig(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateLdapConfigDto,
   ) {
     const config = await this.ldapService.updateConfig(teamId, dto);
@@ -155,10 +157,10 @@ export class LdapController {
   }
 
   @Delete('config')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: 'Delete LDAP configuration' })
-  async deleteConfig(@Headers('x-team-id') teamId: string) {
+  async deleteConfig(@ScopedTeamId() teamId: string) {
     const deleted = await this.ldapService.deleteConfig(teamId);
     return { success: deleted };
   }
@@ -166,27 +168,28 @@ export class LdapController {
   // ========== Testing & Sync ==========
 
   @Post('test')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: 'Test LDAP connection' })
-  async testConnection(@Headers('x-team-id') teamId: string) {
+  async testConnection(@ScopedTeamId() teamId: string) {
     return this.ldapService.testConnection(teamId);
   }
 
   @Post('sync')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.SETTINGS_EDIT)
   @ApiOperation({ summary: 'Sync users from LDAP' })
-  async syncUsers(@Headers('x-team-id') teamId: string) {
+  async syncUsers(@ScopedTeamId() teamId: string) {
     return this.ldapService.syncUsers(teamId);
   }
 
   // ========== Authentication ==========
 
   @Post('authenticate')
+  @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Authenticate user via LDAP' })
   async authenticate(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: LdapAuthenticateDto,
   ) {
     const user = await this.ldapService.authenticate(teamId, dto.username, dto.password);

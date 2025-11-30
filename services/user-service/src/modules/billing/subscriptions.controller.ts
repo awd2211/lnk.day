@@ -12,7 +12,12 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, FindOptionsWhere } from 'typeorm';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  AdminOnly,
+} from '@lnk/nestjs-common';
 import { BillingService } from './billing.service';
 import { Subscription, SubscriptionStatus, Invoice } from './entities/subscription.entity';
 import { PlanType } from '../quota/quota.entity';
@@ -22,7 +27,8 @@ import { User } from '../user/entities/user.entity';
 
 @ApiTags('subscriptions')
 @Controller('subscriptions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+@AdminOnly()
 @ApiBearerAuth()
 export class SubscriptionsController {
   constructor(

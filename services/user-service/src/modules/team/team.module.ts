@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { HttpModule } from '@nestjs/axios';
 
 import { TeamController } from './team.controller';
 import { InvitationController } from './invitation.controller';
@@ -19,6 +20,7 @@ import { InvitationCleanupTask } from './tasks/invitation-cleanup.task';
   imports: [
     TypeOrmModule.forFeature([Team, TeamMember, TeamInvitation, CustomRole, User]),
     forwardRef(() => UserModule),
+    HttpModule,
   ],
   controllers: [TeamController, InvitationController, RoleController],
   providers: [TeamService, InvitationService, RoleService, InvitationCleanupTask],

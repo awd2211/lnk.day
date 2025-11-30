@@ -6,12 +6,10 @@ import {
   Body,
   Param,
   UseGuards,
-  Req,
   Ip,
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Request } from 'express';
 
 import { PrivacyService } from './privacy.service';
 import {
@@ -20,7 +18,7 @@ import {
   CreateDataRequestDto,
   CancelDeletionDto,
 } from './dto/privacy.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 import { ConsentType } from './entities/user-consent.entity';
 
 @ApiTags('privacy')
@@ -34,16 +32,16 @@ export class PrivacyController {
 
   @Get('overview')
   @ApiOperation({ summary: '获取隐私设置概览' })
-  async getOverview(@Req() req: any) {
-    return this.privacyService.getPrivacyOverview(req.user.id);
+  async getOverview(@CurrentUser() user: AuthenticatedUser) {
+    return this.privacyService.getPrivacyOverview(user.sub);
   }
 
   // ========== 同意管理 ==========
 
   @Get('consents')
   @ApiOperation({ summary: '获取所有同意状态' })
-  async getConsents(@Req() req: any) {
-    const consents = await this.privacyService.getConsents(req.user.id);
+  async getConsents(@CurrentUser() user: AuthenticatedUser) {
+    const consents = await this.privacyService.getConsents(user.sub);
     return { consents };
   }
 
@@ -51,12 +49,12 @@ export class PrivacyController {
   @ApiOperation({ summary: '更新单个同意状态' })
   async updateConsent(
     @Body() dto: UpdateConsentDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     const consent = await this.privacyService.updateConsent(
-      req.user.id,
+      user.sub,
       dto,
       ip,
       userAgent,
@@ -68,12 +66,12 @@ export class PrivacyController {
   @ApiOperation({ summary: '批量更新同意状态' })
   async bulkUpdateConsents(
     @Body() dto: BulkUpdateConsentDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string,
   ) {
     const consents = await this.privacyService.bulkUpdateConsents(
-      req.user.id,
+      user.sub,
       dto,
       ip,
       userAgent,
@@ -142,8 +140,8 @@ export class PrivacyController {
 
   @Get('requests')
   @ApiOperation({ summary: '获取数据请求历史' })
-  async getDataRequests(@Req() req: any) {
-    const requests = await this.privacyService.getDataRequests(req.user.id);
+  async getDataRequests(@CurrentUser() user: AuthenticatedUser) {
+    const requests = await this.privacyService.getDataRequests(user.sub);
     return { requests };
   }
 
@@ -151,11 +149,11 @@ export class PrivacyController {
   @ApiOperation({ summary: '创建数据请求（导出/删除等）' })
   async createDataRequest(
     @Body() dto: CreateDataRequestDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Ip() ip: string,
   ) {
     const request = await this.privacyService.createDataRequest(
-      req.user.id,
+      user.sub,
       dto,
       ip,
     );
@@ -166,9 +164,9 @@ export class PrivacyController {
 
   @Post('export')
   @ApiOperation({ summary: '请求导出个人数据' })
-  async requestExport(@Req() req: any, @Ip() ip: string) {
+  async requestExport(@CurrentUser() user: AuthenticatedUser, @Ip() ip: string) {
     const request = await this.privacyService.createDataRequest(
-      req.user.id,
+      user.sub,
       { type: 'export' as any },
       ip,
     );
@@ -184,11 +182,11 @@ export class PrivacyController {
   @ApiOperation({ summary: '请求删除账户（30天冷静期）' })
   async requestAccountDeletion(
     @Body() body: { reason?: string },
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Ip() ip: string,
   ) {
     const request = await this.privacyService.createDataRequest(
-      req.user.id,
+      user.sub,
       { type: 'delete' as any, reason: body.reason },
       ip,
     );
@@ -203,9 +201,9 @@ export class PrivacyController {
   @ApiOperation({ summary: '取消账户删除请求' })
   async cancelAccountDeletion(
     @Param('requestId') requestId: string,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.privacyService.cancelDeletionRequest(req.user.id, requestId);
+    await this.privacyService.cancelDeletionRequest(user.sub, requestId);
     return { message: '删除请求已取消' };
   }
 

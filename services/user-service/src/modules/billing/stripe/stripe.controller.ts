@@ -16,7 +16,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { Request } from 'express';
 
 import { StripeService } from './stripe.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 import { BillingCycle } from '../entities/subscription.entity';
 import { PlanType } from '../../quota/quota.entity';
 
@@ -46,10 +46,10 @@ export class StripeController {
   @ApiBody({ type: CreateCheckoutDto })
   async createCheckout(
     @Body() dto: CreateCheckoutDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const teamId = req.user.teamId || req.user.id; // Use teamId or userId as fallback
-    const email = req.user.email;
+    const teamId = user.scope?.teamId || user.sub;
+    const email = user.email;
 
     return this.stripeService.createCheckoutSession(
       teamId,
@@ -79,8 +79,8 @@ export class StripeController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建 Stripe 账单门户会话' })
-  async createPortalSession(@Req() req: any) {
-    const teamId = req.user.teamId || req.user.id;
+  async createPortalSession(@CurrentUser() user: AuthenticatedUser) {
+    const teamId = user.scope?.teamId || user.sub;
     return this.stripeService.createBillingPortalSession(teamId);
   }
 
@@ -92,11 +92,9 @@ export class StripeController {
   @ApiOperation({ summary: '取消订阅' })
   async cancelSubscription(
     @Body() body: { cancelAtPeriodEnd?: boolean },
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const teamId = req.user.teamId || req.user.id;
-    // Get subscription ID from database
-    // This would need to look up the subscription first
+    const teamId = user.scope?.teamId || user.sub;
     return { message: '请使用账单门户管理订阅' };
   }
 
@@ -104,8 +102,8 @@ export class StripeController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '重新激活订阅' })
-  async reactivateSubscription(@Req() req: any) {
-    const teamId = req.user.teamId || req.user.id;
+  async reactivateSubscription(@CurrentUser() user: AuthenticatedUser) {
+    const teamId = user.scope?.teamId || user.sub;
     return { message: '请使用账单门户管理订阅' };
   }
 
@@ -116,9 +114,9 @@ export class StripeController {
   @ApiBody({ type: ChangePlanDto })
   async changePlan(
     @Body() dto: ChangePlanDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const teamId = req.user.teamId || req.user.id;
+    const teamId = user.scope?.teamId || user.sub;
     return { message: '请使用账单门户管理订阅' };
   }
 
@@ -128,9 +126,9 @@ export class StripeController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建 SetupIntent 用于添加支付方式' })
-  async createSetupIntent(@Req() req: any) {
-    const email = req.user.email;
-    const teamId = req.user.teamId || req.user.id;
+  async createSetupIntent(@CurrentUser() user: AuthenticatedUser) {
+    const email = user.email;
+    const teamId = user.scope?.teamId || user.sub;
 
     const customerId = await this.stripeService.createOrGetCustomer(teamId, email);
     return this.stripeService.createSetupIntent(customerId);
@@ -140,9 +138,9 @@ export class StripeController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取支付方式列表' })
-  async listPaymentMethods(@Req() req: any) {
-    const teamId = req.user.teamId || req.user.id;
-    const email = req.user.email;
+  async listPaymentMethods(@CurrentUser() user: AuthenticatedUser) {
+    const teamId = user.scope?.teamId || user.sub;
+    const email = user.email;
 
     const customerId = await this.stripeService.createOrGetCustomer(teamId, email);
     const methods = await this.stripeService.listPaymentMethods(customerId);
@@ -162,10 +160,10 @@ export class StripeController {
   @ApiOperation({ summary: '设置默认支付方式' })
   async setDefaultPaymentMethod(
     @Param('id') paymentMethodId: string,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const teamId = req.user.teamId || req.user.id;
-    const email = req.user.email;
+    const teamId = user.scope?.teamId || user.sub;
+    const email = user.email;
 
     const customerId = await this.stripeService.createOrGetCustomer(teamId, email);
     await this.stripeService.setDefaultPaymentMethod(customerId, paymentMethodId);
@@ -181,10 +179,10 @@ export class StripeController {
   @ApiOperation({ summary: '获取发票列表' })
   async listInvoices(
     @Query('limit') limit: number = 10,
-    @Req() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const teamId = req.user.teamId || req.user.id;
-    const email = req.user.email;
+    const teamId = user.scope?.teamId || user.sub;
+    const email = user.email;
 
     const customerId = await this.stripeService.createOrGetCustomer(teamId, email);
     const invoices = await this.stripeService.listStripeInvoices(customerId, limit);

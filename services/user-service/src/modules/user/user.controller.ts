@@ -16,9 +16,8 @@ import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 import { InternalAuthGuard } from '../../common/guards/internal-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('users')
 @Controller('users')
@@ -112,6 +111,37 @@ export class UserController {
       name: user.name,
       role: user.role,
       teamId: user.teamId,
+    };
+  }
+
+  @Post('internal/:id/suspend')
+  @UseGuards(InternalAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '内部服务封禁用户' })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
+  async internalSuspendUser(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+  ) {
+    const user = await this.userService.suspendUser(id, body.reason);
+    return {
+      success: true,
+      userId: user.id,
+      status: user.status,
+    };
+  }
+
+  @Post('internal/:id/unsuspend')
+  @UseGuards(InternalAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '内部服务解封用户' })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
+  async internalUnsuspendUser(@Param('id') id: string) {
+    const user = await this.userService.unsuspendUser(id);
+    return {
+      success: true,
+      userId: user.id,
+      status: user.status,
     };
   }
 }

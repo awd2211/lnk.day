@@ -7,21 +7,27 @@ import {
   Body,
   Param,
   UseGuards,
-  Req,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+} from '@lnk/nestjs-common';
 import { RoleService, CreateRoleDto, UpdateRoleDto } from './role.service';
-import { Permission } from './entities/custom-role.entity';
 
 @ApiTags('roles')
 @Controller('teams/:teamId/roles')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @ApiBearerAuth()
+@ApiParam({ name: 'teamId', description: '团队 ID' })
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
   @Get()
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiOperation({ summary: '获取团队所有角色' })
   async findAll(@Param('teamId') teamId: string) {
     const roles = await this.roleService.findAll(teamId);
@@ -29,6 +35,7 @@ export class RoleController {
   }
 
   @Post()
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '创建自定义角色' })
   @ApiBody({
     schema: {
@@ -49,12 +56,14 @@ export class RoleController {
   }
 
   @Get('permissions')
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiOperation({ summary: '获取所有可用权限' })
-  getAvailablePermissions() {
+  async getAvailablePermissions() {
     return this.roleService.getAvailablePermissions();
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiOperation({ summary: '获取单个角色' })
   async findOne(@Param('teamId') teamId: string, @Param('id') id: string) {
     const role = await this.roleService.findOne(id, teamId);
@@ -62,6 +71,7 @@ export class RoleController {
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '更新角色' })
   async update(
     @Param('teamId') teamId: string,
@@ -73,6 +83,7 @@ export class RoleController {
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '删除角色' })
   async delete(@Param('teamId') teamId: string, @Param('id') id: string) {
     await this.roleService.delete(id, teamId);
@@ -80,6 +91,7 @@ export class RoleController {
   }
 
   @Post(':id/duplicate')
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '复制角色' })
   @ApiBody({
     schema: {
@@ -100,6 +112,7 @@ export class RoleController {
   }
 
   @Post('initialize')
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '初始化默认角色' })
   async initializeDefaults(@Param('teamId') teamId: string) {
     await this.roleService.initializeDefaultRoles(teamId);
@@ -107,6 +120,7 @@ export class RoleController {
   }
 
   @Get('default')
+  @RequirePermissions(Permission.TEAM_VIEW)
   @ApiOperation({ summary: '获取默认角色' })
   async getDefaultRole(@Param('teamId') teamId: string) {
     const role = await this.roleService.getDefaultRole(teamId);
@@ -114,6 +128,7 @@ export class RoleController {
   }
 
   @Post(':id/set-default')
+  @RequirePermissions(Permission.TEAM_ROLES_MANAGE)
   @ApiOperation({ summary: '设置为默认角色' })
   async setDefault(@Param('teamId') teamId: string, @Param('id') id: string) {
     const role = await this.roleService.update(id, teamId, { isDefault: true });

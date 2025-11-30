@@ -6,15 +6,25 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
   UseGuards,
+  ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam } from '@nestjs/swagger';
 
 import { ApiKeyService } from './apikey.service';
 import { ApiKeyScope } from './apikey.entity';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  isPlatformAdmin,
+} from '@lnk/nestjs-common';
 
 class CreateApiKeyDto {
   name: string;
@@ -35,12 +45,13 @@ class UpdateApiKeyDto {
 
 @ApiTags('api-keys')
 @Controller('api-keys')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
   @Post()
+  @RequirePermissions(Permission.API_KEYS_MANAGE)
   @ApiOperation({ summary: '创建 API 密钥' })
   @ApiResponse({
     status: 201,
@@ -48,13 +59,13 @@ export class ApiKeyController {
   })
   async create(
     @Body() createDto: CreateApiKeyDto,
-    @CurrentUser() user: { id: string },
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
     const { apiKey, plainKey } = await this.apiKeyService.create(
       createDto.name,
       user.id,
-      teamId || user.id,
+      teamId,
       {
         description: createDto.description,
         scopes: createDto.scopes,
@@ -77,39 +88,92 @@ export class ApiKeyController {
   }
 
   @Get()
+  @RequirePermissions(Permission.API_KEYS_VIEW)
   @ApiOperation({ summary: '获取 API 密钥列表' })
-  findAll(
-    @Headers('x-team-id') teamId: string,
-    @CurrentUser() user: { id: string },
-  ) {
-    return this.apiKeyService.findAll(teamId || user.id);
+  findAll(@ScopedTeamId() teamId: string) {
+    return this.apiKeyService.findAll(teamId);
+  }
+
+  @Get('scopes/list')
+  @RequirePermissions(Permission.API_KEYS_VIEW)
+  @ApiOperation({ summary: '获取可用的权限范围列表' })
+  getScopes() {
+    return {
+      scopes: [
+        { value: ApiKeyScope.READ, description: '读取数据' },
+        { value: ApiKeyScope.WRITE, description: '创建和修改数据' },
+        { value: ApiKeyScope.DELETE, description: '删除数据' },
+        { value: ApiKeyScope.ADMIN, description: '完全访问权限' },
+      ],
+    };
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.API_KEYS_VIEW)
   @ApiOperation({ summary: '获取单个 API 密钥详情' })
-  findOne(@Param('id') id: string) {
-    return this.apiKeyService.findOne(id);
+  @ApiParam({ name: 'id', type: String })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const apiKey = await this.apiKeyService.findOne(id);
+    if (!isPlatformAdmin(user) && apiKey.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此 API 密钥');
+    }
+    return apiKey;
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.API_KEYS_MANAGE)
   @ApiOperation({ summary: '更新 API 密钥' })
-  update(@Param('id') id: string, @Body() updateDto: UpdateApiKeyDto) {
+  @ApiParam({ name: 'id', type: String })
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateDto: UpdateApiKeyDto,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const apiKey = await this.apiKeyService.findOne(id);
+    if (!isPlatformAdmin(user) && apiKey.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此 API 密钥');
+    }
     return this.apiKeyService.update(id, updateDto);
   }
 
   @Post(':id/revoke')
+  @RequirePermissions(Permission.API_KEYS_MANAGE)
   @ApiOperation({ summary: '撤销 API 密钥' })
-  revoke(@Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async revoke(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const apiKey = await this.apiKeyService.findOne(id);
+    if (!isPlatformAdmin(user) && apiKey.teamId !== teamId) {
+      throw new ForbiddenException('无权撤销此 API 密钥');
+    }
     return this.apiKeyService.revoke(id);
   }
 
   @Post(':id/regenerate')
+  @RequirePermissions(Permission.API_KEYS_MANAGE)
   @ApiOperation({ summary: '重新生成 API 密钥' })
   @ApiResponse({
     status: 200,
     description: '返回新的 API 密钥，旧密钥将失效',
   })
-  async regenerate(@Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async regenerate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const existingKey = await this.apiKeyService.findOne(id);
+    if (!isPlatformAdmin(user) && existingKey.teamId !== teamId) {
+      throw new ForbiddenException('无权重新生成此 API 密钥');
+    }
     const { apiKey, plainKey } = await this.apiKeyService.regenerate(id);
 
     return {
@@ -122,21 +186,18 @@ export class ApiKeyController {
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.API_KEYS_MANAGE)
   @ApiOperation({ summary: '删除 API 密钥' })
-  delete(@Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async delete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const apiKey = await this.apiKeyService.findOne(id);
+    if (!isPlatformAdmin(user) && apiKey.teamId !== teamId) {
+      throw new ForbiddenException('无权删除此 API 密钥');
+    }
     return this.apiKeyService.delete(id);
-  }
-
-  @Get('scopes/list')
-  @ApiOperation({ summary: '获取可用的权限范围列表' })
-  getScopes() {
-    return {
-      scopes: [
-        { value: ApiKeyScope.READ, description: '读取数据' },
-        { value: ApiKeyScope.WRITE, description: '创建和修改数据' },
-        { value: ApiKeyScope.DELETE, description: '删除数据' },
-        { value: ApiKeyScope.ADMIN, description: '完全访问权限' },
-      ],
-    };
   }
 }

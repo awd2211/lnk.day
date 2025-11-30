@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { PRESET_ROLE_PERMISSIONS, UnifiedJwtPayload, TeamRole, Scope } from '@lnk/nestjs-common';
 
 import { UserService } from '../user/user.service';
 import { TeamService } from '../team/team.service';
@@ -75,28 +76,53 @@ export class AuthService {
   }
 
   /**
-   * 生成包含权限信息的 JWT
+   * 生成包含权限信息的统一格式 JWT
+   *
+   * 新版统一格式包含：
+   * - type: 'user' 标识普通用户（区别于 'admin' 管理员）
+   * - scope: 访问范围（team 或 personal）
+   * - role: 团队角色
+   * - permissions: 权限列表
    */
   private async generateTokensWithPermissions(userId: string, email: string, teamId?: string) {
     // 获取用户的团队成员身份和权限
-    let teamRole: string | null = null;
+    let teamRole: string = TeamRole.MEMBER;
     let permissions: string[] = [];
+    let scope: Scope;
 
     if (teamId) {
       const membership = await this.teamService.getUserTeamMembership(userId, teamId);
       if (membership) {
-        teamRole = membership.teamRole;
+        // membership.teamRole 是 TeamMemberRole 类型，值与 TeamRole 相同
+        teamRole = membership.teamRole || TeamRole.MEMBER;
         permissions = membership.permissions;
       }
+      scope = {
+        level: 'team',
+        teamId,
+      };
+    } else {
+      // 没有团队的用户作为个人工作区，给予 OWNER 角色和默认权限
+      teamRole = TeamRole.OWNER;
+      permissions = PRESET_ROLE_PERMISSIONS.MEMBER || [];
+      scope = {
+        level: 'personal',
+        teamId: userId, // 个人工作区使用 userId 作为隔离标识
+      };
     }
 
-    const payload = {
+    // 构建统一格式的 JWT payload
+    const payload: Omit<UnifiedJwtPayload, 'iat' | 'exp'> = {
       sub: userId,
       email,
+      type: 'user',
+      scope,
+      role: teamRole,
+      permissions,
+      // 向后兼容：保留旧字段
       teamId: teamId || null,
       teamRole,
-      permissions,
-    };
+    } as any;
 
     const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
     const refreshExpiresIn = this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');

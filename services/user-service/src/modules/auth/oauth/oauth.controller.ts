@@ -5,7 +5,6 @@ import {
   Delete,
   Param,
   Query,
-  Headers,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +14,11 @@ import { ConfigService } from '@nestjs/config';
 
 import { OAuthService } from './oauth.service';
 import { OAuthProvider } from './oauth-account.entity';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  CurrentUser,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 
 @ApiTags('oauth')
 @Controller('auth/oauth')
@@ -122,8 +125,8 @@ export class OAuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取已关联的社交账号' })
-  async getLinkedAccounts(@Headers('x-user-id') userId: string) {
-    const accounts = await this.oauthService.getLinkedAccounts(userId);
+  async getLinkedAccounts(@CurrentUser() user: AuthenticatedUser) {
+    const accounts = await this.oauthService.getLinkedAccounts(user.sub);
     return { accounts };
   }
 
@@ -134,10 +137,10 @@ export class OAuthController {
   async linkAccount(
     @Param('provider') provider: OAuthProvider,
     @Query('code') code: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const oauthUser = await this.oauthService.exchangeCodeForTokens(provider, code);
-    const account = await this.oauthService.linkOAuthAccount(userId, oauthUser);
+    const account = await this.oauthService.linkOAuthAccount(user.sub, oauthUser);
     return {
       message: `${provider} account linked successfully`,
       account: {
@@ -155,9 +158,9 @@ export class OAuthController {
   @ApiOperation({ summary: '解除社交账号关联' })
   async unlinkAccount(
     @Param('provider') provider: OAuthProvider,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.oauthService.unlinkOAuthAccount(userId, provider);
+    await this.oauthService.unlinkOAuthAccount(user.sub, provider);
     return { message: `${provider} account unlinked successfully` };
   }
 }
