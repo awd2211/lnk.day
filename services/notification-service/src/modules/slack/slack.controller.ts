@@ -17,6 +17,14 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { SlackService } from './slack.service';
 import { SlackOAuthService } from './slack-oauth.service';
 import { SlackCommandsService } from './slack-commands.service';
@@ -28,13 +36,6 @@ import {
   SlackEventPayload,
   UpdateSlackSettingsDto,
 } from './dto/slack.dto';
-
-// Simple auth guard placeholder - implement with your actual auth
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
 
 // ========== DTO Classes for existing endpoints ==========
 
@@ -89,14 +90,16 @@ export class SlackController {
   // ========== OAuth Endpoints ==========
 
   @Get('oauth/install')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get Slack OAuth installation URL' })
   getInstallUrl(
     @Query() dto: InitiateSlackOAuthDto,
+    @ScopedTeamId() teamId: string,
     @Res() res: Response,
   ) {
-    const authUrl = this.oauthService.generateAuthUrl(dto.teamId, dto.redirectUrl);
+    const authUrl = this.oauthService.generateAuthUrl(teamId, dto.redirectUrl);
     return res.redirect(authUrl);
   }
 
@@ -124,10 +127,11 @@ export class SlackController {
   }
 
   @Get('installation')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get Slack installation for team' })
-  async getInstallation(@Query('teamId') teamId: string) {
+  async getInstallation(@ScopedTeamId() teamId: string) {
     const installation = await this.oauthService.getInstallationByTeamId(teamId);
 
     if (!installation) {
@@ -144,11 +148,12 @@ export class SlackController {
   }
 
   @Put('settings')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update Slack notification settings' })
   async updateSettings(
-    @Query('teamId') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateSlackSettingsDto,
   ) {
     const installation = await this.oauthService.updateSettings(teamId, dto);
@@ -159,19 +164,21 @@ export class SlackController {
   }
 
   @Get('channels')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List available Slack channels' })
-  async listChannels(@Query('teamId') teamId: string) {
+  async listChannels(@ScopedTeamId() teamId: string) {
     const channels = await this.oauthService.listChannels(teamId);
     return { channels };
   }
 
   @Delete('uninstall')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Uninstall Slack app' })
-  async uninstall(@Query('teamId') teamId: string) {
+  async uninstall(@ScopedTeamId() teamId: string) {
     await this.oauthService.uninstall(teamId);
     return { success: true };
   }

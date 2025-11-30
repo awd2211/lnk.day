@@ -15,14 +15,22 @@ export class CampaignService {
     return this.campaignRepository.save(campaign);
   }
 
-  async findAll(teamId: string, options?: { status?: CampaignStatus }): Promise<Campaign[]> {
-    const where: any = { teamId };
+  async findAll(teamId?: string, options?: { status?: CampaignStatus; page?: number; limit?: number }): Promise<{ items: Campaign[]; total: number; page: number; limit: number }> {
+    const where: any = {};
+    if (teamId) where.teamId = teamId;
     if (options?.status) where.status = options.status;
 
-    return this.campaignRepository.find({
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+
+    const [items, total] = await this.campaignRepository.findAndCount({
       where,
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return { items, total, page, limit };
   }
 
   async findActive(teamId: string): Promise<Campaign[]> {

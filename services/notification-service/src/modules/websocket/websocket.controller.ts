@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 import { WebsocketService } from './websocket.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { JwtAuthGuard, ScopeGuard, PermissionGuard } from '@lnk/nestjs-common';
 
 class PublishEventDto {
   channel: string;

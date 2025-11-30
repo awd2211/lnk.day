@@ -8,29 +8,36 @@ import {
   Param,
   Query,
   UseGuards,
-  Req,
-  Headers,
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiParam, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 import { WebhookService } from './webhook.service';
 import { CreateWebhookDto, UpdateWebhookDto, FireWebhookDto } from './dto/webhook.dto';
 import { WebhookPlatform } from './entities/webhook.entity';
 
 @ApiTags('webhooks')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('webhooks')
 export class WebhookController {
   constructor(private readonly webhookService: WebhookService) {}
 
   @Get()
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取所有 Webhooks' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
   @ApiQuery({ name: 'platform', required: false, enum: WebhookPlatform })
   async listWebhooks(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('platform') platform?: WebhookPlatform,
   ) {
     const webhooks = await this.webhookService.findAll(teamId, platform);
@@ -38,20 +45,19 @@ export class WebhookController {
   }
 
   @Post()
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '创建 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  @ApiHeader({ name: 'x-user-id', required: true })
   async createWebhook(
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWebhookDto,
   ) {
-    const webhook = await this.webhookService.create(teamId, userId, dto);
+    const webhook = await this.webhookService.create(teamId, user.id, dto);
     return { webhook };
   }
 
   @Get('events')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取可用的事件类型' })
   getEvents() {
     return {
@@ -60,6 +66,7 @@ export class WebhookController {
   }
 
   @Get('platforms')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取支持的平台' })
   getPlatforms() {
     return {
@@ -109,30 +116,32 @@ export class WebhookController {
   }
 
   @Get('stats')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取 Webhook 统计' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async getStats(@Headers('x-team-id') teamId: string) {
+  async getStats(@ScopedTeamId() teamId: string) {
     const stats = await this.webhookService.getStats(teamId);
     return stats;
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取单个 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async getWebhook(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async getWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     const webhook = await this.webhookService.findOne(id, teamId);
     return { webhook };
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '更新 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
+  @ApiParam({ name: 'id', type: String })
   async updateWebhook(
-    @Headers('x-team-id') teamId: string,
-    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateWebhookDto,
   ) {
     const webhook = await this.webhookService.update(id, teamId, dto);
@@ -140,28 +149,37 @@ export class WebhookController {
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '删除 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async deleteWebhook(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async deleteWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     await this.webhookService.delete(id, teamId);
     return { success: true };
   }
 
   @Post(':id/toggle')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '启用/禁用 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async toggleWebhook(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async toggleWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     const webhook = await this.webhookService.toggle(id, teamId);
     return { webhook };
   }
 
   @Post(':id/test')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '测试 Webhook' })
-  @ApiBearerAuth()
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async testWebhook(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async testWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     const result = await this.webhookService.testWebhook(id, teamId);
     return result;
   }
@@ -179,15 +197,14 @@ export class WebhookController {
   // ========== Make.com 专用端点 ==========
 
   @Post('make/subscribe')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: 'Make.com 订阅 (用于 Custom App)' })
-  @ApiHeader({ name: 'x-team-id', required: true })
-  @ApiHeader({ name: 'x-user-id', required: true })
   async makeSubscribe(
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { webhookUrl: string; event: string; name?: string },
   ) {
-    const webhook = await this.webhookService.create(teamId, userId, {
+    const webhook = await this.webhookService.create(teamId, user.id, {
       name: body.name || `Make - ${body.event}`,
       platform: WebhookPlatform.MAKE,
       webhookUrl: body.webhookUrl,
@@ -198,9 +215,13 @@ export class WebhookController {
   }
 
   @Delete('make/unsubscribe/:id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: 'Make.com 取消订阅' })
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async makeUnsubscribe(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async makeUnsubscribe(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     await this.webhookService.delete(id, teamId);
     return { success: true };
   }
@@ -208,15 +229,14 @@ export class WebhookController {
   // ========== n8n 专用端点 ==========
 
   @Post('n8n/subscribe')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: 'n8n 订阅' })
-  @ApiHeader({ name: 'x-team-id', required: true })
-  @ApiHeader({ name: 'x-user-id', required: true })
   async n8nSubscribe(
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() body: { webhookUrl: string; event: string; name?: string },
   ) {
-    const webhook = await this.webhookService.create(teamId, userId, {
+    const webhook = await this.webhookService.create(teamId, user.id, {
       name: body.name || `n8n - ${body.event}`,
       platform: WebhookPlatform.N8N,
       webhookUrl: body.webhookUrl,
@@ -227,9 +247,13 @@ export class WebhookController {
   }
 
   @Delete('n8n/unsubscribe/:id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: 'n8n 取消订阅' })
-  @ApiHeader({ name: 'x-team-id', required: true })
-  async n8nUnsubscribe(@Headers('x-team-id') teamId: string, @Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async n8nUnsubscribe(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     await this.webhookService.delete(id, teamId);
     return { success: true };
   }

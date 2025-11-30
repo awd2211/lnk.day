@@ -41,6 +41,25 @@ export class DeepLinkService {
     });
   }
 
+  async findAll(teamId?: string, options?: { page?: number; limit?: number; status?: string }): Promise<{ items: DeepLink[]; total: number; page: number; limit: number }> {
+    const where: any = {};
+    if (teamId) where.teamId = teamId;
+    if (options?.status === 'enabled') where.enabled = true;
+    if (options?.status === 'disabled') where.enabled = false;
+
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+
+    const [items, total] = await this.deepLinkRepository.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { items, total, page, limit };
+  }
+
   async update(id: string, data: Partial<DeepLink>): Promise<DeepLink> {
     const deepLink = await this.findOne(id);
     Object.assign(deepLink, data);

@@ -56,11 +56,22 @@ export class TrackingService {
     return record;
   }
 
-  async findAllByTeam(teamId: string): Promise<QrRecord[]> {
-    return this.qrRecordRepository.find({
-      where: { teamId },
+  async findAllByTeam(teamId?: string, options?: { page?: number; limit?: number; style?: string }): Promise<{ items: QrRecord[]; total: number; page: number; limit: number }> {
+    const where: any = {};
+    if (teamId) where.teamId = teamId;
+    if (options?.style) where.style = { type: options.style };
+
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+
+    const [items, total] = await this.qrRecordRepository.findAndCount({
+      where,
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return { items, total, page, limit };
   }
 
   async updateTargetUrl(id: string, targetUrl: string): Promise<QrRecord> {

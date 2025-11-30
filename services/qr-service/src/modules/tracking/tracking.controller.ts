@@ -6,26 +6,35 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+  CurrentUser,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 import { Request } from 'express';
 import { TrackingService } from './tracking.service';
 import { QrType, QrContentType } from './qr-record.entity';
 
 @ApiTags('qr-tracking')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('qr-records')
 export class TrackingController {
   constructor(private readonly trackingService: TrackingService) {}
 
   @Post()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_CREATE)
   @ApiOperation({ summary: '创建二维码记录' })
   create(
     @Body()
@@ -40,33 +49,50 @@ export class TrackingController {
       campaignId?: string;
       tags?: string[];
     },
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
     return this.trackingService.createQrRecord({
       ...body,
-      userId,
+      userId: user.sub,
       teamId,
     });
   }
 
   @Get()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: false })
+  @RequirePermissions(Permission.QR_VIEW)
   @ApiOperation({ summary: '获取二维码列表' })
-  findAll(@Headers('x-team-id') teamId: string) {
-    return this.trackingService.findAllByTeam(teamId);
+  @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的二维码' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'style', required: false })
+  findAll(
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('all') all?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('style') style?: string,
+  ) {
+    // 平台管理员可以查看所有二维码
+    const isPlatformAdmin = user.type === 'admin' || user.scope?.level === 'platform';
+    const shouldQueryAll = all === 'true' && isPlatformAdmin;
+    return this.trackingService.findAllByTeam(shouldQueryAll ? undefined : teamId, { page, limit, style });
   }
 
   @Get('top')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_VIEW)
   @ApiOperation({ summary: '获取扫码量最高的二维码' })
   @ApiQuery({ name: 'limit', required: false })
-  getTop(@Headers('x-team-id') teamId: string, @Query('limit') limit?: string) {
+  getTop(@ScopedTeamId() teamId: string, @Query('limit') limit?: string) {
     return this.trackingService.getTopQrCodes(teamId, limit ? parseInt(limit) : 10);
   }
 
   @Get(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_VIEW)
   @ApiOperation({ summary: '获取二维码详情' })
   findOne(@Param('id') id: string) {
     return this.trackingService.findById(id);
@@ -79,27 +105,30 @@ export class TrackingController {
   }
 
   @Put(':id/target')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '更新动态二维码目标URL' })
   updateTarget(@Param('id') id: string, @Body() body: { targetUrl: string }) {
     return this.trackingService.updateTargetUrl(id, body.targetUrl);
   }
 
   @Put(':id/style')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '更新二维码样式' })
   updateStyle(@Param('id') id: string, @Body() style: any) {
     return this.trackingService.updateStyle(id, style);
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '删除二维码' })
   delete(@Param('id') id: string) {
     return this.trackingService.delete(id);
   }
 
-  // Scan tracking
+  // Scan tracking - public endpoint for recording scans
   @Post(':id/scan')
   @ApiOperation({ summary: '记录扫码事件' })
   recordScan(
@@ -126,7 +155,8 @@ export class TrackingController {
   }
 
   @Get(':id/scans')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取扫码记录' })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
@@ -142,7 +172,8 @@ export class TrackingController {
   }
 
   @Get(':id/stats')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取扫码统计' })
   @ApiQuery({ name: 'days', required: false, description: '统计天数，默认30' })
   getStats(@Param('id') id: string, @Query('days') days?: string) {

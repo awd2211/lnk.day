@@ -1,6 +1,16 @@
-import { Controller, Post, Body, Res, Get, Query, Param, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Res, Get, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  isPlatformAdmin,
+} from '@lnk/nestjs-common';
 import { Response } from 'express';
 import { QrService, QrOptions, GradientConfig, EyeStyle, TextLabelConfig } from './qr.service';
 import {
@@ -160,7 +170,7 @@ import { QrLimitService } from './qr-limit.service';
 
 @ApiTags('qr')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('qr')
 export class QrController {
   constructor(
@@ -169,6 +179,7 @@ export class QrController {
   ) {}
 
   @Post('generate')
+  @RequirePermissions(Permission.QR_CREATE)
   @ApiOperation({ summary: '生成二维码 (支持 PNG/SVG/PDF/EPS 格式)' })
   @ApiBody({ type: GenerateQrDto })
   async generate(@Body() body: GenerateQrDto, @Res() res: Response) {
@@ -622,12 +633,12 @@ export class QrController {
   // ============ QR 限制 API ============
 
   @Post('limits')
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '创建 QR 扫码限制配置' })
   async createLimit(
     @Body()
     body: {
       qrId: string;
-      teamId: string;
       maxScans?: number;
       dailyLimit?: number;
       allowedCountries?: string[];
@@ -638,10 +649,11 @@ export class QrController {
       limitRedirectUrl?: string;
       limitMessage?: string;
     },
+    @ScopedTeamId() teamId: string,
   ) {
     const limit = await this.qrLimitService.create({
       qrId: body.qrId,
-      teamId: body.teamId,
+      teamId, // 使用安全的 teamId
       maxScans: body.maxScans,
       dailyLimit: body.dailyLimit,
       allowedCountries: body.allowedCountries,
@@ -656,41 +668,67 @@ export class QrController {
   }
 
   @Get('limits/:qrId')
+  @RequirePermissions(Permission.QR_VIEW)
   @ApiOperation({ summary: '获取 QR 扫码限制配置' })
-  async getLimit(@Query('qrId') qrId: string) {
+  async getLimit(
+    @Param('qrId') qrId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const limit = await this.qrLimitService.findByQrId(qrId);
+    if (limit && !isPlatformAdmin(user) && limit.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此 QR 限制配置');
+    }
     return limit || { message: 'No limit configured for this QR' };
   }
 
   @Get('limits/:qrId/stats')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取 QR 扫码统计' })
-  async getLimitStats(@Query('qrId') qrId: string) {
+  async getLimitStats(
+    @Param('qrId') qrId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const limit = await this.qrLimitService.findByQrId(qrId);
+    if (limit && !isPlatformAdmin(user) && limit.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此 QR 统计');
+    }
     const stats = await this.qrLimitService.getStats(qrId);
     return stats || { message: 'No stats available' };
   }
 
   @Post('limits/:qrId/check')
+  @RequirePermissions(Permission.QR_VIEW)
   @ApiOperation({ summary: '检查是否允许扫码' })
   async checkLimit(
-    @Query('qrId') qrId: string,
+    @Param('qrId') qrId: string,
     @Body() body: { country?: string },
   ) {
     return this.qrLimitService.checkLimit(qrId, body.country);
   }
 
   @Post('limits/:qrId/reset')
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '重置扫码计数' })
   async resetLimit(
-    @Query('qrId') qrId: string,
+    @Param('qrId') qrId: string,
     @Body() body: { type?: 'all' | 'daily' },
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    const limit = await this.qrLimitService.findByQrId(qrId);
+    if (limit && !isPlatformAdmin(user) && limit.teamId !== teamId) {
+      throw new ForbiddenException('无权重置此 QR 计数');
+    }
     await this.qrLimitService.resetScans(qrId, body.type || 'all');
     return { success: true, qrId };
   }
 
   @Post('limits/:qrId/record')
+  @RequirePermissions(Permission.QR_EDIT)
   @ApiOperation({ summary: '记录一次扫码' })
-  async recordScan(@Query('qrId') qrId: string) {
+  async recordScan(@Param('qrId') qrId: string) {
     await this.qrLimitService.recordScan(qrId);
     return { success: true };
   }

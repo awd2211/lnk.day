@@ -1,114 +1,215 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  isPlatformAdmin,
+} from '@lnk/nestjs-common';
 import { CampaignService } from './campaign.service';
 import { CampaignStatus, UTMParams } from './entities/campaign.entity';
 
 @ApiTags('campaigns')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('campaigns')
 export class CampaignController {
   constructor(private readonly campaignService: CampaignService) {}
 
   @Post()
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '创建营销活动' })
   create(
     @Body() data: any,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.campaignService.create({ ...data, userId, teamId });
+    return this.campaignService.create({ ...data, userId: user.id, teamId });
   }
 
   @Get()
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取营销活动列表' })
   @ApiQuery({ name: 'status', required: false, enum: CampaignStatus })
-  findAll(@Headers('x-team-id') teamId: string, @Query('status') status?: CampaignStatus) {
-    return this.campaignService.findAll(teamId, { status });
+  @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的活动' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  findAll(
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: CampaignStatus,
+    @Query('all') all?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    // 平台管理员可以查看所有活动
+    const shouldQueryAll = all === 'true' && isPlatformAdmin(user);
+    return this.campaignService.findAll(shouldQueryAll ? undefined : teamId, { status, page, limit });
   }
 
   @Get('active')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取进行中的营销活动' })
-  findActive(@Headers('x-team-id') teamId: string) {
+  findActive(@ScopedTeamId() teamId: string) {
     return this.campaignService.findActive(teamId);
   }
 
   @Get(':id')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取单个营销活动' })
-  findOne(@Param('id') id: string) {
-    return this.campaignService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此营销活动');
+    }
+    return campaign;
   }
 
   @Get(':id/stats')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取营销活动统计' })
-  getStats(@Param('id') id: string) {
+  async getStats(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此营销活动统计');
+    }
     return this.campaignService.getStats(id);
   }
 
   @Put(':id')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '更新营销活动' })
-  update(@Param('id') id: string, @Body() data: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() data: any,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此营销活动');
+    }
     return this.campaignService.update(id, data);
   }
 
   @Post(':id/start')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '启动营销活动' })
-  start(@Param('id') id: string) {
+  async start(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权启动此营销活动');
+    }
     return this.campaignService.start(id);
   }
 
   @Post(':id/pause')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '暂停营销活动' })
-  pause(@Param('id') id: string) {
+  async pause(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权暂停此营销活动');
+    }
     return this.campaignService.pause(id);
   }
 
   @Post(':id/complete')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '结束营销活动' })
-  complete(@Param('id') id: string) {
+  async complete(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权结束此营销活动');
+    }
     return this.campaignService.complete(id);
   }
 
   @Post(':id/archive')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '归档营销活动' })
-  archive(@Param('id') id: string) {
+  async archive(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权归档此营销活动');
+    }
     return this.campaignService.archive(id);
   }
 
   @Post(':id/links')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '添加链接到营销活动' })
-  addLinks(@Param('id') id: string, @Body() body: { linkIds: string[] }) {
+  async addLinks(
+    @Param('id') id: string,
+    @Body() body: { linkIds: string[] },
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此营销活动');
+    }
     return this.campaignService.addLinks(id, body.linkIds);
   }
 
   @Delete(':id/links')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '从营销活动移除链接' })
-  removeLinks(@Param('id') id: string, @Body() body: { linkIds: string[] }) {
+  async removeLinks(
+    @Param('id') id: string,
+    @Body() body: { linkIds: string[] },
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此营销活动');
+    }
     return this.campaignService.removeLinks(id, body.linkIds);
   }
 
   @Post(':id/duplicate')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '复制营销活动' })
-  duplicate(
+  async duplicate(
     @Param('id') id: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.campaignService.duplicate(id, userId, teamId);
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权复制此营销活动');
+    }
+    return this.campaignService.duplicate(id, user.id, teamId);
   }
 
   @Post('utm-builder')
@@ -118,9 +219,17 @@ export class CampaignController {
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.CAMPAIGNS_DELETE)
   @ApiOperation({ summary: '删除营销活动' })
-  remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const campaign = await this.campaignService.findOne(id);
+    if (!isPlatformAdmin(user) && campaign.teamId !== teamId) {
+      throw new ForbiddenException('无权删除此营销活动');
+    }
     return this.campaignService.remove(id);
   }
 }

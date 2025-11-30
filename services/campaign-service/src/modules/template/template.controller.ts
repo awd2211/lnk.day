@@ -1,39 +1,50 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+  CurrentUser,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 import { TemplateService } from './template.service';
 
 @ApiTags('campaign-templates')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('campaign-templates')
 export class TemplateController {
   constructor(private readonly templateService: TemplateService) {}
 
   @Post()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '创建活动模板' })
   create(
     @Body() data: any,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.templateService.create({ ...data, userId, teamId });
+    return this.templateService.create({ ...data, userId: user.sub, teamId });
   }
 
   @Post('from-campaign/:campaignId')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '从现有活动创建模板' })
   createFromCampaign(
     @Param('campaignId') campaignId: string,
     @Body() body: { name: string; description?: string; isPublic?: boolean; includeGoals?: boolean },
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
     return this.templateService.createFromCampaign(
       campaignId,
       body.name,
-      userId,
+      user.sub,
       teamId,
       {
         description: body.description,
@@ -44,9 +55,10 @@ export class TemplateController {
   }
 
   @Get()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取活动模板列表' })
-  findAll(@Headers('x-team-id') teamId: string) {
+  findAll(@ScopedTeamId() teamId: string) {
     return this.templateService.findAll(teamId);
   }
 
@@ -57,28 +69,32 @@ export class TemplateController {
   }
 
   @Get(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取单个模板' })
   findOne(@Param('id') id: string) {
     return this.templateService.findOne(id);
   }
 
   @Put(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '更新模板' })
   update(@Param('id') id: string, @Body() data: any) {
     return this.templateService.update(id, data);
   }
 
   @Delete(':id')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '删除模板' })
   delete(@Param('id') id: string) {
     return this.templateService.delete(id);
   }
 
   @Post(':id/create-campaign')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '从模板创建活动' })
   createCampaign(
     @Param('id') templateId: string,
@@ -90,12 +106,12 @@ export class TemplateController {
       budget?: number;
       overrides?: any;
     },
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
     return this.templateService.createCampaignFromTemplate(templateId, {
       name: body.name,
-      userId,
+      userId: user.sub,
       teamId,
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       endDate: body.endDate ? new Date(body.endDate) : undefined,

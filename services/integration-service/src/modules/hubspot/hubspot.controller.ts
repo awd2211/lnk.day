@@ -18,6 +18,14 @@ import { Response, Request } from 'express';
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
 
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { HubSpotService } from './hubspot.service';
 import {
   InitiateHubSpotOAuthDto,
@@ -30,15 +38,10 @@ import {
   HubSpotWebhookEvent,
 } from './dto/hubspot.dto';
 
-// Placeholder auth guard
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
-
 @ApiTags('hubspot')
 @Controller('hubspot')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class HubSpotController {
   constructor(
     private readonly hubspotService: HubSpotService,
@@ -81,7 +84,7 @@ export class HubSpotController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Get HubSpot connection status' })
-  async getConnection(@Headers('x-team-id') teamId: string) {
+  async getConnection(@ScopedTeamId() teamId: string) {
     const connection = await this.hubspotService.getConnection(teamId);
 
     if (!connection) {
@@ -102,7 +105,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Update HubSpot integration settings' })
   async updateSettings(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateHubSpotSettingsDto,
   ) {
     const connection = await this.hubspotService.updateSettings(teamId, dto);
@@ -113,7 +116,7 @@ export class HubSpotController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Disconnect HubSpot integration' })
-  async disconnect(@Headers('x-team-id') teamId: string) {
+  async disconnect(@ScopedTeamId() teamId: string) {
     await this.hubspotService.disconnect(teamId);
     return { success: true };
   }
@@ -122,7 +125,7 @@ export class HubSpotController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Create custom properties in HubSpot' })
-  async setupProperties(@Headers('x-team-id') teamId: string) {
+  async setupProperties(@ScopedTeamId() teamId: string) {
     await this.hubspotService.ensureCustomProperties(teamId);
     return { success: true, message: 'Custom properties created' };
   }
@@ -136,7 +139,7 @@ export class HubSpotController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'after', required: false })
   async getContacts(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
   ) {
@@ -152,7 +155,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Search for a contact by email' })
   async searchContact(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('email') email: string,
   ) {
     const contact = await this.hubspotService.getContactByEmail(teamId, email);
@@ -164,7 +167,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Create a HubSpot contact' })
   async createContact(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateHubSpotContactDto,
   ) {
     return this.hubspotService.createContact(teamId, dto);
@@ -175,7 +178,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Update a HubSpot contact' })
   async updateContact(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('contactId') contactId: string,
     @Body() dto: UpdateHubSpotContactDto,
   ) {
@@ -191,7 +194,7 @@ export class HubSpotController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'after', required: false })
   async getDeals(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
   ) {
@@ -207,7 +210,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Get a specific deal' })
   async getDeal(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('dealId') dealId: string,
   ) {
     return this.hubspotService.getDeal(teamId, dealId);
@@ -218,7 +221,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Update deal stage' })
   async updateDealStage(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('dealId') dealId: string,
     @Body('stage') stage: string,
   ) {
@@ -232,7 +235,7 @@ export class HubSpotController {
   
   @ApiOperation({ summary: 'Log an activity to HubSpot' })
   async logActivity(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: LogHubSpotActivityDto,
   ) {
     const result = await this.hubspotService.logActivity(teamId, dto);
@@ -295,7 +298,7 @@ export class HubSpotController {
   @Post('track-click')
   @ApiOperation({ summary: 'Track a link click in HubSpot (internal use)' })
   async trackClick(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body()
     body: {
       linkId: string;

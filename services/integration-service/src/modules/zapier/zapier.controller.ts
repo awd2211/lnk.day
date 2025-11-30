@@ -8,8 +8,17 @@ import {
   Query,
   Headers,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { ZapierService, TriggerEvent } from './zapier.service';
 
 // DTOs
@@ -44,6 +53,8 @@ class CreateQrActionDto {
 
 @ApiTags('zapier')
 @Controller('zapier')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class ZapierController {
   constructor(private readonly zapierService: ZapierService) {}
 
@@ -52,7 +63,7 @@ export class ZapierController {
   @Get('auth/test')
   @ApiOperation({ summary: 'Test authentication (for Zapier)' })
   @ApiHeader({ name: 'x-team-id', required: true })
-  async testAuth(@Headers('x-team-id') teamId: string) {
+  async testAuth(@ScopedTeamId() teamId: string) {
     return {
       success: true,
       teamId,
@@ -66,7 +77,7 @@ export class ZapierController {
   @ApiOperation({ summary: 'Subscribe to a trigger event' })
   @ApiHeader({ name: 'x-team-id', required: true })
   async subscribe(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: SubscribeDto,
   ) {
     const subscription = await this.zapierService.subscribeToTrigger(
@@ -87,7 +98,7 @@ export class ZapierController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Unsubscribe from a trigger event' })
   async unsubscribe(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('id') id: string,
   ) {
     await this.zapierService.unsubscribeFromTrigger(id, teamId);
@@ -97,7 +108,7 @@ export class ZapierController {
   @Get('hooks/subscriptions')
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'List all subscriptions' })
-  async listSubscriptions(@Headers('x-team-id') teamId: string) {
+  async listSubscriptions(@ScopedTeamId() teamId: string) {
     const subscriptions = await this.zapierService.getSubscriptions(teamId);
     return { subscriptions };
   }
@@ -108,7 +119,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Poll for new links (Zapier polling trigger)' })
   async pollNewLinks(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('since') since?: string,
   ) {
     const links = await this.zapierService.getRecentLinks(
@@ -122,7 +133,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Poll for new clicks (Zapier polling trigger)' })
   async pollNewClicks(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('since') since?: string,
   ) {
     const clicks = await this.zapierService.getRecentClicks(
@@ -148,7 +159,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Create a short link (Zapier action)' })
   async createLink(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateLinkActionDto,
   ) {
     const result = await this.zapierService.createLink(teamId, dto);
@@ -162,7 +173,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Update a link (Zapier action)' })
   async updateLink(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() body: { linkId: string } & UpdateLinkActionDto,
   ) {
     const { linkId, ...data } = body;
@@ -177,7 +188,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Delete a link (Zapier action)' })
   async deleteLink(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() body: { linkId: string },
   ) {
     const result = await this.zapierService.deleteLink(teamId, body.linkId);
@@ -191,7 +202,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Get link details (Zapier action)' })
   async getLink(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() body: { linkId: string },
   ) {
     const result = await this.zapierService.getLink(teamId, body.linkId);
@@ -205,7 +216,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Get link statistics (Zapier action)' })
   async getLinkStats(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() body: { linkId: string },
   ) {
     const result = await this.zapierService.getLinkStats(teamId, body.linkId);
@@ -219,7 +230,7 @@ export class ZapierController {
   @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: 'Create a QR code (Zapier action)' })
   async createQr(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateQrActionDto,
   ) {
     const result = await this.zapierService.createQrCode(teamId, dto);

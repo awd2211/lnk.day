@@ -7,8 +7,9 @@ import {
   Body,
   Param,
   Query,
-  Headers,
   UseGuards,
+  ForbiddenException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,10 +17,21 @@ import {
   ApiBearerAuth,
   ApiResponse,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 
 import { WebhookEndpointService } from './webhook-endpoint.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  isPlatformAdmin,
+} from '@lnk/nestjs-common';
 import {
   CreateWebhookDto,
   UpdateWebhookDto,
@@ -29,36 +41,38 @@ import { WebhookEndpoint, WebhookEventType } from './entities/webhook-endpoint.e
 
 @ApiTags('webhooks')
 @Controller('webhooks')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class WebhookController {
   constructor(private readonly webhookEndpointService: WebhookEndpointService) {}
 
   @Post()
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '创建 Webhook 端点' })
   @ApiResponse({ status: 201, type: WebhookEndpoint })
   async create(
     @Body() dto: CreateWebhookDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<WebhookEndpoint> {
-    return this.webhookEndpointService.create(dto, userId, teamId || userId);
+    return this.webhookEndpointService.create(dto, user.id, teamId);
   }
 
   @Get()
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取 Webhook 列表' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async findAll(
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.webhookEndpointService.findAll(teamId || userId, { page, limit });
+    return this.webhookEndpointService.findAll(teamId, { page, limit });
   }
 
   @Get('events')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取支持的事件类型列表' })
   getEventTypes() {
     return {
@@ -70,65 +84,144 @@ export class WebhookController {
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取 Webhook 详情' })
-  async findOne(@Param('id') id: string): Promise<WebhookEndpoint> {
-    return this.webhookEndpointService.findOne(id);
+  @ApiParam({ name: 'id', type: String })
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<WebhookEndpoint> {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此 Webhook');
+    }
+    return webhook;
   }
 
   @Get(':id/deliveries')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取 Webhook 投递记录' })
+  @ApiParam({ name: 'id', type: String })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async getDeliveries(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此 Webhook');
+    }
     return this.webhookEndpointService.getDeliveries(id, { page, limit });
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '更新 Webhook' })
+  @ApiParam({ name: 'id', type: String })
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateWebhookDto,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<WebhookEndpoint> {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此 Webhook');
+    }
     return this.webhookEndpointService.update(id, dto);
   }
 
   @Post(':id/enable')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '启用 Webhook' })
-  async enable(@Param('id') id: string): Promise<WebhookEndpoint> {
+  @ApiParam({ name: 'id', type: String })
+  async enable(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<WebhookEndpoint> {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权操作此 Webhook');
+    }
     return this.webhookEndpointService.enable(id);
   }
 
   @Post(':id/disable')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '禁用 Webhook' })
-  async disable(@Param('id') id: string): Promise<WebhookEndpoint> {
+  @ApiParam({ name: 'id', type: String })
+  async disable(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<WebhookEndpoint> {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权操作此 Webhook');
+    }
     return this.webhookEndpointService.disable(id);
   }
 
   @Post(':id/regenerate-secret')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '重新生成 Webhook 密钥' })
-  async regenerateSecret(@Param('id') id: string) {
+  @ApiParam({ name: 'id', type: String })
+  async regenerateSecret(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权操作此 Webhook');
+    }
     return this.webhookEndpointService.regenerateSecret(id);
   }
 
   @Post(':id/test')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '发送测试 Webhook' })
-  async test(@Param('id') id: string, @Body() dto: TestWebhookDto) {
+  @ApiParam({ name: 'id', type: String })
+  async test(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TestWebhookDto,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权操作此 Webhook');
+    }
     return this.webhookEndpointService.testWebhook(id, dto.event);
   }
 
   @Post('deliveries/:deliveryId/retry')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '重试失败的投递' })
-  async retryDelivery(@Param('deliveryId') deliveryId: string) {
+  @ApiParam({ name: 'deliveryId', type: String })
+  async retryDelivery(@Param('deliveryId', ParseUUIDPipe) deliveryId: string) {
     return this.webhookEndpointService.retryDelivery(deliveryId);
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '删除 Webhook' })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
+  @ApiParam({ name: 'id', type: String })
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ message: string }> {
+    const webhook = await this.webhookEndpointService.findOne(id);
+    if (!isPlatformAdmin(user) && webhook.teamId !== teamId) {
+      throw new ForbiddenException('无权删除此 Webhook');
+    }
     await this.webhookEndpointService.remove(id);
     return { message: 'Webhook deleted successfully' };
   }

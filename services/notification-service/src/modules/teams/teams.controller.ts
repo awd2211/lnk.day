@@ -6,19 +6,20 @@ import {
   Delete,
   Body,
   Param,
-  Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { TeamsService, TeamsCard } from './teams.service';
 import { TeamsInstallationService, CreateTeamsInstallationDto, UpdateTeamsSettingsDto } from './teams-installation.service';
-
-// Simple auth guard placeholder
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
 
 class SendTeamsCardDto {
   webhookUrl: string;
@@ -125,16 +126,18 @@ export class TeamsController {
   // ========== Installation Management ==========
 
   @Get('installations')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all Teams installations for a team' })
-  async getInstallations(@Query('teamId') teamId: string) {
+  async getInstallations(@ScopedTeamId() teamId: string) {
     const installations = await this.installationService.findAllByTeam(teamId);
     return { installations };
   }
 
   @Post('installations')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new Teams installation' })
   async createInstallation(@Body() dto: CreateTeamsInstallationDto) {
@@ -143,24 +146,28 @@ export class TeamsController {
   }
 
   @Get('installations/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get a specific Teams installation' })
+  @ApiParam({ name: 'id', type: String })
   async getInstallation(
-    @Param('id') id: string,
-    @Query('teamId') teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
   ) {
     const installation = await this.installationService.findOne(id, teamId);
     return { installation };
   }
 
   @Put('installations/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a Teams installation' })
+  @ApiParam({ name: 'id', type: String })
   async updateInstallation(
-    @Param('id') id: string,
-    @Query('teamId') teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateTeamsSettingsDto,
   ) {
     const installation = await this.installationService.update(id, teamId, dto);
@@ -168,31 +175,36 @@ export class TeamsController {
   }
 
   @Delete('installations/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a Teams installation' })
+  @ApiParam({ name: 'id', type: String })
   async deleteInstallation(
-    @Param('id') id: string,
-    @Query('teamId') teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
   ) {
     await this.installationService.delete(id, teamId);
     return { success: true };
   }
 
   @Post('installations/:id/test')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Send a test notification' })
+  @ApiParam({ name: 'id', type: String })
   async testInstallation(
-    @Param('id') id: string,
-    @Query('teamId') teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
   ) {
     const success = await this.installationService.testNotification(id, teamId);
     return { success };
   }
 
   @Post('validate-webhook')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.INTEGRATIONS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Validate a Teams webhook URL' })
   async validateWebhook(@Body() body: { webhookUrl: string }) {

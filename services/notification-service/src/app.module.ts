@@ -11,6 +11,7 @@ import {
   VersionModule,
   TimeoutModule,
   LoggerModule,
+  AuthModule,
 } from '@lnk/nestjs-common';
 import { EmailModule } from './modules/email/email.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
@@ -34,6 +35,7 @@ import { NotificationConfigModule } from './modules/config/config.module';
     VersionModule,
     TimeoutModule,
     LoggerModule,
+    AuthModule.forValidation(),
     RabbitMQModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],

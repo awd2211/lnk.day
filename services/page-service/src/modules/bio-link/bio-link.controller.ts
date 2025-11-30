@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  Headers,
   UseGuards,
   Req,
   ParseUUIDPipe,
@@ -23,7 +22,17 @@ import {
 import { Request } from 'express';
 
 import { BioLinkService } from './bio-link.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  Public,
+} from '@lnk/nestjs-common';
 import {
   CreateBioLinkDto,
   UpdateBioLinkDto,
@@ -36,42 +45,42 @@ import { BioLink, BioLinkItem, BioLinkStatus } from './entities/bio-link.entity'
 
 @ApiTags('bio-links')
 @Controller('bio-links')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class BioLinkController {
   constructor(private readonly bioLinkService: BioLinkService) {}
 
   // ==================== Bio Link Management ====================
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_CREATE)
   @ApiOperation({ summary: '创建 Bio Link 页面' })
   @ApiResponse({ status: 201, type: BioLinkResponseDto })
   async create(
     @Body() dto: CreateBioLinkDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<BioLink> {
-    return this.bioLinkService.create(dto, userId, teamId || userId);
+    return this.bioLinkService.create(dto, user.id, teamId);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取 Bio Link 列表' })
   @ApiQuery({ name: 'status', enum: BioLinkStatus, required: false })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async findAll(
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
     @Query('status') status?: BioLinkStatus,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.bioLinkService.findAll(teamId || userId, { status, page, limit });
+    return this.bioLinkService.findAll(teamId, { status, page, limit });
   }
 
   @Get('check-username/:username')
+  @Public()
   @ApiOperation({ summary: '检查用户名是否可用' })
   async checkUsername(@Param('username') username: string) {
     const available = await this.bioLinkService.checkUsernameAvailability(username);
@@ -79,8 +88,7 @@ export class BioLinkController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取 Bio Link 详情' })
   @ApiParam({ name: 'id', type: String })
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<BioLink> {
@@ -88,64 +96,56 @@ export class BioLinkController {
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '更新 Bio Link' })
   @ApiParam({ name: 'id', type: String })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateBioLinkDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<BioLink> {
-    return this.bioLinkService.update(id, dto, userId, teamId || userId);
+    return this.bioLinkService.update(id, dto, user.id, teamId);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_DELETE)
   @ApiOperation({ summary: '删除 Bio Link' })
   @ApiParam({ name: 'id', type: String })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<{ message: string }> {
-    await this.bioLinkService.remove(id, teamId || userId);
+    await this.bioLinkService.remove(id, teamId);
     return { message: 'Bio link deleted successfully' };
   }
 
   @Post(':id/publish')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '发布 Bio Link' })
   @ApiParam({ name: 'id', type: String })
   async publish(
     @Param('id', ParseUUIDPipe) id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BioLink> {
-    return this.bioLinkService.publish(id, teamId || userId);
+    return this.bioLinkService.publish(id, teamId);
   }
 
   @Post(':id/unpublish')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '取消发布 Bio Link' })
   @ApiParam({ name: 'id', type: String })
   async unpublish(
     @Param('id', ParseUUIDPipe) id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BioLink> {
-    return this.bioLinkService.unpublish(id, teamId || userId);
+    return this.bioLinkService.unpublish(id, teamId);
   }
 
   // ==================== Bio Link Items ====================
 
   @Get(':id/items')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取 Bio Link 的链接列表' })
   @ApiParam({ name: 'id', type: String })
   async getItems(
@@ -155,8 +155,7 @@ export class BioLinkController {
   }
 
   @Post(':id/items')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '添加链接到 Bio Link' })
   @ApiParam({ name: 'id', type: String })
   async addItem(
@@ -167,8 +166,7 @@ export class BioLinkController {
   }
 
   @Put(':id/items/:itemId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '更新链接' })
   @ApiParam({ name: 'id', type: String })
   @ApiParam({ name: 'itemId', type: String })
@@ -180,8 +178,7 @@ export class BioLinkController {
   }
 
   @Delete(':id/items/:itemId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_DELETE)
   @ApiOperation({ summary: '删除链接' })
   @ApiParam({ name: 'id', type: String })
   @ApiParam({ name: 'itemId', type: String })
@@ -193,8 +190,7 @@ export class BioLinkController {
   }
 
   @Post(':id/items/reorder')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '重新排序链接' })
   @ApiParam({ name: 'id', type: String })
   async reorderItems(
@@ -205,8 +201,7 @@ export class BioLinkController {
   }
 
   @Post(':id/items/:itemId/toggle-visibility')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_EDIT)
   @ApiOperation({ summary: '切换链接显示/隐藏状态' })
   async toggleItemVisibility(
     @Param('itemId', ParseUUIDPipe) itemId: string,
@@ -215,8 +210,7 @@ export class BioLinkController {
   }
 
   @Post(':id/items/:itemId/duplicate')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.PAGES_CREATE)
   @ApiOperation({ summary: '复制链接' })
   async duplicateItem(
     @Param('itemId', ParseUUIDPipe) itemId: string,
@@ -227,8 +221,7 @@ export class BioLinkController {
   // ==================== Analytics ====================
 
   @Get(':id/analytics')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取 Bio Link 分析数据' })
   @ApiParam({ name: 'id', type: String })
   @ApiQuery({ name: 'days', required: false, description: '统计天数，默认30天' })

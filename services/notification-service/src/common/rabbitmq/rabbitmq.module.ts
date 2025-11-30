@@ -1,4 +1,4 @@
-import { Module, Global, Logger } from '@nestjs/common';
+import { Module, Global, Logger, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as amqplib from 'amqplib';
 import { NotificationEventConsumer } from './notification-event.consumer';
@@ -11,12 +11,20 @@ import {
   NOTIFICATION_SLACK_QUEUE,
   NOTIFICATION_WEBHOOK_QUEUE,
 } from './rabbitmq.constants';
+import { EmailModule } from '../../modules/email/email.module';
+import { SlackModule } from '../../modules/slack/slack.module';
+import { WebhookModule } from '../../modules/webhook/webhook.module';
 
 export { RABBITMQ_CONNECTION, RABBITMQ_CHANNEL };
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    forwardRef(() => EmailModule),
+    forwardRef(() => SlackModule),
+    forwardRef(() => WebhookModule),
+  ],
   providers: [
     {
       provide: RABBITMQ_CONNECTION,

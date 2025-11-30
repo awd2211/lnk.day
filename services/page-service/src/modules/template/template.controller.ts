@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  Headers,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,10 +15,21 @@ import {
   ApiBearerAuth,
   ApiResponse,
   ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger';
 
 import { TemplateService } from './template.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  AdminOnly,
+  ScopedTeamId,
+  CurrentUser,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 import {
   CreateTemplateDto,
   UpdateTemplateDto,
@@ -32,6 +42,8 @@ import { PageTemplate, TemplateCategory } from './entities/page-template.entity'
 @Controller('templates')
 export class TemplateController {
   constructor(private readonly templateService: TemplateService) {}
+
+  // ========== Public endpoints (no auth required) ==========
 
   @Get()
   @ApiOperation({ summary: '获取模板列表' })
@@ -80,20 +92,24 @@ export class TemplateController {
     return this.templateService.findOne(id);
   }
 
+  // ========== Admin endpoints ==========
+
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @AdminOnly()
   @ApiOperation({ summary: '创建模板（管理员）' })
   async create(
     @Body() dto: CreateTemplateDto,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PageTemplate> {
-    return this.templateService.create(dto, userId);
+    return this.templateService.create(dto, user.sub);
   }
 
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @AdminOnly()
   @ApiOperation({ summary: '更新模板（管理员）' })
   async update(
     @Param('id') id: string,
@@ -103,88 +119,102 @@ export class TemplateController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @AdminOnly()
   @ApiOperation({ summary: '删除模板（管理员）' })
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     await this.templateService.remove(id);
     return { message: 'Template deleted successfully' };
   }
 
+  // ========== User endpoints ==========
+
   @Post(':id/use')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.PAGES_CREATE)
   @ApiOperation({ summary: '使用模板创建页面' })
   async useTemplate(
     @Param('id') templateId: string,
     @Body() dto: CreatePageFromTemplateDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
     return this.templateService.createPageFromTemplate(
       templateId,
       dto.name,
       dto.slug,
-      userId,
-      teamId || userId,
+      user.sub,
+      teamId,
     );
   }
 
   // ========== Favorites ==========
 
   @Get('favorites/me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取我收藏的模板' })
   async getMyFavorites(
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.templateService.getUserFavorites(userId, { page, limit });
+    return this.templateService.getUserFavorites(user.sub, { page, limit });
   }
 
   @Post(':id/favorite')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '收藏模板' })
   async addFavorite(
     @Param('id') templateId: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ message: string }> {
-    await this.templateService.addFavorite(userId, templateId);
+    await this.templateService.addFavorite(user.sub, templateId);
     return { message: 'Template favorited successfully' };
   }
 
   @Delete(':id/favorite')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '取消收藏模板' })
   async removeFavorite(
     @Param('id') templateId: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ message: string }> {
-    await this.templateService.removeFavorite(userId, templateId);
+    await this.templateService.removeFavorite(user.sub, templateId);
     return { message: 'Template unfavorited successfully' };
   }
 
   @Get(':id/favorited')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '检查是否已收藏' })
   async checkFavorited(
     @Param('id') templateId: string,
-    @Headers('x-user-id') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ favorited: boolean }> {
-    const favorited = await this.templateService.isFavorited(userId, templateId);
+    const favorited = await this.templateService.isFavorited(user.sub, templateId);
     return { favorited };
   }
 
   // ========== Admin ==========
 
   @Post('seed')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
   @ApiBearerAuth()
+  @AdminOnly()
   @ApiOperation({ summary: '初始化默认模板（管理员）' })
   async seedTemplates(): Promise<{ message: string }> {
     await this.templateService.seedDefaultTemplates();

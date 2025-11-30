@@ -6,28 +6,35 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { GoalsService, CreateGoalDto } from './goals.service';
 import { GoalType, GoalStatus, NotificationChannels } from './entities/campaign-goal.entity';
 
 @ApiTags('campaign-goals')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('campaigns/:campaignId/goals')
 export class GoalsController {
   constructor(private readonly goalsService: GoalsService) {}
 
   @Post()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '创建营销活动目标' })
   create(
     @Param('campaignId') campaignId: string,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body()
     body: {
       name: string;
@@ -55,42 +62,48 @@ export class GoalsController {
   }
 
   @Get()
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取营销活动所有目标' })
   findAll(@Param('campaignId') campaignId: string) {
     return this.goalsService.findByCampaign(campaignId);
   }
 
   @Get('summary')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取营销活动目标汇总' })
   getSummary(@Param('campaignId') campaignId: string) {
     return this.goalsService.getCampaignGoalsSummary(campaignId);
   }
 
   @Get(':goalId')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取单个目标详情' })
   findOne(@Param('goalId') goalId: string) {
     return this.goalsService.findOne(goalId);
   }
 
   @Get(':goalId/progress')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取目标进度详情（包含预测）' })
   getProgress(@Param('goalId') goalId: string) {
     return this.goalsService.getGoalProgress(goalId);
   }
 
   @Get(':goalId/notifications')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
   @ApiOperation({ summary: '获取目标通知历史' })
   getNotifications(@Param('goalId') goalId: string) {
     return this.goalsService.getNotificationHistory(goalId);
   }
 
   @Put(':goalId')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '更新目标设置' })
   update(
     @Param('goalId') goalId: string,
@@ -118,7 +131,8 @@ export class GoalsController {
   }
 
   @Post(':goalId/progress')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '更新目标进度' })
   updateProgress(
     @Param('goalId') goalId: string,
@@ -132,18 +146,20 @@ export class GoalsController {
   }
 
   @Delete(':goalId')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '删除目标' })
   delete(@Param('goalId') goalId: string) {
     return this.goalsService.delete(goalId);
   }
 
   @Post('defaults')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
   @ApiOperation({ summary: '创建默认目标集' })
   createDefaults(
     @Param('campaignId') campaignId: string,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() body: { notifications: NotificationChannels },
   ) {
     return this.goalsService.createDefaultGoals(campaignId, teamId, body.notifications);
@@ -151,12 +167,15 @@ export class GoalsController {
 }
 
 @ApiTags('goals')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('goals')
 export class GoalsStandaloneController {
   constructor(private readonly goalsService: GoalsService) {}
 
   @Post('bulk-update')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '批量更新活动目标进度' })
   bulkUpdate(
     @Body()

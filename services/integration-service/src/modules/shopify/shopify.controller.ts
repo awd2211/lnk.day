@@ -17,14 +17,15 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiExcludeEndpoint, ApiHeader } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { ShopifyService } from './shopify.service';
-
-// Placeholder auth guard
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
 
 // DTOs
 class UpdateSettingsDto {
@@ -49,6 +50,8 @@ class BulkGenerateLinksDto {
 
 @ApiTags('shopify')
 @Controller('shopify')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class ShopifyController {
   constructor(private readonly shopifyService: ShopifyService) {}
 
@@ -100,7 +103,7 @@ export class ShopifyController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Get Shopify connection status' })
-  async getConnection(@Headers('x-team-id') teamId: string) {
+  async getConnection(@ScopedTeamId() teamId: string) {
     const connection = await this.shopifyService.getConnection(teamId);
 
     if (!connection) {
@@ -124,7 +127,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Update Shopify integration settings' })
   async updateSettings(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateSettingsDto,
   ) {
     const connection = await this.shopifyService.updateSettings(teamId, dto);
@@ -135,7 +138,7 @@ export class ShopifyController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Disconnect Shopify integration' })
-  async disconnect(@Headers('x-team-id') teamId: string) {
+  async disconnect(@ScopedTeamId() teamId: string) {
     await this.shopifyService.disconnect(teamId);
     return { success: true };
   }
@@ -149,7 +152,7 @@ export class ShopifyController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'page_info', required: false })
   async getProducts(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
     @Query('page_info') pageInfo?: string,
   ) {
@@ -165,7 +168,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Get a specific product' })
   async getProduct(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('productId') productId: string,
   ) {
     return this.shopifyService.getProduct(teamId, parseInt(productId));
@@ -180,7 +183,7 @@ export class ShopifyController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'status', required: false })
   async getOrders(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
@@ -197,7 +200,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Get a specific order' })
   async getOrder(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('orderId') orderId: string,
   ) {
     return this.shopifyService.getOrder(teamId, parseInt(orderId));
@@ -210,7 +213,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Generate short link for a product' })
   async generateProductLink(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('productId') productId: string,
     @Body() dto: GenerateLinkDto,
   ) {
@@ -227,7 +230,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Generate short links for multiple products' })
   async bulkGenerateLinks(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: BulkGenerateLinksDto,
   ) {
     const results = await this.shopifyService.bulkGenerateProductLinks(
@@ -248,7 +251,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Get product metafields' })
   async getProductMetafields(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('productId') productId: string,
   ) {
     const metafields = await this.shopifyService.getProductMetafields(
@@ -263,7 +266,7 @@ export class ShopifyController {
   
   @ApiOperation({ summary: 'Save product metafield' })
   async saveProductMetafield(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('productId') productId: string,
     @Body() body: { key: string; value: string },
   ) {

@@ -1,28 +1,74 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  isPlatformAdmin,
+  Public,
+} from '@lnk/nestjs-common';
 import { DeepLinkService } from './deeplink.service';
 
 @ApiTags('deeplinks')
 @Controller('deeplinks')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class DeepLinkController {
   constructor(private readonly deepLinkService: DeepLinkService) {}
 
+  @Get()
+  @RequirePermissions(Permission.DEEPLINKS_VIEW)
+  @ApiOperation({ summary: '获取深度链接列表' })
+  @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的深度链接' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  findAll(
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('all') all?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+  ) {
+    // 平台管理员可以查看所有深度链接
+    const shouldQueryAll = all === 'true' && isPlatformAdmin(user);
+    return this.deepLinkService.findAll(shouldQueryAll ? undefined : teamId, { page, limit, status });
+  }
+
   @Post()
+  @RequirePermissions(Permission.DEEPLINKS_CREATE)
   @ApiOperation({ summary: '创建深度链接配置' })
-  create(@Body() data: any) {
-    return this.deepLinkService.create(data);
+  create(
+    @Body() data: any,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
+  ) {
+    return this.deepLinkService.create({ ...data, userId: user.id, teamId });
   }
 
   @Get('link/:linkId')
+  @RequirePermissions(Permission.DEEPLINKS_VIEW)
   @ApiOperation({ summary: '通过linkId获取深度链接配置' })
-  findByLinkId(@Param('linkId') linkId: string) {
-    return this.deepLinkService.findByLinkId(linkId);
+  async findByLinkId(
+    @Param('linkId') linkId: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const deepLink = await this.deepLinkService.findByLinkId(linkId);
+    if (deepLink && !isPlatformAdmin(user) && deepLink.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此深度链接配置');
+    }
+    return deepLink;
   }
 
   @Get('resolve/:linkId')
+  @Public()
   @ApiOperation({ summary: '解析深度链接跳转URL' })
   async resolveUrl(
     @Param('linkId') linkId: string,
@@ -38,14 +84,33 @@ export class DeepLinkController {
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.DEEPLINKS_EDIT)
   @ApiOperation({ summary: '更新深度链接配置' })
-  update(@Param('id') id: string, @Body() data: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() data: any,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const deepLink = await this.deepLinkService.findOne(id);
+    if (!isPlatformAdmin(user) && deepLink.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此深度链接配置');
+    }
     return this.deepLinkService.update(id, data);
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.DEEPLINKS_DELETE)
   @ApiOperation({ summary: '删除深度链接配置' })
-  remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const deepLink = await this.deepLinkService.findOne(id);
+    if (!isPlatformAdmin(user) && deepLink.teamId !== teamId) {
+      throw new ForbiddenException('无权删除此深度链接配置');
+    }
     return this.deepLinkService.remove(id);
   }
 }

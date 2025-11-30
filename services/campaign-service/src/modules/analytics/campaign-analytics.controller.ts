@@ -4,13 +4,19 @@ import {
   Post,
   Body,
   Param,
-  Headers,
   Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { Response } from 'express';
 import { CampaignAnalyticsService } from './campaign-analytics.service';
 
@@ -102,16 +108,19 @@ export class CampaignAnalyticsController {
 }
 
 @ApiTags('team-analytics')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('analytics')
 export class TeamAnalyticsController {
   constructor(private readonly analyticsService: CampaignAnalyticsService) {}
 
   @Get('overview')
-  @ApiBearerAuth()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取团队营销活动总览' })
   @ApiQuery({ name: 'range', required: false })
   getTeamOverview(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('range') range?: string,
   ) {
     return this.analyticsService.getTeamOverview(teamId, { range });

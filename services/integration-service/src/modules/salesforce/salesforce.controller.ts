@@ -14,14 +14,15 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
 import { Response } from 'express';
 
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { SalesforceService } from './salesforce.service';
-
-// Placeholder auth guard
-class JwtAuthGuard {
-  canActivate() {
-    return true;
-  }
-}
 
 // DTOs
 class UpdateSettingsDto {
@@ -68,6 +69,8 @@ class QueryDto {
 
 @ApiTags('salesforce')
 @Controller('salesforce')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class SalesforceController {
   constructor(private readonly salesforceService: SalesforceService) {}
 
@@ -118,7 +121,7 @@ export class SalesforceController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Get Salesforce connection status' })
-  async getConnection(@Headers('x-team-id') teamId: string) {
+  async getConnection(@ScopedTeamId() teamId: string) {
     const connection = await this.salesforceService.getConnection(teamId);
 
     if (!connection) {
@@ -140,7 +143,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Update Salesforce integration settings' })
   async updateSettings(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: UpdateSettingsDto,
   ) {
     const connection = await this.salesforceService.updateSettings(teamId, dto);
@@ -151,7 +154,7 @@ export class SalesforceController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Disconnect Salesforce integration' })
-  async disconnect(@Headers('x-team-id') teamId: string) {
+  async disconnect(@ScopedTeamId() teamId: string) {
     await this.salesforceService.disconnect(teamId);
     return { success: true };
   }
@@ -164,7 +167,7 @@ export class SalesforceController {
   @ApiOperation({ summary: 'Get Salesforce leads' })
   @ApiQuery({ name: 'limit', required: false })
   async getLeads(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
   ) {
     return this.salesforceService.getLeads(teamId, limit ? parseInt(limit) : 100);
@@ -175,7 +178,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Search lead by email' })
   async searchLead(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('email') email: string,
   ) {
     const lead = await this.salesforceService.getLeadByEmail(teamId, email);
@@ -187,7 +190,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Create a Salesforce lead' })
   async createLead(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateLeadDto,
   ) {
     return this.salesforceService.createLead(teamId, dto);
@@ -198,7 +201,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Update a Salesforce lead' })
   async updateLead(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('leadId') leadId: string,
     @Body() data: Record<string, any>,
   ) {
@@ -214,7 +217,7 @@ export class SalesforceController {
   @ApiOperation({ summary: 'Get Salesforce contacts' })
   @ApiQuery({ name: 'limit', required: false })
   async getContacts(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
   ) {
     return this.salesforceService.getContacts(teamId, limit ? parseInt(limit) : 100);
@@ -225,7 +228,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Search contact by email' })
   async searchContact(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('email') email: string,
   ) {
     const contact = await this.salesforceService.getContactByEmail(teamId, email);
@@ -237,7 +240,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Create a Salesforce contact' })
   async createContact(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateContactDto,
   ) {
     return this.salesforceService.createContact(teamId, dto);
@@ -251,7 +254,7 @@ export class SalesforceController {
   @ApiOperation({ summary: 'Get Salesforce opportunities' })
   @ApiQuery({ name: 'limit', required: false })
   async getOpportunities(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('limit') limit?: string,
   ) {
     return this.salesforceService.getOpportunities(teamId, limit ? parseInt(limit) : 100);
@@ -262,7 +265,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Update opportunity stage' })
   async updateOpportunityStage(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('opportunityId') opportunityId: string,
     @Body('stageName') stageName: string,
   ) {
@@ -277,7 +280,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Create a Salesforce task' })
   async createTask(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreateTaskDto,
   ) {
     return this.salesforceService.createTask(teamId, dto);
@@ -290,7 +293,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Execute SOQL query' })
   async query(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body() dto: QueryDto,
   ) {
     return this.salesforceService.query(teamId, dto.soql);
@@ -302,7 +305,7 @@ export class SalesforceController {
   @ApiHeader({ name: 'x-team-id', required: true })
   
   @ApiOperation({ summary: 'Get available Salesforce objects' })
-  async getObjects(@Headers('x-team-id') teamId: string) {
+  async getObjects(@ScopedTeamId() teamId: string) {
     const objects = await this.salesforceService.getAvailableObjects(teamId);
     return { objects };
   }
@@ -312,7 +315,7 @@ export class SalesforceController {
   
   @ApiOperation({ summary: 'Describe a Salesforce object' })
   async describeObject(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Param('objectName') objectName: string,
   ) {
     return this.salesforceService.describeObject(teamId, objectName);
@@ -323,7 +326,7 @@ export class SalesforceController {
   @Post('track-click')
   @ApiOperation({ summary: 'Track link click in Salesforce (internal)' })
   async trackClick(
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Body()
     body: {
       linkId: string;
