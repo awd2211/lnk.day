@@ -28,16 +28,22 @@ export class JwtAuthGuard implements CanActivate {
       }
       const payload = jwt.verify(token, secret) as any;
 
-      // Attach user info to request
+      // Attach user info to request (including team context from JWT scope)
       request.user = {
         id: payload.sub || payload.userId,
         email: payload.email,
         roles: payload.roles || [],
+        teamId: payload.scope?.teamId || payload.teamId,
+        teamRole: payload.scope?.teamRole || payload.teamRole,
+        permissions: payload.permissions || [],
       };
 
-      // Set headers for downstream services
+      // Set headers for downstream services (from JWT, not client headers)
       request.headers['x-user-id'] = request.user.id;
       request.headers['x-user-email'] = request.user.email;
+      if (request.user.teamId) {
+        request.headers['x-team-id'] = request.user.teamId;
+      }
 
       return true;
     } catch (error: any) {

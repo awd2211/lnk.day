@@ -16,7 +16,7 @@ async function bootstrap() {
   // API 版本管理
   app.enableVersioning({
     type: VersioningType.URI,
-    prefix: 'v',
+    prefix: 'api/v',
     defaultVersion: '1',
   });
 
@@ -49,8 +49,8 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
-  logger.log(`API Gateway running on port ${port}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`API Gateway running on port ${port} (0.0.0.0)`);
 
   // 优雅关闭处理
   const shutdown = async (signal: string) => {

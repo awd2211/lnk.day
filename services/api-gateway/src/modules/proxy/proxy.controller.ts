@@ -13,7 +13,7 @@ import { ProxyService } from './proxy.service';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @ApiTags('proxy')
-@Controller('api')
+@Controller()
 export class ProxyController {
   constructor(private readonly proxyService: ProxyService) {}
 
@@ -22,9 +22,9 @@ export class ProxyController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Proxy requests to backend services' })
   async proxyRequest(@Req() req: Request, @Res() res: Response) {
-    // req.path 在 NestJS 版本控制下是完整路径如 /v1/api/links
-    // 需要去掉版本前缀 /v1/api，然后加上 /api 前缀
-    const resourcePath = req.path.replace(/^\/v\d+\/api/, ''); // /v1/api/links -> /links
+    // req.path 在 NestJS 版本控制下是完整路径如 /api/v1/links
+    // 需要去掉版本前缀 /api/v1，然后加上 /api 前缀
+    const resourcePath = req.path.replace(/^\/api\/v\d+/, ''); // /api/v1/links -> /links
     const path = `/api${resourcePath}`;
     const route = this.proxyService.findRoute(path);
 
@@ -38,11 +38,13 @@ export class ProxyController {
     }
 
     try {
-      // Forward relevant headers
+      const user = (req as any).user;
+
+      // Forward relevant headers - use JWT claims, NOT client-supplied headers
       const headers: Record<string, string> = {
         'content-type': req.headers['content-type'] || 'application/json',
-        'x-user-id': (req as any).user?.id || '',
-        'x-user-email': (req as any).user?.email || '',
+        'x-user-id': user?.id || '',
+        'x-user-email': user?.email || '',
         'x-request-id': req.headers['x-request-id'] as string || crypto.randomUUID(),
         'x-forwarded-for': req.ip || '',
       };
@@ -52,9 +54,10 @@ export class ProxyController {
         headers['authorization'] = req.headers.authorization as string;
       }
 
-      // Add team ID if present
-      if (req.headers['x-team-id']) {
-        headers['x-team-id'] = req.headers['x-team-id'] as string;
+      // Add team ID from JWT claims (set by OptionalJwtAuthGuard), NOT from client headers
+      // This prevents IDOR attacks where client could spoof x-team-id header
+      if (user?.teamId) {
+        headers['x-team-id'] = user.teamId;
       }
 
       const result = await this.proxyService.proxyRequest(

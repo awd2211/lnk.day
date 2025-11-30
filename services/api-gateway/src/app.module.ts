@@ -1,7 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { MetricsModule, MetricsInterceptor, TracingModule, CircuitBreakerModule, HttpRetryModule, VersionModule, TimeoutModule, LoggerModule } from '@lnk/nestjs-common';
 
@@ -15,7 +14,6 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ScheduleModule.forRoot(),
     MetricsModule.forRoot({
       serviceName: 'api-gateway',
     }),
@@ -50,9 +48,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       ],
     }),
     AuthModule,
-    ProxyModule,
-    HealthModule,
+    HealthModule,  // 放在 ProxyModule 之前，确保 /health 路由优先匹配
     RateLimitModule,
+    ProxyModule,   // 代理模块最后导入，因为它使用 @All('*') 捕获所有请求
   ],
   providers: [
     {
