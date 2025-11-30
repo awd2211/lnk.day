@@ -1,6 +1,11 @@
+// ============================================================================
+// 资源权限（用户门户使用）
+// ============================================================================
+
 /**
- * 系统权限定义
+ * 资源权限定义
  * 采用 resource:action 格式
+ * 用于用户门户的团队内权限控制
  */
 export enum Permission {
   // ========== 链接管理 ==========
@@ -70,10 +75,63 @@ export enum Permission {
   SETTINGS_EDIT = 'settings:edit',
 }
 
+// ============================================================================
+// 管理权限（管理后台使用）
+// ============================================================================
+
 /**
- * 预设角色权限模板
+ * 管理员权限定义
+ * 采用 admin:resource:action 格式
+ * 用于平台管理后台的权限控制
  */
-export const PRESET_ROLE_PERMISSIONS: Record<string, Permission[]> = {
+export enum AdminPermission {
+  // ========== 用户管理 ==========
+  ADMIN_USERS_VIEW = 'admin:users:view',
+  ADMIN_USERS_EDIT = 'admin:users:edit',
+  ADMIN_USERS_SUSPEND = 'admin:users:suspend',
+  ADMIN_USERS_DELETE = 'admin:users:delete',
+
+  // ========== 团队管理 ==========
+  ADMIN_TEAMS_VIEW = 'admin:teams:view',
+  ADMIN_TEAMS_EDIT = 'admin:teams:edit',
+  ADMIN_TEAMS_DELETE = 'admin:teams:delete',
+
+  // ========== 内容审核 ==========
+  ADMIN_MODERATION_VIEW = 'admin:moderation:view',
+  ADMIN_MODERATION_ACTION = 'admin:moderation:action',
+
+  // ========== 全局资源访问（跨团队）==========
+  ADMIN_RESOURCES_VIEW = 'admin:resources:view',
+  ADMIN_RESOURCES_EDIT = 'admin:resources:edit',
+  ADMIN_RESOURCES_DELETE = 'admin:resources:delete',
+
+  // ========== 域名管理 ==========
+  ADMIN_DOMAINS_VIEW = 'admin:domains:view',
+  ADMIN_DOMAINS_APPROVE = 'admin:domains:approve',
+  ADMIN_DOMAINS_REVOKE = 'admin:domains:revoke',
+
+  // ========== 系统配置 ==========
+  ADMIN_SYSTEM_CONFIG = 'admin:system:config',
+  ADMIN_SYSTEM_METRICS = 'admin:system:metrics',
+  ADMIN_SYSTEM_LOGS = 'admin:system:logs',
+
+  // ========== 账单与订阅 ==========
+  ADMIN_BILLING_VIEW = 'admin:billing:view',
+  ADMIN_BILLING_MANAGE = 'admin:billing:manage',
+
+  // ========== 管理员管理 ==========
+  ADMIN_ADMINS_VIEW = 'admin:admins:view',
+  ADMIN_ADMINS_MANAGE = 'admin:admins:manage',
+}
+
+// ============================================================================
+// 角色权限模板
+// ============================================================================
+
+/**
+ * 团队角色权限模板
+ */
+export const TEAM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   OWNER: Object.values(Permission), // 所有权限
 
   ADMIN: [
@@ -114,6 +172,47 @@ export const PRESET_ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.TEAM_VIEW,
   ],
 };
+
+/**
+ * 管理员角色权限模板
+ */
+export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
+  SUPER_ADMIN: Object.values(AdminPermission), // 所有管理权限
+
+  ADMIN: [
+    AdminPermission.ADMIN_USERS_VIEW,
+    AdminPermission.ADMIN_USERS_EDIT,
+    AdminPermission.ADMIN_USERS_SUSPEND,
+    AdminPermission.ADMIN_TEAMS_VIEW,
+    AdminPermission.ADMIN_TEAMS_EDIT,
+    AdminPermission.ADMIN_MODERATION_VIEW,
+    AdminPermission.ADMIN_MODERATION_ACTION,
+    AdminPermission.ADMIN_RESOURCES_VIEW,
+    AdminPermission.ADMIN_RESOURCES_EDIT,
+    AdminPermission.ADMIN_DOMAINS_VIEW,
+    AdminPermission.ADMIN_DOMAINS_APPROVE,
+    AdminPermission.ADMIN_SYSTEM_METRICS,
+    AdminPermission.ADMIN_SYSTEM_LOGS,
+    AdminPermission.ADMIN_BILLING_VIEW,
+    AdminPermission.ADMIN_ADMINS_VIEW,
+  ],
+
+  OPERATOR: [
+    AdminPermission.ADMIN_MODERATION_VIEW,
+    AdminPermission.ADMIN_MODERATION_ACTION,
+    AdminPermission.ADMIN_RESOURCES_VIEW,
+    AdminPermission.ADMIN_SYSTEM_METRICS,
+  ],
+};
+
+/**
+ * @deprecated 使用 TEAM_ROLE_PERMISSIONS 替代
+ */
+export const PRESET_ROLE_PERMISSIONS = TEAM_ROLE_PERMISSIONS;
+
+// ============================================================================
+// 权限分组（用于 UI 显示）
+// ============================================================================
 
 /**
  * 权限分组（用于 UI 显示）
@@ -232,22 +331,107 @@ export const PERMISSION_GROUPS = {
 };
 
 /**
- * 检查用户是否拥有指定权限
+ * 管理权限分组（用于 UI 显示）
  */
-export function hasPermission(userPermissions: Permission[], required: Permission): boolean {
+export const ADMIN_PERMISSION_GROUPS = {
+  users: {
+    name: '用户管理',
+    icon: 'users',
+    permissions: [
+      { key: AdminPermission.ADMIN_USERS_VIEW, name: '查看用户', description: '查看平台用户列表' },
+      { key: AdminPermission.ADMIN_USERS_EDIT, name: '编辑用户', description: '编辑用户信息' },
+      { key: AdminPermission.ADMIN_USERS_SUSPEND, name: '停用用户', description: '停用或恢复用户账号' },
+      { key: AdminPermission.ADMIN_USERS_DELETE, name: '删除用户', description: '永久删除用户账号' },
+    ],
+  },
+  teams: {
+    name: '团队管理',
+    icon: 'building',
+    permissions: [
+      { key: AdminPermission.ADMIN_TEAMS_VIEW, name: '查看团队', description: '查看所有团队' },
+      { key: AdminPermission.ADMIN_TEAMS_EDIT, name: '编辑团队', description: '编辑团队设置' },
+      { key: AdminPermission.ADMIN_TEAMS_DELETE, name: '删除团队', description: '删除团队' },
+    ],
+  },
+  moderation: {
+    name: '内容审核',
+    icon: 'shield',
+    permissions: [
+      { key: AdminPermission.ADMIN_MODERATION_VIEW, name: '查看审核', description: '查看待审核内容' },
+      { key: AdminPermission.ADMIN_MODERATION_ACTION, name: '审核操作', description: '批准或拒绝内容' },
+    ],
+  },
+  resources: {
+    name: '资源管理',
+    icon: 'database',
+    permissions: [
+      { key: AdminPermission.ADMIN_RESOURCES_VIEW, name: '查看资源', description: '查看所有用户资源' },
+      { key: AdminPermission.ADMIN_RESOURCES_EDIT, name: '编辑资源', description: '编辑任意资源' },
+      { key: AdminPermission.ADMIN_RESOURCES_DELETE, name: '删除资源', description: '删除任意资源' },
+    ],
+  },
+  domains: {
+    name: '域名管理',
+    icon: 'globe',
+    permissions: [
+      { key: AdminPermission.ADMIN_DOMAINS_VIEW, name: '查看域名', description: '查看所有自定义域名' },
+      { key: AdminPermission.ADMIN_DOMAINS_APPROVE, name: '审批域名', description: '审批域名申请' },
+      { key: AdminPermission.ADMIN_DOMAINS_REVOKE, name: '撤销域名', description: '撤销域名授权' },
+    ],
+  },
+  system: {
+    name: '系统管理',
+    icon: 'settings',
+    permissions: [
+      { key: AdminPermission.ADMIN_SYSTEM_CONFIG, name: '系统配置', description: '修改系统配置' },
+      { key: AdminPermission.ADMIN_SYSTEM_METRICS, name: '系统指标', description: '查看系统监控指标' },
+      { key: AdminPermission.ADMIN_SYSTEM_LOGS, name: '系统日志', description: '查看系统日志' },
+    ],
+  },
+  billing: {
+    name: '账单管理',
+    icon: 'credit-card',
+    permissions: [
+      { key: AdminPermission.ADMIN_BILLING_VIEW, name: '查看账单', description: '查看所有账单' },
+      { key: AdminPermission.ADMIN_BILLING_MANAGE, name: '管理账单', description: '管理订阅和退款' },
+    ],
+  },
+  admins: {
+    name: '管理员管理',
+    icon: 'user-cog',
+    permissions: [
+      { key: AdminPermission.ADMIN_ADMINS_VIEW, name: '查看管理员', description: '查看管理员列表' },
+      { key: AdminPermission.ADMIN_ADMINS_MANAGE, name: '管理管理员', description: '创建和编辑管理员' },
+    ],
+  },
+};
+
+// ============================================================================
+// 权限检查函数
+// ============================================================================
+
+/**
+ * 检查是否拥有指定权限
+ */
+export function hasPermission(userPermissions: string[], required: string): boolean {
   return userPermissions.includes(required);
 }
 
 /**
- * 检查用户是否拥有任意一个权限
+ * 检查是否拥有任意一个权限
  */
-export function hasAnyPermission(userPermissions: Permission[], required: Permission[]): boolean {
+export function hasAnyPermission(userPermissions: string[], required: string[]): boolean {
   return required.some(p => userPermissions.includes(p));
 }
 
 /**
- * 检查用户是否拥有所有指定权限
+ * 检查是否拥有所有指定权限
  */
-export function hasAllPermissions(userPermissions: Permission[], required: Permission[]): boolean {
+export function hasAllPermissions(userPermissions: string[], required: string[]): boolean {
   return required.every(p => userPermissions.includes(p));
 }
+
+/**
+ * 合并权限类型
+ */
+export type AnyPermission = Permission | AdminPermission;

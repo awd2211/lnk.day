@@ -1,9 +1,24 @@
+/**
+ * @deprecated 此文件已废弃，请使用 guards/permission.guard.ts 中的新版本
+ *
+ * 迁移指南：
+ * - @RequirePermissions -> import { RequirePermissions } from '@lnk/nestjs-common'
+ * - @RequireAnyPermission -> import { RequireAnyPermission } from '@lnk/nestjs-common'
+ * - @PublicPermission -> import { PublicPermission } from '@lnk/nestjs-common'
+ * - @OwnerOnly -> import { OwnerOnly } from '@lnk/nestjs-common'
+ *
+ * 新版本支持统一的用户/管理员权限检查
+ */
+
 import { SetMetadata, applyDecorators } from '@nestjs/common';
 import { Permission } from './permissions.enum';
 
+/** @deprecated 使用 guards/permission.guard.ts 中的 PERMISSIONS_KEY */
 export const PERMISSIONS_KEY = 'permissions';
+/** @deprecated 使用 guards/permission.guard.ts 中的 PERMISSIONS_MODE_KEY */
 export const PERMISSIONS_MODE_KEY = 'permissions_mode';
 
+/** @deprecated */
 export type PermissionMode = 'all' | 'any';
 
 /**

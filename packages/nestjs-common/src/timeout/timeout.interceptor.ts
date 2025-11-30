@@ -26,7 +26,7 @@ export const Timeout = (milliseconds: number) =>
  */
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
-  constructor(private readonly reflector: Reflector) {}
+  private readonly reflector = new Reflector();
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     // 检查是否有自定义超时设置

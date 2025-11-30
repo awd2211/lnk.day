@@ -2,26 +2,22 @@ import {
   Injectable,
   ExecutionContext,
   UnauthorizedException,
-  SetMetadata,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Observable } from 'rxjs';
+import { IS_PUBLIC_KEY, Public } from '../guards/decorators';
 
-export const IS_PUBLIC_KEY = 'isPublic';
-
-/**
- * 标记路由为公开访问（跳过 JWT 验证）
- */
-export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+// 重新导出以保持向后兼容
+export { IS_PUBLIC_KEY, Public };
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(
-    private reflector: Reflector,
-    private configService: ConfigService,
-  ) {
+  // 创建自己的 Reflector 实例，因为 Reflector 在非根模块中可能不可用
+  private readonly reflector = new Reflector();
+
+  constructor(private configService: ConfigService) {
     super();
   }
 
@@ -49,9 +45,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       // Check Bearer token matches internal API key
       if (authHeader === `Bearer ${internalApiKey}`) {
         request.user = {
+          id: 'system',
           sub: 'system',
           email: 'system@internal',
+          type: 'admin',
+          scope: { level: 'platform' },
           role: 'INTERNAL',
+          permissions: [],
         };
         return true;
       }
@@ -59,9 +59,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       // Check x-internal-api-key header
       if (xInternalKey === internalApiKey) {
         request.user = {
+          id: 'system',
           sub: 'system',
           email: 'system@internal',
+          type: 'admin',
+          scope: { level: 'platform' },
           role: 'INTERNAL',
+          permissions: [],
         };
         return true;
       }

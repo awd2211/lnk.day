@@ -16,6 +16,7 @@ export * from './config';
 // 认证和授权
 export * from './auth';
 export * from './permissions';
+export * from './guards';
 
 // API
 export * from './swagger';
