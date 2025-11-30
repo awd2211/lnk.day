@@ -5,8 +5,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { AdminRoleEntity } from '../../system/entities/admin-role.entity';
 
+/**
+ * @deprecated 使用 AdminRoleEntity 代替，保留用于向后兼容
+ */
 export enum AdminRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
@@ -29,9 +35,23 @@ export class Admin {
   @Column()
   password: string;
 
+  /**
+   * @deprecated 使用 roleEntity 代替
+   */
   @Column({ type: 'enum', enum: AdminRole, default: AdminRole.OPERATOR })
   @Index()
   role: AdminRole;
+
+  /**
+   * 关联的角色实体（新的权限系统）
+   */
+  @ManyToOne(() => AdminRoleEntity, { nullable: true, eager: true })
+  @JoinColumn({ name: 'role_id' })
+  roleEntity?: AdminRoleEntity;
+
+  @Column({ nullable: true })
+  @Index()
+  roleId?: string;
 
   @Column({ default: true })
   @Index()

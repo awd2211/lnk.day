@@ -112,6 +112,41 @@ export class ProxyService {
     };
   }
 
+  // Helper to get team names map
+  private async getTeamNamesMap(teamIds: string[], auth?: string): Promise<Record<string, string>> {
+    if (!teamIds.length) return {};
+    try {
+      const result = await this.forward('user', '/teams', {
+        params: { limit: 100 },
+        headers: auth ? { Authorization: auth } : {},
+      });
+      const teams = result?.items || result?.teams || result?.data || [];
+      const map: Record<string, string> = {};
+      for (const team of teams) {
+        if (teamIds.includes(team.id)) {
+          map[team.id] = team.name;
+        }
+      }
+      return map;
+    } catch (error) {
+      this.logger.warn('Failed to fetch team names', error);
+      return {};
+    }
+  }
+
+  // Helper to enrich items with team names
+  private async enrichWithTeamNames<T extends { teamId?: string }>(
+    items: T[],
+    auth?: string,
+  ): Promise<(T & { teamName?: string })[]> {
+    const teamIds = [...new Set(items.map((item) => item.teamId).filter(Boolean))] as string[];
+    const teamNames = await this.getTeamNamesMap(teamIds, auth);
+    return items.map((item) => ({
+      ...item,
+      teamName: item.teamId ? teamNames[item.teamId] || item.teamId : undefined,
+    }));
+  }
+
   // User Service Proxies
   async getUsers(params?: { page?: number; limit?: number; search?: string }, auth?: string): Promise<any> {
     const result = await this.forward('user', '/users', { params, headers: auth ? { Authorization: auth } : {} });
@@ -137,6 +172,14 @@ export class ProxyService {
 
   async getTeam(id: string, auth?: string): Promise<any> {
     return this.forward('user', `/teams/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async updateTeamStatus(id: string, status: 'active' | 'suspended', auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${id}/status`, {
+      method: 'PATCH',
+      data: { status },
+      headers: auth ? { Authorization: auth } : {},
+    });
   }
 
   // Link Service Proxies
@@ -174,11 +217,25 @@ export class ProxyService {
   }
 
   // Campaign Service Proxies
-  async getCampaigns(teamId: string, params?: { status?: string }, auth?: string): Promise<any> {
-    return this.forward('campaign', '/campaigns', {
-      params,
-      headers: { 'x-team-id': teamId, ...(auth ? { Authorization: auth } : {}) },
+  async getCampaigns(teamId?: string, params?: { status?: string; page?: number; limit?: number }, auth?: string): Promise<any> {
+    const headers: Record<string, string> = auth ? { Authorization: auth } : {};
+    if (teamId) {
+      headers['x-team-id'] = teamId;
+    }
+    // 如果没有传 teamId，则查询所有活动（管理员模式）
+    const result = await this.forward('campaign', '/campaigns', {
+      params: { ...params, all: !teamId },
+      headers,
     });
+    // Enrich with team names
+    const items = result?.items || result?.campaigns || result?.data || [];
+    const enrichedItems = await this.enrichWithTeamNames(items, auth);
+    return {
+      items: enrichedItems,
+      total: result?.total || items.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
   }
 
   async getCampaign(id: string, auth?: string): Promise<any> {
@@ -470,11 +527,25 @@ export class ProxyService {
   }
 
   // QR Code Service Proxies (uses /qr-records endpoint from tracking controller)
-  async getQRCodes(teamId: string, params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
-    return this.forward('qr', '/qr-records', {
-      params,
-      headers: { 'x-team-id': teamId, ...(auth ? { Authorization: auth } : {}) },
+  async getQRCodes(teamId?: string, params?: { page?: number; limit?: number; style?: string }, auth?: string): Promise<any> {
+    const headers: Record<string, string> = auth ? { Authorization: auth } : {};
+    if (teamId) {
+      headers['x-team-id'] = teamId;
+    }
+    // 如果没有传 teamId，则查询所有二维码（管理员模式）
+    const result = await this.forward('qr', '/qr-records', {
+      params: { ...params, all: !teamId },
+      headers,
     });
+    // Enrich with team names
+    const items = result?.items || result?.qrcodes || result?.data || [];
+    const enrichedItems = await this.enrichWithTeamNames(items, auth);
+    return {
+      items: enrichedItems,
+      total: result?.total || items.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
   }
 
   async getQRCode(id: string, auth?: string): Promise<any> {
@@ -491,11 +562,25 @@ export class ProxyService {
   }
 
   // Deep Link Service Proxies
-  async getDeepLinks(teamId: string, params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
-    return this.forward('deeplink', '/deeplinks', {
-      params,
-      headers: { 'x-team-id': teamId, ...(auth ? { Authorization: auth } : {}) },
+  async getDeepLinks(teamId?: string, params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
+    const headers: Record<string, string> = auth ? { Authorization: auth } : {};
+    if (teamId) {
+      headers['x-team-id'] = teamId;
+    }
+    // 如果没有传 teamId，则查询所有深度链接（管理员模式）
+    const result = await this.forward('deeplink', '/deeplinks', {
+      params: { ...params, all: !teamId },
+      headers,
     });
+    // Enrich with team names
+    const items = result?.items || result?.deeplinks || result?.data || [];
+    const enrichedItems = await this.enrichWithTeamNames(items, auth);
+    return {
+      items: enrichedItems,
+      total: result?.total || items.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
   }
 
   async getDeepLink(id: string, auth?: string): Promise<any> {
@@ -513,10 +598,19 @@ export class ProxyService {
 
   // Domain Service Proxies
   async getDomains(params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
-    return this.forward('domain', '/domains', {
+    const result = await this.forward('domain', '/domains', {
       params,
       headers: auth ? { Authorization: auth } : {},
     });
+    // Normalize and enrich with team names
+    const items = result?.items || result?.domains || result?.data || [];
+    const enrichedItems = await this.enrichWithTeamNames(items, auth);
+    return {
+      items: enrichedItems,
+      total: result?.total || items.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
   }
 
   async getDomain(id: string, auth?: string): Promise<any> {

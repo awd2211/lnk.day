@@ -129,8 +129,6 @@ export class SystemService {
           let healthPath = '/api/v1/health'; // 默认 NestJS 服务
           if (['analytics-service', 'redirect-service', 'datastream-service'].includes(service.name)) {
             healthPath = '/health'; // Python/Go 服务
-          } else if (service.name === 'api-gateway') {
-            healthPath = '/v1/health'; // api-gateway 使用不同的版本前缀
           }
           const response = await this.httpClient.get(`${service.url}${healthPath}`, {
             timeout: 3000,

@@ -9,7 +9,10 @@ import * as crypto from 'crypto';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
 import { firstValueFrom } from 'rxjs';
-import { Admin } from './entities/admin.entity';
+import { Admin, AdminRole } from './entities/admin.entity';
+import { ADMIN_ROLE_PERMISSIONS, UnifiedJwtPayload, Scope } from '@lnk/nestjs-common';
+import { AdminRoleService } from '../system/admin-role.service';
+import { DEFAULT_ROLE_PERMISSIONS } from '../system/entities/admin-role.entity';
 
 @Injectable()
 export class AdminService {
@@ -23,6 +26,7 @@ export class AdminService {
     private readonly jwtService: JwtService,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly adminRoleService: AdminRoleService,
   ) {
     this.notificationServiceUrl = this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020');
     this.consoleUrl = this.configService.get('CONSOLE_URL', 'http://localhost:60011');
@@ -69,7 +73,31 @@ export class AdminService {
     admin.lastLoginAt = new Date();
     await this.adminRepository.save(admin);
 
-    const payload = { sub: admin.id, email: admin.email, role: admin.role };
+    // 构建统一格式的 JWT payload
+    const scope: Scope = { level: 'platform' };
+
+    // 优先使用新的角色实体权限，否则回退到旧的枚举权限
+    let permissions: string[] = [];
+    let roleName = admin.role;
+
+    if (admin.roleEntity) {
+      permissions = admin.roleEntity.permissions;
+      roleName = admin.roleEntity.name as AdminRole;
+    } else {
+      // 回退到旧的权限系统
+      permissions = DEFAULT_ROLE_PERMISSIONS[admin.role] || ADMIN_ROLE_PERMISSIONS[admin.role] || [];
+    }
+
+    const payload: Omit<UnifiedJwtPayload, 'iat' | 'exp'> = {
+      sub: admin.id,
+      email: admin.email,
+      name: admin.name,
+      type: 'admin',
+      scope,
+      role: roleName,
+      permissions,
+    };
+
     const expiresIn = rememberMe ? '7d' : '8h';
     return {
       admin: {
@@ -77,6 +105,12 @@ export class AdminService {
         email: admin.email,
         name: admin.name,
         role: admin.role,
+        roleEntity: admin.roleEntity ? {
+          id: admin.roleEntity.id,
+          name: admin.roleEntity.name,
+          color: admin.roleEntity.color,
+        } : undefined,
+        permissions,
         twoFactorEnabled: admin.twoFactorEnabled,
       },
       accessToken: this.jwtService.sign(payload, { expiresIn }),

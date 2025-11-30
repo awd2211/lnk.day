@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Patch, Param, Query, Body, UseGuards, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
+import { CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 import { ProxyService } from './proxy.service';
 
 @ApiTags('proxy')
@@ -56,6 +57,16 @@ export class ProxyController {
   @ApiOperation({ summary: '获取团队详情' })
   getTeam(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.getTeam(id, auth);
+  }
+
+  @Patch('teams/:id/status')
+  @ApiOperation({ summary: '更新团队状态' })
+  updateTeamStatus(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { status: 'active' | 'suspended' },
+  ) {
+    return this.proxyService.updateTeamStatus(id, data.status, auth);
   }
 
   // Link Management
@@ -129,10 +140,18 @@ export class ProxyController {
   // Campaign Management
   @Get('campaigns')
   @ApiOperation({ summary: '获取营销活动列表' })
-  @ApiQuery({ name: 'teamId', required: true })
+  @ApiQuery({ name: 'teamId', required: false, description: '可选，不传则返回所有团队的活动' })
   @ApiQuery({ name: 'status', required: false })
-  getCampaigns(@Headers('authorization') auth: string, @Query('teamId') teamId: string, @Query('status') status?: string) {
-    return this.proxyService.getCampaigns(teamId, { status }, auth);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getCampaigns(
+    @Headers('authorization') auth: string,
+    @Query('teamId') teamId?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.proxyService.getCampaigns(teamId, { status, page, limit }, auth);
   }
 
   @Get('campaigns/:id')
@@ -176,6 +195,20 @@ export class ProxyController {
   }
 
   // Extended User Management
+  @Patch('users/:id/status')
+  @ApiOperation({ summary: '更新用户状态' })
+  toggleUserStatus(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { status: 'active' | 'disabled' },
+  ) {
+    if (data.status === 'disabled') {
+      return this.proxyService.suspendUser(id, undefined, auth);
+    } else {
+      return this.proxyService.unsuspendUser(id, auth);
+    }
+  }
+
   @Post('users/:id/suspend')
   @ApiOperation({ summary: '暂停用户' })
   suspendUser(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data?: { reason?: string }) {
@@ -358,46 +391,42 @@ export class ProxyController {
   @ApiOperation({ summary: '通过审核' })
   approveFlaggedLink(
     @Headers('authorization') auth: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-user-name') userName: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() data?: { note?: string },
   ) {
-    return this.proxyService.approveFlaggedLink(id, data, userId, userName, auth);
+    return this.proxyService.approveFlaggedLink(id, data, user.sub, user.email || '', auth);
   }
 
   @Post('moderation/flagged-links/:id/block')
   @ApiOperation({ summary: '封禁链接' })
   blockFlaggedLink(
     @Headers('authorization') auth: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-user-name') userName: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() data?: { note?: string; blockUser?: boolean },
   ) {
-    return this.proxyService.blockFlaggedLink(id, data, userId, userName, auth);
+    return this.proxyService.blockFlaggedLink(id, data, user.sub, user.email || '', auth);
   }
 
   @Post('moderation/flagged-links/bulk-approve')
   @ApiOperation({ summary: '批量通过审核' })
   bulkApproveFlaggedLinks(
     @Headers('authorization') auth: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-user-name') userName: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() data: { ids: string[]; note?: string },
   ) {
-    return this.proxyService.bulkApproveFlaggedLinks(data, userId, userName, auth);
+    return this.proxyService.bulkApproveFlaggedLinks(data, user.sub, user.email || '', auth);
   }
 
   @Post('moderation/flagged-links/bulk-block')
   @ApiOperation({ summary: '批量封禁链接' })
   bulkBlockFlaggedLinks(
     @Headers('authorization') auth: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-user-name') userName: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() data: { ids: string[]; note?: string; blockUsers?: boolean },
   ) {
-    return this.proxyService.bulkBlockFlaggedLinks(data, userId, userName, auth);
+    return this.proxyService.bulkBlockFlaggedLinks(data, user.sub, user.email || '', auth);
   }
 
   @Get('moderation/blocked-users')
@@ -455,16 +484,18 @@ export class ProxyController {
   // QR Code Management
   @Get('qrcodes')
   @ApiOperation({ summary: '获取二维码列表' })
-  @ApiQuery({ name: 'teamId', required: true })
+  @ApiQuery({ name: 'teamId', required: false, description: '可选，不传则返回所有团队的二维码' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'style', required: false })
   getQRCodes(
     @Headers('authorization') auth: string,
-    @Query('teamId') teamId: string,
+    @Query('teamId') teamId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('style') style?: string,
   ) {
-    return this.proxyService.getQRCodes(teamId, { page, limit }, auth);
+    return this.proxyService.getQRCodes(teamId, { page, limit, style }, auth);
   }
 
   @Get('qrcodes/:id')
@@ -482,16 +513,18 @@ export class ProxyController {
   // Deep Link Management
   @Get('deeplinks')
   @ApiOperation({ summary: '获取深度链接列表' })
-  @ApiQuery({ name: 'teamId', required: true })
+  @ApiQuery({ name: 'teamId', required: false, description: '可选，不传则返回所有团队的深度链接' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
   getDeepLinks(
     @Headers('authorization') auth: string,
-    @Query('teamId') teamId: string,
+    @Query('teamId') teamId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('status') status?: string,
   ) {
-    return this.proxyService.getDeepLinks(teamId, { page, limit }, auth);
+    return this.proxyService.getDeepLinks(teamId, { page, limit, status }, auth);
   }
 
   @Get('deeplinks/:id')
