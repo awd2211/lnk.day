@@ -149,7 +149,7 @@ export const proxyService = {
     api.get(`/proxy/analytics/teams/${teamId}`, { params }),
 
   // Campaigns
-  getCampaigns: (teamId: string, params?: { status?: string }) =>
+  getCampaigns: (teamId?: string, params?: { status?: string; page?: number; limit?: number }) =>
     api.get('/proxy/campaigns', { params: { teamId, ...params } }),
   getCampaign: (id: string) => api.get(`/proxy/campaigns/${id}`),
   deleteCampaign: (id: string) => api.delete(`/proxy/campaigns/${id}`),

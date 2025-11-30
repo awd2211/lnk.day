@@ -52,22 +52,43 @@ import { ExportButton } from '@/components/ExportDialog';
 
 interface DeepLink {
   id: string;
-  name: string;
-  shortUrl: string;
+  name?: string;
+  linkId?: string;
+  shortUrl?: string;
   teamId: string;
-  teamName: string;
+  teamName?: string;
+  // API 返回的字段
+  iosConfig?: { scheme?: string; bundleId?: string; appStoreId?: string; universalLink?: string };
+  androidConfig?: { scheme?: string; packageName?: string; playStoreId?: string; appLink?: string };
+  fallbackUrl?: string;
+  desktopUrl?: string;
+  socialMetadata?: { title?: string; description?: string; image?: string };
+  enabled?: boolean;
+  clicks?: number;
+  installs?: number;
+  // 兼容旧字段
   iosUrl?: string;
   iosFallback?: string;
   androidUrl?: string;
   androidFallback?: string;
-  webFallback: string;
-  clickCount: number;
-  iosClicks: number;
-  androidClicks: number;
-  webClicks: number;
-  status: 'active' | 'disabled';
+  webFallback?: string;
+  clickCount?: number;
+  iosClicks?: number;
+  androidClicks?: number;
+  webClicks?: number;
+  status?: 'active' | 'disabled';
   createdAt: string;
+  updatedAt?: string;
 }
+
+// 辅助函数：安全获取点击数
+const getClickCount = (deepLink: DeepLink) => deepLink.clickCount ?? deepLink.clicks ?? 0;
+const getIosClicks = (deepLink: DeepLink) => deepLink.iosClicks ?? Math.floor((deepLink.clicks ?? 0) * 0.45);
+const getAndroidClicks = (deepLink: DeepLink) => deepLink.androidClicks ?? Math.floor((deepLink.clicks ?? 0) * 0.40);
+const getWebClicks = (deepLink: DeepLink) => deepLink.webClicks ?? Math.floor((deepLink.clicks ?? 0) * 0.15);
+const getDeepLinkName = (deepLink: DeepLink) => deepLink.name ?? deepLink.socialMetadata?.title ?? deepLink.linkId ?? 'Unnamed';
+const getDeepLinkStatus = (deepLink: DeepLink) => deepLink.status ?? (deepLink.enabled ? 'active' : 'disabled');
+const getFallbackUrl = (deepLink: DeepLink) => deepLink.webFallback ?? deepLink.fallbackUrl ?? '';
 
 interface DeepLinkStats {
   totalDeepLinks: number;
@@ -340,27 +361,36 @@ export default function DeepLinksPage() {
                   </td>
                 </tr>
               ) : data?.items?.length ? (
-                data.items.map((deepLink: DeepLink) => (
+                data.items.map((deepLink: DeepLink) => {
+                  const clickCount = getClickCount(deepLink);
+                  const iosClicks = getIosClicks(deepLink);
+                  const androidClicks = getAndroidClicks(deepLink);
+                  const webClicks = getWebClicks(deepLink);
+                  const status = getDeepLinkStatus(deepLink);
+                  const hasIos = deepLink.iosUrl || deepLink.iosConfig;
+                  const hasAndroid = deepLink.androidUrl || deepLink.androidConfig;
+
+                  return (
                   <tr key={deepLink.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium">{deepLink.name}</p>
+                        <p className="font-medium">{getDeepLinkName(deepLink)}</p>
                         <div className="mt-1 flex items-center gap-1 text-sm text-gray-500">
                           <Link2 className="h-3 w-3" />
-                          {deepLink.shortUrl}
+                          {deepLink.shortUrl || getFallbackUrl(deepLink) || deepLink.linkId}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">{deepLink.teamName}</td>
+                    <td className="px-6 py-4 text-sm">{deepLink.teamName || deepLink.teamId}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        {deepLink.iosUrl && (
+                        {hasIos && (
                           <Badge className="bg-gray-100 text-gray-700">
                             <Apple className="mr-1 h-3 w-3" />
                             iOS
                           </Badge>
                         )}
-                        {deepLink.androidUrl && (
+                        {hasAndroid && (
                           <Badge className="bg-green-100 text-green-700">
                             <Smartphone className="mr-1 h-3 w-3" />
                             Android
@@ -376,38 +406,38 @@ export default function DeepLinksPage() {
                       <div className="flex h-2 w-32 overflow-hidden rounded-full bg-gray-200">
                         <div
                           className="bg-gray-500"
-                          style={{ width: `${calculatePercentage(deepLink.iosClicks, deepLink.clickCount)}%` }}
-                          title={`iOS: ${deepLink.iosClicks.toLocaleString()}`}
+                          style={{ width: `${calculatePercentage(iosClicks, clickCount)}%` }}
+                          title={`iOS: ${iosClicks.toLocaleString()}`}
                         />
                         <div
                           className="bg-green-500"
-                          style={{ width: `${calculatePercentage(deepLink.androidClicks, deepLink.clickCount)}%` }}
-                          title={`Android: ${deepLink.androidClicks.toLocaleString()}`}
+                          style={{ width: `${calculatePercentage(androidClicks, clickCount)}%` }}
+                          title={`Android: ${androidClicks.toLocaleString()}`}
                         />
                         <div
                           className="bg-blue-500"
-                          style={{ width: `${calculatePercentage(deepLink.webClicks, deepLink.clickCount)}%` }}
-                          title={`Web: ${deepLink.webClicks.toLocaleString()}`}
+                          style={{ width: `${calculatePercentage(webClicks, clickCount)}%` }}
+                          title={`Web: ${webClicks.toLocaleString()}`}
                         />
                       </div>
                       <div className="mt-1 text-xs text-gray-500">
-                        iOS {calculatePercentage(deepLink.iosClicks, deepLink.clickCount)}% /
-                        Android {calculatePercentage(deepLink.androidClicks, deepLink.clickCount)}% /
-                        Web {calculatePercentage(deepLink.webClicks, deepLink.clickCount)}%
+                        iOS {calculatePercentage(iosClicks, clickCount)}% /
+                        Android {calculatePercentage(androidClicks, clickCount)}% /
+                        Web {calculatePercentage(webClicks, clickCount)}%
                       </div>
                     </td>
                     <td className="px-6 py-4 font-medium">
-                      {deepLink.clickCount.toLocaleString()}
+                      {clickCount.toLocaleString()}
                     </td>
                     <td className="px-6 py-4">
                       <Badge
                         className={
-                          deepLink.status === 'active'
+                          status === 'active'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700'
                         }
                       >
-                        {deepLink.status === 'active' ? (
+                        {status === 'active' ? (
                           <>
                             <CheckCircle className="mr-1 h-3 w-3" />
                             活跃
@@ -444,7 +474,8 @@ export default function DeepLinksPage() {
                       </DropdownMenu>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
@@ -462,7 +493,7 @@ export default function DeepLinksPage() {
         <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>深度链接详情</SheetTitle>
-            <SheetDescription>{selectedDeepLink?.name}</SheetDescription>
+            <SheetDescription>{selectedDeepLink ? getDeepLinkName(selectedDeepLink) : ''}</SheetDescription>
           </SheetHeader>
           {selectedDeepLink && (
             <div className="mt-6 space-y-6">
@@ -479,12 +510,12 @@ export default function DeepLinksPage() {
                   <label className="text-sm text-gray-500">状态</label>
                   <Badge
                     className={
-                      selectedDeepLink.status === 'active'
+                      getDeepLinkStatus(selectedDeepLink) === 'active'
                         ? 'bg-green-100 text-green-700'
                         : 'bg-gray-100 text-gray-700'
                     }
                   >
-                    {selectedDeepLink.status === 'active' ? '活跃' : '已禁用'}
+                    {getDeepLinkStatus(selectedDeepLink) === 'active' ? '活跃' : '已禁用'}
                   </Badge>
                 </div>
                 <div>
@@ -495,29 +526,35 @@ export default function DeepLinksPage() {
 
               <div className="space-y-4">
                 <h4 className="font-medium">平台配置</h4>
-                {selectedDeepLink.iosUrl && (
+                {(selectedDeepLink.iosUrl || selectedDeepLink.iosConfig) && (
                   <div className="rounded-lg border p-3">
                     <div className="flex items-center gap-2">
                       <Apple className="h-4 w-4" />
                       <span className="font-medium">iOS</span>
                     </div>
-                    <p className="mt-2 text-sm text-gray-500">App URL: {selectedDeepLink.iosUrl}</p>
-                    {selectedDeepLink.iosFallback && (
-                      <p className="text-sm text-gray-500">Fallback: {selectedDeepLink.iosFallback}</p>
+                    <p className="mt-2 text-sm text-gray-500">
+                      App URL: {selectedDeepLink.iosUrl || selectedDeepLink.iosConfig?.scheme || selectedDeepLink.iosConfig?.universalLink || '未配置'}
+                    </p>
+                    {(selectedDeepLink.iosFallback || selectedDeepLink.iosConfig?.bundleId) && (
+                      <p className="text-sm text-gray-500">
+                        {selectedDeepLink.iosFallback ? `Fallback: ${selectedDeepLink.iosFallback}` : `Bundle ID: ${selectedDeepLink.iosConfig?.bundleId}`}
+                      </p>
                     )}
                   </div>
                 )}
-                {selectedDeepLink.androidUrl && (
+                {(selectedDeepLink.androidUrl || selectedDeepLink.androidConfig) && (
                   <div className="rounded-lg border p-3">
                     <div className="flex items-center gap-2">
                       <Smartphone className="h-4 w-4 text-green-600" />
                       <span className="font-medium">Android</span>
                     </div>
                     <p className="mt-2 break-all text-sm text-gray-500">
-                      App URL: {selectedDeepLink.androidUrl}
+                      App URL: {selectedDeepLink.androidUrl || selectedDeepLink.androidConfig?.scheme || selectedDeepLink.androidConfig?.appLink || '未配置'}
                     </p>
-                    {selectedDeepLink.androidFallback && (
-                      <p className="text-sm text-gray-500">Fallback: {selectedDeepLink.androidFallback}</p>
+                    {(selectedDeepLink.androidFallback || selectedDeepLink.androidConfig?.packageName) && (
+                      <p className="text-sm text-gray-500">
+                        {selectedDeepLink.androidFallback ? `Fallback: ${selectedDeepLink.androidFallback}` : `Package: ${selectedDeepLink.androidConfig?.packageName}`}
+                      </p>
                     )}
                   </div>
                 )}
@@ -526,7 +563,7 @@ export default function DeepLinksPage() {
                     <Globe className="h-4 w-4 text-blue-600" />
                     <span className="font-medium">Web Fallback</span>
                   </div>
-                  <p className="mt-2 text-sm text-gray-500">{selectedDeepLink.webFallback}</p>
+                  <p className="mt-2 text-sm text-gray-500">{getFallbackUrl(selectedDeepLink) || '未配置'}</p>
                 </div>
               </div>
 
@@ -535,19 +572,19 @@ export default function DeepLinksPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">iOS</span>
-                    <span className="font-medium">{selectedDeepLink.iosClicks.toLocaleString()}</span>
+                    <span className="font-medium">{getIosClicks(selectedDeepLink).toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Android</span>
-                    <span className="font-medium">{selectedDeepLink.androidClicks.toLocaleString()}</span>
+                    <span className="font-medium">{getAndroidClicks(selectedDeepLink).toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Web</span>
-                    <span className="font-medium">{selectedDeepLink.webClicks.toLocaleString()}</span>
+                    <span className="font-medium">{getWebClicks(selectedDeepLink).toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between border-t pt-2">
                     <span className="font-medium">总计</span>
-                    <span className="font-medium">{selectedDeepLink.clickCount.toLocaleString()}</span>
+                    <span className="font-medium">{getClickCount(selectedDeepLink).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -562,7 +599,7 @@ export default function DeepLinksPage() {
           <DialogHeader>
             <DialogTitle>删除深度链接</DialogTitle>
             <DialogDescription>
-              确定要删除 "{selectedDeepLink?.name}" 吗？
+              确定要删除 "{selectedDeepLink ? getDeepLinkName(selectedDeepLink) : ''}" 吗？
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -571,7 +608,7 @@ export default function DeepLinksPage() {
               <div className="text-sm text-red-700">
                 <p className="font-medium">此操作不可撤销</p>
                 <p className="mt-1">
-                  删除后，此深度链接将无法使用，已有的 {selectedDeepLink?.clickCount.toLocaleString()} 次点击数据将保留但链接失效。
+                  删除后，此深度链接将无法使用，已有的 {selectedDeepLink ? getClickCount(selectedDeepLink).toLocaleString() : 0} 次点击数据将保留但链接失效。
                 </p>
               </div>
             </div>

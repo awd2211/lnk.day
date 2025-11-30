@@ -25,6 +25,7 @@ import QRCodesPage from '@/pages/QRCodesPage';
 import DeepLinksPage from '@/pages/DeepLinksPage';
 import PagesPage from '@/pages/PagesPage';
 import RolesPage from '@/pages/RolesPage';
+import AdminRolesPage from '@/pages/AdminRolesPage';
 import AdminProfilePage from '@/pages/AdminProfilePage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
 import NotificationsPage from '@/pages/NotificationsPage';
@@ -57,6 +58,7 @@ function App() {
         <Route path="audit-logs" element={<AuditLogsPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="system" element={<SystemPage />} />
+        <Route path="admin-roles" element={<AdminRolesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<AdminProfilePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />

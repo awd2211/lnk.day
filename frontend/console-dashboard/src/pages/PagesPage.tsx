@@ -54,16 +54,20 @@ import { ExportButton } from '@/components/ExportDialog';
 
 interface LandingPage {
   id: string;
-  title: string;
+  title?: string;
+  name?: string;
   slug: string;
   teamId: string;
-  teamName: string;
-  type: 'bio' | 'landing' | 'link-in-bio' | 'custom';
+  teamName?: string;
+  type: 'bio' | 'landing' | 'link-in-bio' | 'link_in_bio' | 'form' | 'custom';
   status: 'published' | 'draft' | 'archived';
   template?: string;
-  viewCount: number;
-  clickCount: number;
-  linkCount: number;
+  templateId?: string;
+  views?: number;
+  uniqueViews?: number;
+  viewCount?: number;
+  clickCount?: number;
+  linkCount?: number;
   customDomain?: string;
   createdAt: string;
   updatedAt: string;
@@ -83,6 +87,8 @@ const typeConfig: Record<string, { label: string; color: string }> = {
   bio: { label: 'Bio 页面', color: 'bg-blue-100 text-blue-700' },
   landing: { label: '落地页', color: 'bg-green-100 text-green-700' },
   'link-in-bio': { label: 'Link in Bio', color: 'bg-purple-100 text-purple-700' },
+  'link_in_bio': { label: 'Link in Bio', color: 'bg-purple-100 text-purple-700' },
+  form: { label: '表单页', color: 'bg-indigo-100 text-indigo-700' },
   custom: { label: '自定义', color: 'bg-orange-100 text-orange-700' },
 };
 
@@ -260,6 +266,11 @@ export default function PagesPage() {
     return ((clicks / views) * 100).toFixed(1);
   };
 
+  // 安全获取视图数（兼容不同API字段名）
+  const getViewCount = (page: LandingPage) => page.viewCount ?? page.views ?? page.uniqueViews ?? 0;
+  const getClickCount = (page: LandingPage) => page.clickCount ?? 0;
+  const getPageTitle = (page: LandingPage) => page.title ?? page.name ?? page.slug;
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
@@ -387,7 +398,7 @@ export default function PagesPage() {
                     <tr key={landingPage.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium">{landingPage.title}</p>
+                          <p className="font-medium">{getPageTitle(landingPage)}</p>
                           <div className="mt-1 flex items-center gap-2 text-sm text-gray-500">
                             <span>/{landingPage.slug}</span>
                             {landingPage.customDomain && (
@@ -398,7 +409,7 @@ export default function PagesPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">{landingPage.teamName}</td>
+                      <td className="px-6 py-4 text-sm">{landingPage.teamName ?? '-'}</td>
                       <td className="px-6 py-4">
                         <Badge className={typeConfig[landingPage.type]?.color}>
                           {typeConfig[landingPage.type]?.label}
@@ -412,12 +423,12 @@ export default function PagesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <span className="font-medium">{landingPage.viewCount.toLocaleString()}</span>
+                          <span className="font-medium">{getViewCount(landingPage).toLocaleString()}</span>
                           <span className="text-gray-500"> / </span>
-                          <span className="font-medium">{landingPage.clickCount.toLocaleString()}</span>
+                          <span className="font-medium">{getClickCount(landingPage).toLocaleString()}</span>
                         </div>
                         <p className="text-xs text-gray-500">
-                          {calculateClickRate(landingPage.clickCount, landingPage.viewCount)}% 点击率
+                          {calculateClickRate(getClickCount(landingPage), getViewCount(landingPage))}% 点击率
                         </p>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
@@ -478,14 +489,14 @@ export default function PagesPage() {
         <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>页面详情</SheetTitle>
-            <SheetDescription>{selectedPage?.title}</SheetDescription>
+            <SheetDescription>{selectedPage ? getPageTitle(selectedPage) : ''}</SheetDescription>
           </SheetHeader>
           {selectedPage && (
             <div className="mt-6 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-500">标题</label>
-                  <p className="font-medium">{selectedPage.title}</p>
+                  <p className="font-medium">{getPageTitle(selectedPage)}</p>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">Slug</label>
@@ -493,7 +504,7 @@ export default function PagesPage() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">团队</label>
-                  <p className="font-medium">{selectedPage.teamName}</p>
+                  <p className="font-medium">{selectedPage.teamName ?? '-'}</p>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">类型</label>
@@ -525,15 +536,15 @@ export default function PagesPage() {
                 <h4 className="mb-3 font-medium">统计数据</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="rounded-lg bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold">{selectedPage.viewCount.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{getViewCount(selectedPage).toLocaleString()}</p>
                     <p className="text-xs text-gray-500">浏览量</p>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold">{selectedPage.clickCount.toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{getClickCount(selectedPage).toLocaleString()}</p>
                     <p className="text-xs text-gray-500">点击量</p>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-3 text-center">
-                    <p className="text-2xl font-bold">{selectedPage.linkCount}</p>
+                    <p className="text-2xl font-bold">{selectedPage.linkCount ?? 0}</p>
                     <p className="text-xs text-gray-500">链接数</p>
                   </div>
                 </div>
@@ -579,7 +590,7 @@ export default function PagesPage() {
           <DialogHeader>
             <DialogTitle>删除页面</DialogTitle>
             <DialogDescription>
-              确定要删除 "{selectedPage?.title}" 吗？
+              确定要删除 "{selectedPage ? getPageTitle(selectedPage) : ''}" 吗？
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -588,7 +599,7 @@ export default function PagesPage() {
               <div className="text-sm text-red-700">
                 <p className="font-medium">此操作不可撤销</p>
                 <p className="mt-1">
-                  删除后，此页面将无法访问。已有的 {selectedPage?.viewCount.toLocaleString()} 次浏览数据将被清除。
+                  删除后，此页面将无法访问。已有的 {selectedPage ? getViewCount(selectedPage).toLocaleString() : 0} 次浏览数据将被清除。
                 </p>
               </div>
             </div>

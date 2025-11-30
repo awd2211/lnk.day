@@ -180,7 +180,7 @@ export default function CampaignsPage() {
     queryKey: ['campaigns', { page, statusFilter, typeFilter, teamFilter, search }],
     queryFn: async () => {
       try {
-        const res = await proxyService.getCampaigns(teamFilter, {
+        const res = await proxyService.getCampaigns(teamFilter !== 'all' ? teamFilter : undefined, {
           status: statusFilter !== 'all' ? statusFilter : undefined,
         });
         return res.data;

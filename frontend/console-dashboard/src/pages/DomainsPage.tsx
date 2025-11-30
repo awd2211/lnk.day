@@ -55,16 +55,34 @@ interface Domain {
   id: string;
   domain: string;
   teamId: string;
-  teamName: string;
-  status: 'pending' | 'active' | 'failed' | 'expired';
+  teamName?: string;
+  type?: 'redirect' | 'page' | 'both';
+  status: 'pending' | 'active' | 'failed' | 'expired' | 'verifying';
   sslStatus: 'pending' | 'active' | 'failed' | 'none';
-  verificationMethod: 'dns' | 'file';
+  verificationMethod?: 'dns' | 'file' | 'TXT' | 'CNAME';
   verificationToken?: string;
-  linkCount: number;
+  isVerified?: boolean;
+  linkCount?: number;
   createdAt: string;
   verifiedAt?: string;
   expiresAt?: string;
+  sslExpiresAt?: string;
+  dnsRecords?: Array<{ name: string; type: string; value: string }>;
+  lastCheckError?: string;
 }
+
+// 辅助函数
+const getDomainLinkCount = (domain: Domain) => domain.linkCount ?? 0;
+const getDomainTeamName = (domain: Domain) => domain.teamName ?? domain.teamId;
+const getDomainVerificationMethod = (domain: Domain) => {
+  if (domain.verificationMethod === 'TXT' || domain.verificationMethod === 'dns') return 'dns';
+  if (domain.verificationMethod === 'CNAME') return 'dns';
+  return domain.verificationMethod || 'dns';
+};
+const getDomainStatus = (domain: Domain) => {
+  if (domain.status === 'verifying') return 'pending';
+  return domain.status;
+};
 
 interface DomainStats {
   totalDomains: number;
@@ -76,6 +94,7 @@ interface DomainStats {
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: '验证中', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+  verifying: { label: '验证中', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   active: { label: '已验证', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   failed: { label: '验证失败', color: 'bg-red-100 text-red-700', icon: XCircle },
   expired: { label: '已过期', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -130,7 +149,12 @@ export default function DomainsPage() {
           page,
           limit: 20,
         });
-        return response.data;
+        // API 返回 { domains: [...], total: n } 或 { items: [...], total: n }
+        const data = response.data;
+        return {
+          items: data.items || data.domains || [],
+          total: data.total || 0,
+        };
       } catch {
         const mockDomains: Domain[] = [
           {
@@ -379,7 +403,7 @@ export default function DomainsPage() {
                           </a>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm">{domain.teamName}</td>
+                      <td className="px-6 py-4 text-sm">{getDomainTeamName(domain)}</td>
                       <td className="px-6 py-4">
                         <Badge className={statusConfig[domain.status]?.color}>
                           <StatusIcon className="mr-1 h-3 w-3" />
@@ -392,7 +416,7 @@ export default function DomainsPage() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 font-medium">
-                        {domain.linkCount.toLocaleString()}
+                        {getDomainLinkCount(domain).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {formatDate(domain.createdAt)}
@@ -457,7 +481,7 @@ export default function DomainsPage() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">团队</label>
-                  <p className="font-medium">{selectedDomain.teamName}</p>
+                  <p className="font-medium">{getDomainTeamName(selectedDomain)}</p>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">状态</label>
@@ -473,12 +497,12 @@ export default function DomainsPage() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">链接数</label>
-                  <p className="font-medium">{selectedDomain.linkCount.toLocaleString()}</p>
+                  <p className="font-medium">{getDomainLinkCount(selectedDomain).toLocaleString()}</p>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">验证方式</label>
                   <p className="font-medium">
-                    {selectedDomain.verificationMethod === 'dns' ? 'DNS 记录' : '文件验证'}
+                    {getDomainVerificationMethod(selectedDomain) === 'dns' ? 'DNS 记录' : '文件验证'}
                   </p>
                 </div>
                 <div>
@@ -554,7 +578,7 @@ export default function DomainsPage() {
               <div className="text-sm text-red-700">
                 <p className="font-medium">此操作不可撤销</p>
                 <p className="mt-1">
-                  删除后，使用此域名的 {selectedDomain?.linkCount || 0} 个链接将无法访问。
+                  删除后，使用此域名的 {selectedDomain ? getDomainLinkCount(selectedDomain) : 0} 个链接将无法访问。
                 </p>
               </div>
             </div>

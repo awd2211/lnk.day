@@ -35,7 +35,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
   }
 
   try {
-    const response = await axios.post(`${API_GATEWAY_URL}/v1/auth/refresh`, { refreshToken });
+    const response = await axios.post(`${API_GATEWAY_URL}/api/v1/auth/refresh`, { refreshToken });
     const newAccessToken = response.data.accessToken;
     const newRefreshToken = response.data.refreshToken;
 
@@ -86,7 +86,7 @@ const createApiClient = (baseURL: string) => {
       // Handle 401 - unauthorized (try token refresh)
       if (error.response?.status === 401 && !config._isRetry) {
         // Skip refresh for auth endpoints
-        if (config.url?.includes('/v1/auth/')) {
+        if (config.url?.includes('/api/v1/auth/')) {
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
           window.location.href = '/login';
@@ -175,46 +175,46 @@ export const qrApi = api;
 
 // Auth API
 export const authService = {
-  login: (email: string, password: string) => api.post('/v1/auth/login', { email, password }),
-  register: (data: { name: string; email: string; password: string }) => api.post('/v1/auth/register', data),
-  refreshToken: (refreshToken: string) => api.post('/v1/auth/refresh', { refreshToken }),
-  me: () => api.get('/v1/api/users/me'),
-  updateProfile: (data: any) => api.put('/v1/api/users/me', data),
+  login: (email: string, password: string) => api.post('/api/v1/auth/login', { email, password }),
+  register: (data: { name: string; email: string; password: string }) => api.post('/api/v1/auth/register', data),
+  refreshToken: (refreshToken: string) => api.post('/api/api/v1/auth/refresh', { refreshToken }),
+  me: () => api.get('/api/v1/users/me'),
+  updateProfile: (data: any) => api.put('/api/v1/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.post('/v1/api/users/me/password', data),
+    api.post('/api/v1/users/me/password', data),
 
   // 2FA
-  get2FAStatus: () => api.get('/v1/api/auth/2fa/status'),
-  enable2FA: () => api.post('/v1/api/auth/2fa/enable'),
-  verify2FA: (code: string) => api.post('/v1/api/auth/2fa/verify', { code }),
-  disable2FA: (code: string) => api.delete('/v1/api/auth/2fa/disable', { data: { code } }),
+  get2FAStatus: () => api.get('/api/v1/auth/2fa/status'),
+  enable2FA: () => api.post('/api/v1/auth/2fa/enable'),
+  verify2FA: (code: string) => api.post('/api/v1/auth/2fa/verify', { code }),
+  disable2FA: (code: string) => api.delete('/api/v1/auth/2fa/disable', { data: { code } }),
   regenerateBackupCodes: (code: string) =>
-    api.post('/v1/api/auth/2fa/regenerate-backup-codes', { code }),
+    api.post('/api/v1/auth/2fa/regenerate-backup-codes', { code }),
 };
 
 // Link API
 export const linkService = {
   getAll: (params?: { page?: number; limit?: number; status?: string; search?: string; folderId?: string }) =>
-    linkApi.get('/v1/api/links', { params }),
+    linkApi.get('/api/v1/links', { params }),
   getOne: (id: string) => linkApi.get(`/api/links/${id}`),
   create: (data: { originalUrl: string; customCode?: string; title?: string; tags?: string[] }) =>
-    linkApi.post('/v1/api/links', data),
+    linkApi.post('/api/v1/links', data),
   update: (id: string, data: any) => linkApi.put(`/api/links/${id}`, data),
   delete: (id: string) => linkApi.delete(`/api/links/${id}`),
   getStats: (id: string) => linkApi.get(`/api/links/${id}/stats`),
   bulkCreate: (links: Array<{ originalUrl: string; title?: string }>) =>
-    linkApi.post('/v1/api/links/bulk', { links }),
+    linkApi.post('/api/v1/links/bulk', { links }),
   bulkOperation: (ids: string[], operation: string, data?: any) =>
-    linkApi.post('/v1/api/links/bulk/operation', { ids, operation, ...data }),
+    linkApi.post('/api/v1/links/bulk/operation', { ids, operation, ...data }),
 };
 
 // Analytics API
 export const analyticsService = {
-  getSummary: () => analyticsApi.get('/v1/api/analytics/summary'),
+  getSummary: () => analyticsApi.get('/api/v1/analytics/summary'),
   getLinkAnalytics: (linkId: string, params?: { startDate?: string; endDate?: string }) =>
     analyticsApi.get(`/api/analytics/links/${linkId}`, { params }),
   getTeamAnalytics: (params?: { startDate?: string; endDate?: string }) =>
-    analyticsApi.get('/v1/api/analytics/team', { params }),
+    analyticsApi.get('/api/v1/analytics/team', { params }),
   getRealtime: (linkId: string) => analyticsApi.get(`/api/analytics/links/${linkId}/realtime`),
 };
 
@@ -231,7 +231,7 @@ export const qrService = {
     dotStyle?: string;
     cornerStyle?: string;
     errorCorrectionLevel?: string;
-  }) => qrApi.post('/v1/api/qr/generate', { url: data.content, options: data }, { responseType: 'blob' }),
+  }) => qrApi.post('/api/v1/qr/generate', { url: data.content, options: data }, { responseType: 'blob' }),
 
   // 多类型二维码生成
   generateTyped: (data: {
@@ -245,10 +245,10 @@ export const qrService = {
       margin?: number;
       errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
     };
-  }) => qrApi.post('/v1/api/qr/generate/typed', data, { responseType: 'blob' }),
+  }) => qrApi.post('/api/v1/qr/generate/typed', data, { responseType: 'blob' }),
 
-  getStyles: () => qrApi.get('/v1/api/qr/styles'),
-  getContentTypes: () => qrApi.get('/v1/api/qr/content-types'),
+  getStyles: () => qrApi.get('/api/v1/qr/styles'),
+  getContentTypes: () => qrApi.get('/api/v1/qr/content-types'),
 };
 
 // Deep Link API
@@ -279,14 +279,14 @@ export const deepLinkService = {
 // A/B Test API
 export const abTestService = {
   getAll: (params?: { page?: number; limit?: number; status?: string }) =>
-    linkApi.get('/v1/api/ab-tests', { params }),
+    linkApi.get('/api/v1/ab-tests', { params }),
   getOne: (id: string) => linkApi.get(`/api/ab-tests/${id}`),
   create: (data: {
     name: string;
     linkId: string;
     variants: Array<{ name: string; url: string; weight: number }>;
     targetMetric?: string;
-  }) => linkApi.post('/v1/api/ab-tests', data),
+  }) => linkApi.post('/api/v1/ab-tests', data),
   update: (id: string, data: any) => linkApi.put(`/api/ab-tests/${id}`, data),
   delete: (id: string) => linkApi.delete(`/api/ab-tests/${id}`),
   getStats: (id: string) => linkApi.get(`/api/ab-tests/${id}/stats`),
@@ -299,34 +299,34 @@ export const abTestService = {
 
 // Folder API
 export const folderService = {
-  getAll: () => linkApi.get('/v1/api/folders'),
-  getTree: () => linkApi.get('/v1/api/folders/tree'),
+  getAll: () => linkApi.get('/api/v1/folders'),
+  getTree: () => linkApi.get('/api/v1/folders/tree'),
   getOne: (id: string) => linkApi.get(`/api/folders/${id}`),
   create: (data: { name: string; color?: string; icon?: string; parentId?: string }) =>
-    linkApi.post('/v1/api/folders', data),
+    linkApi.post('/api/v1/folders', data),
   update: (id: string, data: { name?: string; color?: string; icon?: string }) =>
     linkApi.put(`/api/folders/${id}`, data),
   delete: (id: string) => linkApi.delete(`/api/folders/${id}`),
-  reorder: (orderedIds: string[]) => linkApi.post('/v1/api/folders/reorder', { orderedIds }),
+  reorder: (orderedIds: string[]) => linkApi.post('/api/v1/folders/reorder', { orderedIds }),
 };
 
 // Link Template API
 export const linkTemplateService = {
   getAll: (params?: { page?: number; limit?: number; search?: string; favoritesOnly?: boolean }) =>
-    linkApi.get('/v1/api/link-templates', { params }),
+    linkApi.get('/api/v1/link-templates', { params }),
   getOne: (id: string) => linkApi.get(`/api/link-templates/${id}`),
-  create: (data: any) => linkApi.post('/v1/api/link-templates', data),
+  create: (data: any) => linkApi.post('/api/v1/link-templates', data),
   update: (id: string, data: any) => linkApi.put(`/api/link-templates/${id}`, data),
   delete: (id: string) => linkApi.delete(`/api/link-templates/${id}`),
   toggleFavorite: (id: string) => linkApi.post(`/api/link-templates/${id}/favorite`),
   createLinkFromTemplate: (data: { templateId: string; originalUrl: string; customSlug?: string; title?: string }) =>
-    linkApi.post('/v1/api/link-templates/create-link', data),
-  getPresets: () => linkApi.get('/v1/api/link-templates/presets'),
+    linkApi.post('/api/v1/link-templates/create-link', data),
+  getPresets: () => linkApi.get('/api/v1/link-templates/presets'),
   getPresetsByCategory: (category: string) => linkApi.get(`/api/link-templates/presets/category/${category}`),
   createFromPreset: (presetId: string, name: string) =>
-    linkApi.post('/v1/api/link-templates/from-preset', { presetId, name }),
-  getMostUsed: (limit?: number) => linkApi.get('/v1/api/link-templates/most-used', { params: { limit } }),
-  getRecentlyUsed: (limit?: number) => linkApi.get('/v1/api/link-templates/recently-used', { params: { limit } }),
+    linkApi.post('/api/v1/link-templates/from-preset', { presetId, name }),
+  getMostUsed: (limit?: number) => linkApi.get('/api/v1/link-templates/most-used', { params: { limit } }),
+  getRecentlyUsed: (limit?: number) => linkApi.get('/api/v1/link-templates/recently-used', { params: { limit } }),
 };
 
 // Redirect Rules API
@@ -344,90 +344,90 @@ export const redirectRulesService = {
 
 // Security API
 export const securityService = {
-  analyze: (url: string) => linkApi.post('/v1/api/security/analyze', { url }),
-  quickCheck: (url: string) => linkApi.post('/v1/api/security/quick-check', { url }),
-  batchScan: (urls: string[]) => linkApi.post('/v1/api/security/batch-scan', { urls }),
+  analyze: (url: string) => linkApi.post('/api/v1/security/analyze', { url }),
+  quickCheck: (url: string) => linkApi.post('/api/v1/security/quick-check', { url }),
+  batchScan: (urls: string[]) => linkApi.post('/api/v1/security/batch-scan', { urls }),
   getScanHistory: (url: string, limit?: number) =>
-    linkApi.get('/v1/api/security/history', { params: { url, limit } }),
-  getStats: () => linkApi.get('/v1/api/security/stats'),
+    linkApi.get('/api/v1/security/history', { params: { url, limit } }),
+  getStats: () => linkApi.get('/api/v1/security/stats'),
   // Suspended links management
   getSuspendedLinks: (params?: { limit?: number; offset?: number }) =>
-    linkApi.get('/v1/api/security/suspended-links', { params }),
+    linkApi.get('/api/v1/security/suspended-links', { params }),
   reinstateLink: (linkId: string, reason: string) =>
     linkApi.post(`/api/security/suspended-links/${linkId}/reinstate`, { reason }),
   checkAndHandle: (url: string) =>
-    linkApi.post('/v1/api/security/check-and-handle', { url }),
+    linkApi.post('/api/v1/security/check-and-handle', { url }),
 };
 
 // API Keys API
 export const apiKeyService = {
-  getAll: () => api.get('/v1/api/api-keys'),
+  getAll: () => api.get('/api/v1/api-keys'),
   getOne: (id: string) => api.get(`/api/api-keys/${id}`),
   create: (data: {
     name: string;
     scopes: string[];
     expiresAt?: string;
     ipWhitelist?: string[];
-  }) => api.post('/v1/api/api-keys', data),
+  }) => api.post('/api/v1/api-keys', data),
   update: (id: string, data: { name?: string; scopes?: string[]; ipWhitelist?: string[] }) =>
     api.put(`/api/api-keys/${id}`, data),
   delete: (id: string) => api.delete(`/api/api-keys/${id}`),
   revoke: (id: string) => api.post(`/api/api-keys/${id}/revoke`),
   regenerate: (id: string) => api.post(`/api/api-keys/${id}/regenerate`),
-  getScopes: () => api.get('/v1/api/api-keys/scopes/list'),
+  getScopes: () => api.get('/api/v1/api-keys/scopes/list'),
 };
 
 // Billing API
 export const billingService = {
   // Subscription
-  getSubscription: () => api.get('/v1/api/billing/subscription'),
-  createSubscription: (data: { priceId: string }) => api.post('/v1/api/billing/subscription', data),
-  updateSubscription: (data: { priceId: string }) => api.put('/v1/api/billing/subscription', data),
-  cancelSubscription: () => api.delete('/v1/api/billing/subscription'),
+  getSubscription: () => api.get('/api/v1/billing/subscription'),
+  createSubscription: (data: { priceId: string }) => api.post('/api/v1/billing/subscription', data),
+  updateSubscription: (data: { priceId: string }) => api.put('/api/v1/billing/subscription', data),
+  cancelSubscription: () => api.delete('/api/v1/billing/subscription'),
 
   // Pricing
-  getPricing: () => api.get('/v1/api/billing/pricing'),
+  getPricing: () => api.get('/api/v1/billing/pricing'),
 
   // Invoices
   getInvoices: (params?: { limit?: number; starting_after?: string }) =>
-    api.get('/v1/api/billing/invoices', { params }),
+    api.get('/api/v1/billing/invoices', { params }),
   downloadInvoice: (invoiceId: string) =>
     api.get(`/api/billing/invoices/${invoiceId}/download`, { responseType: 'blob' }),
 
   // Stripe
   createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
-    api.post('/v1/api/stripe/checkout', data),
-  createPortalSession: (data: { returnUrl: string }) => api.post('/v1/api/stripe/portal', data),
-  getPaymentMethods: () => api.get('/v1/api/stripe/payment-methods'),
+    api.post('/api/v1/stripe/checkout', data),
+  createPortalSession: (data: { returnUrl: string }) => api.post('/api/v1/stripe/portal', data),
+  getPaymentMethods: () => api.get('/api/v1/stripe/payment-methods'),
   setDefaultPaymentMethod: (paymentMethodId: string) =>
-    api.post('/v1/api/stripe/payment-methods/default', { paymentMethodId }),
+    api.post('/api/v1/stripe/payment-methods/default', { paymentMethodId }),
   deletePaymentMethod: (paymentMethodId: string) =>
     api.delete(`/api/stripe/payment-methods/${paymentMethodId}`),
 };
 
 // Privacy API
 export const privacyService = {
-  getOverview: () => api.get('/v1/api/privacy/overview'),
-  getConsents: () => api.get('/v1/api/privacy/consents'),
-  updateConsents: (data: Record<string, boolean>) => api.post('/v1/api/privacy/consents', data),
-  requestExport: () => api.post('/v1/api/privacy/export'),
-  requestDeleteAccount: () => api.post('/v1/api/privacy/delete-account'),
-  cancelDeleteRequest: () => api.delete('/v1/api/privacy/delete-account'),
-  getRights: () => api.get('/v1/api/privacy/rights'),
+  getOverview: () => api.get('/api/v1/privacy/overview'),
+  getConsents: () => api.get('/api/v1/privacy/consents'),
+  updateConsents: (data: Record<string, boolean>) => api.post('/api/v1/privacy/consents', data),
+  requestExport: () => api.post('/api/v1/privacy/export'),
+  requestDeleteAccount: () => api.post('/api/v1/privacy/delete-account'),
+  cancelDeleteRequest: () => api.delete('/api/v1/privacy/delete-account'),
+  getRights: () => api.get('/api/v1/privacy/rights'),
 };
 
 // Quota API
 export const quotaService = {
-  getUsage: () => api.get('/v1/api/quota'),
-  getLimits: () => api.get('/v1/api/quota/limits'),
+  getUsage: () => api.get('/api/v1/quota'),
+  getLimits: () => api.get('/api/v1/quota/limits'),
   getLogs: (params?: { limit?: number; offset?: number }) =>
-    api.get('/v1/api/quota/logs', { params }),
+    api.get('/api/v1/quota/logs', { params }),
 };
 
 // User/Team API
 export const userService = {
   // Team management
-  getCurrentTeam: () => api.get('/v1/api/teams/current'),
+  getCurrentTeam: () => api.get('/api/v1/teams/current'),
   getTeamMembers: (teamId: string) => api.get(`/api/teams/${teamId}/members`),
   getTeamInvitations: (teamId: string) => api.get(`/api/teams/${teamId}/invitations`),
   inviteTeamMember: (teamId: string, data: { email: string; role: string }) =>
@@ -449,12 +449,12 @@ const campaignApi = api;
 // Goals API
 export const goalsService = {
   getAll: (params?: { campaignId?: string }) =>
-    campaignApi.get('/v1/api/goals', { params }),
+    campaignApi.get('/api/v1/goals', { params }),
   getOne: (id: string) => campaignApi.get(`/api/goals/${id}`),
-  create: (data: any) => campaignApi.post('/v1/api/goals', data),
+  create: (data: any) => campaignApi.post('/api/v1/goals', data),
   update: (id: string, data: any) => campaignApi.patch(`/api/goals/${id}`, data),
   delete: (id: string) => campaignApi.delete(`/api/goals/${id}`),
-  getStats: () => campaignApi.get('/v1/api/goals/stats'),
+  getStats: () => campaignApi.get('/api/v1/goals/stats'),
   pause: (id: string) => campaignApi.post(`/api/goals/${id}/pause`),
   resume: (id: string) => campaignApi.post(`/api/goals/${id}/resume`),
   getHistory: (id: string) => campaignApi.get(`/api/goals/${id}/history`),
@@ -462,9 +462,9 @@ export const goalsService = {
   getTrends: (id: string, period?: string) =>
     campaignApi.get(`/api/goals/${id}/trends`, { params: { period } }),
   compareGoals: (goalId1: string, goalId2: string) =>
-    campaignApi.get('/v1/api/goals/compare', { params: { goal1: goalId1, goal2: goalId2 } }),
+    campaignApi.get('/api/v1/goals/compare', { params: { goal1: goalId1, goal2: goalId2 } }),
   getTeamStats: (teamId?: string) =>
-    campaignApi.get('/v1/api/goals/team-stats', { params: { teamId } }),
+    campaignApi.get('/api/v1/goals/team-stats', { params: { teamId } }),
   updateProgress: (id: string, value: number, source?: string) =>
     campaignApi.post(`/api/goals/${id}/progress`, { value, source }),
   recalculateProjection: (id: string) =>
@@ -477,16 +477,16 @@ const pageApi = api;
 // Bio Links API
 export const bioLinksService = {
   getAll: (params?: { page?: number; limit?: number; status?: string }) =>
-    pageApi.get('/v1/api/bio-links', { params }),
+    pageApi.get('/api/v1/bio-links', { params }),
   getOne: (id: string) => pageApi.get(`/api/bio-links/${id}`),
   getByUsername: (username: string) => pageApi.get(`/api/bio-links/username/${username}`),
-  create: (data: any) => pageApi.post('/v1/api/bio-links', data),
+  create: (data: any) => pageApi.post('/api/v1/bio-links', data),
   update: (id: string, data: any) => pageApi.patch(`/api/bio-links/${id}`, data),
   delete: (id: string) => pageApi.delete(`/api/bio-links/${id}`),
   publish: (id: string) => pageApi.post(`/api/bio-links/${id}/publish`),
   unpublish: (id: string) => pageApi.post(`/api/bio-links/${id}/unpublish`),
   checkUsernameAvailability: (username: string) =>
-    pageApi.get('/v1/api/bio-links/check-username', { params: { username } }),
+    pageApi.get('/api/v1/bio-links/check-username', { params: { username } }),
   getAnalytics: (id: string, params?: { startDate?: string; endDate?: string }) =>
     pageApi.get(`/api/bio-links/${id}/analytics`, { params }),
   // Block management
@@ -503,9 +503,9 @@ export const bioLinksService = {
 
 // Saved Search API
 export const savedSearchService = {
-  getAll: () => linkApi.get('/v1/api/saved-searches'),
+  getAll: () => linkApi.get('/api/v1/saved-searches'),
   getOne: (id: string) => linkApi.get(`/api/saved-searches/${id}`),
-  create: (data: any) => linkApi.post('/v1/api/saved-searches', data),
+  create: (data: any) => linkApi.post('/api/v1/saved-searches', data),
   update: (id: string, data: any) => linkApi.patch(`/api/saved-searches/${id}`, data),
   delete: (id: string) => linkApi.delete(`/api/saved-searches/${id}`),
   execute: (id: string) => linkApi.post(`/api/saved-searches/${id}/execute`),

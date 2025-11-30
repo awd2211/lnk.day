@@ -116,6 +116,7 @@ const navigationGroups: NavGroup[] = [
     icon: Cog,
     items: [
       { name: '系统监控', href: '/system', icon: Server },
+      { name: '管理员角色', href: '/admin-roles', icon: ShieldCheck },
       { name: '通知管理', href: '/notifications', icon: Mail },
       { name: '系统设置', href: '/settings', icon: Settings },
     ],

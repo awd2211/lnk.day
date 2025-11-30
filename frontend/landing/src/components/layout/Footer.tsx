@@ -1,19 +1,27 @@
 'use client';
 
-import Link from 'next/link';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { Link2, Twitter, Linkedin, Github, Youtube } from 'lucide-react';
 
 export default function Footer() {
   const t = useTranslations('footer');
-  const locale = useLocale();
 
   const productLinks = [
     { href: '/products/url-shortener', label: t('urlShortener') },
     { href: '/products/qr-codes', label: t('qrCodes') },
     { href: '/products/link-in-bio', label: t('linkInBio') },
     { href: '/products/analytics', label: t('analytics') },
+    { href: '/products/campaigns', label: t('campaigns') },
     { href: '/developers', label: t('api') },
+  ];
+
+  const solutionLinks = [
+    { href: '/solutions/enterprise', label: t('enterprise') },
+    { href: '/solutions/marketing', label: t('marketing') },
+    { href: '/solutions/retail', label: t('retail') },
+    { href: '/solutions/media', label: t('media') },
+    { href: '/solutions/tech', label: t('tech') },
   ];
 
   const resourceLinks = [
@@ -46,10 +54,10 @@ export default function Footer() {
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-8">
           {/* Brand */}
           <div className="col-span-2">
-            <Link href={`/${locale}`} className="flex items-center space-x-2 mb-4">
+            <Link href="/" className="flex items-center space-x-2 mb-4">
               <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
                 <Link2 className="w-5 h-5 text-white" />
               </div>
@@ -80,7 +88,26 @@ export default function Footer() {
               {productLinks.map((link) => (
                 <li key={link.href}>
                   <Link
-                    href={`/${locale}${link.href}`}
+                    href={link.href}
+                    className="text-gray-400 hover:text-white text-sm transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Solutions */}
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider mb-4">
+              {t('solutions')}
+            </h3>
+            <ul className="space-y-3">
+              {solutionLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
                     className="text-gray-400 hover:text-white text-sm transition-colors"
                   >
                     {link.label}
@@ -99,7 +126,7 @@ export default function Footer() {
               {resourceLinks.map((link) => (
                 <li key={link.href}>
                   <Link
-                    href={`/${locale}${link.href}`}
+                    href={link.href}
                     className="text-gray-400 hover:text-white text-sm transition-colors"
                   >
                     {link.label}
@@ -118,7 +145,7 @@ export default function Footer() {
               {companyLinks.map((link) => (
                 <li key={link.href}>
                   <Link
-                    href={`/${locale}${link.href}`}
+                    href={link.href}
                     className="text-gray-400 hover:text-white text-sm transition-colors"
                   >
                     {link.label}
@@ -137,7 +164,7 @@ export default function Footer() {
               {legalLinks.map((link) => (
                 <li key={link.href}>
                   <Link
-                    href={`/${locale}${link.href}`}
+                    href={link.href}
                     className="text-gray-400 hover:text-white text-sm transition-colors"
                   >
                     {link.label}

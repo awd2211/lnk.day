@@ -20,6 +20,15 @@ import {
   Cpu,
 } from 'lucide-react';
 
+const locales = [
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'zh', label: '简体中文', flag: '🇨🇳' },
+  { code: 'zh-TW', label: '繁體中文', flag: '🇹🇼' },
+  { code: 'ja', label: '日本語', flag: '🇯🇵' },
+  { code: 'es', label: 'Español', flag: '🇪🇸' },
+  { code: 'pt', label: 'Português', flag: '🇧🇷' },
+];
+
 export default function Header() {
   const t = useTranslations();
   const locale = useLocale();
@@ -27,9 +36,12 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  const otherLocale = locale === 'en' ? 'zh' : 'en';
   // Remove locale prefix from pathname for Link component
-  const pathname = fullPathname.replace(/^\/(en|zh)/, '') || '/';
+  const pathname = fullPathname.replace(/^\/(en|zh-TW|zh|ja|es|pt)/, '') || '/';
+  const currentLocale = locales.find(l => l.code === locale) || locales[0];
+
+  // User portal URL for login/signup
+  const userPortalUrl = process.env.NEXT_PUBLIC_USER_PORTAL_URL || 'http://localhost:60010';
 
   const productLinks = [
     { href: '/products/url-shortener', icon: Link2, label: t('nav.urlShortener') },
@@ -52,7 +64,7 @@ export default function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href={`/${locale}`} className="flex items-center space-x-2">
+          <Link href="/" className="flex items-center space-x-2">
             <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
               <Link2 className="w-5 h-5 text-white" />
             </div>
@@ -82,7 +94,7 @@ export default function Header() {
                     {productLinks.map((link) => (
                       <Link
                         key={link.href}
-                        href={`/${locale}${link.href}`}
+                        href={link.href}
                         className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                       >
                         <link.icon className="w-5 h-5 text-orange-500" />
@@ -115,7 +127,7 @@ export default function Header() {
                     {solutionLinks.map((link) => (
                       <Link
                         key={link.href}
-                        href={`/${locale}${link.href}`}
+                        href={link.href}
                         className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors"
                       >
                         <link.icon className="w-5 h-5 text-orange-500" />
@@ -128,32 +140,59 @@ export default function Header() {
             </div>
 
             <Link
-              href={`/${locale}/pricing`}
+              href="/pricing"
               className="text-gray-700 hover:text-gray-900 font-medium"
             >
               {t('nav.pricing')}
             </Link>
 
             {/* Language Switcher */}
-            <Link
-              href={pathname}
-              locale={otherLocale}
-              className="flex items-center space-x-1 text-gray-600 hover:text-gray-900"
+            <div
+              className="relative"
+              onMouseEnter={() => setActiveDropdown('language')}
+              onMouseLeave={() => setActiveDropdown(null)}
             >
-              <Globe className="w-4 h-4" />
-              <span className="text-sm">{otherLocale === 'en' ? 'EN' : '中文'}</span>
-            </Link>
+              <button className="flex items-center space-x-1 text-gray-600 hover:text-gray-900">
+                <Globe className="w-4 h-4" />
+                <span className="text-sm">{currentLocale.flag} {currentLocale.label}</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              <AnimatePresence>
+                {activeDropdown === 'language' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2"
+                  >
+                    {locales.map((loc) => (
+                      <Link
+                        key={loc.code}
+                        href={pathname}
+                        locale={loc.code}
+                        className={`flex items-center space-x-3 px-4 py-2 hover:bg-gray-50 transition-colors ${
+                          locale === loc.code ? 'bg-orange-50 text-orange-600' : 'text-gray-700'
+                        }`}
+                      >
+                        <span>{loc.flag}</span>
+                        <span>{loc.label}</span>
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           {/* CTA Buttons */}
           <div className="hidden lg:flex items-center space-x-4">
             <a
-              href="http://localhost:60010/login"
+              href={`${userPortalUrl}/login`}
               className="text-gray-700 hover:text-gray-900 font-medium"
             >
               {t('common.login')}
             </a>
-            <a href="http://localhost:60010/signup" className="btn-primary">
+            <a href={`${userPortalUrl}/signup`} className="btn-primary">
               {t('common.signup')}
             </a>
           </div>
@@ -188,7 +227,7 @@ export default function Header() {
                   {productLinks.map((link) => (
                     <Link
                       key={link.href}
-                      href={`/${locale}${link.href}`}
+                      href={link.href}
                       className="flex items-center space-x-3 px-4 py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
@@ -204,7 +243,7 @@ export default function Header() {
                   {solutionLinks.map((link) => (
                     <Link
                       key={link.href}
-                      href={`/${locale}${link.href}`}
+                      href={link.href}
                       className="flex items-center space-x-3 px-4 py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
@@ -214,23 +253,39 @@ export default function Header() {
                   ))}
                 </div>
                 <div className="px-4 pt-4 border-t border-gray-100 space-y-3">
-                  <Link
-                    href={pathname}
-                    locale={otherLocale}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center space-x-2 text-gray-600"
-                  >
-                    <Globe className="w-4 h-4" />
-                    <span>{locale === 'en' ? 'Switch to 中文' : 'Switch to English'}</span>
-                  </Link>
+                  {/* Mobile Language Selector */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-500 uppercase flex items-center space-x-2">
+                      <Globe className="w-4 h-4" />
+                      <span>Language</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {locales.map((loc) => (
+                        <Link
+                          key={loc.code}
+                          href={pathname}
+                          locale={loc.code}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm ${
+                            locale === loc.code
+                              ? 'bg-orange-100 text-orange-600 font-medium'
+                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span>{loc.flag}</span>
+                          <span>{loc.label}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
                   <a
-                    href="http://localhost:60010/login"
+                    href={`${userPortalUrl}/login`}
                     className="block text-center py-2 text-gray-700 font-medium"
                   >
                     {t('common.login')}
                   </a>
                   <a
-                    href="http://localhost:60010/signup"
+                    href={`${userPortalUrl}/signup`}
                     className="block text-center btn-primary"
                   >
                     {t('common.signup')}
