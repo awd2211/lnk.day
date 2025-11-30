@@ -6,11 +6,20 @@ import {
   Delete,
   Body,
   Param,
-  Headers,
+  Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { Request } from 'express';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { DeepLinkService } from './deeplink.service';
 import { FallbackBehavior, IOSConfig, AndroidConfig, AttributionConfig } from './deeplink.entity';
 
@@ -28,34 +37,45 @@ class CreateDeepLinkConfigDto {
 @ApiTags('deep-links')
 @Controller('links/:linkId/deep-link')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class DeepLinkController {
   constructor(private readonly deepLinkService: DeepLinkService) {}
 
   @Post()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.DEEPLINKS_CREATE)
   @ApiOperation({ summary: '配置深度链接' })
   create(@Param('linkId') linkId: string, @Body() data: CreateDeepLinkConfigDto) {
     return this.deepLinkService.createConfig(linkId, data);
   }
 
   @Get()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.DEEPLINKS_VIEW)
   @ApiOperation({ summary: '获取深度链接配置' })
   get(@Param('linkId') linkId: string) {
     return this.deepLinkService.getConfig(linkId);
   }
 
   @Put()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.DEEPLINKS_EDIT)
   @ApiOperation({ summary: '更新深度链接配置' })
   update(@Param('linkId') linkId: string, @Body() data: Partial<CreateDeepLinkConfigDto>) {
     return this.deepLinkService.updateConfig(linkId, data);
   }
 
   @Delete()
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.DEEPLINKS_EDIT)
   @ApiOperation({ summary: '删除深度链接配置' })
   delete(@Param('linkId') linkId: string) {
     return this.deepLinkService.deleteConfig(linkId);
   }
 
   @Post('resolve')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.DEEPLINKS_VIEW)
   @ApiOperation({ summary: '解析深度链接目标 URL' })
   async resolve(
     @Param('linkId') linkId: string,
@@ -77,8 +97,9 @@ export class WellKnownController {
 
   @Get('apple-app-site-association')
   @ApiOperation({ summary: 'Apple App Site Association 文件' })
-  async getAASA(@Headers('x-team-id') teamId: string) {
+  async getAASA(@Query('teamId') teamId?: string) {
     // In production, this would fetch all configs for the domain
+    // teamId is optional - domain resolution happens at redirect-service level
     return {
       applinks: {
         apps: [],
@@ -89,8 +110,9 @@ export class WellKnownController {
 
   @Get('assetlinks.json')
   @ApiOperation({ summary: 'Android Asset Links 文件' })
-  async getAssetLinks(@Headers('x-team-id') teamId: string) {
+  async getAssetLinks(@Query('teamId') teamId?: string) {
     // In production, this would fetch all configs for the domain
+    // teamId is optional - domain resolution happens at redirect-service level
     return [];
   }
 }

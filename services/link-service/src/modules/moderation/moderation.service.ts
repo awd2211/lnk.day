@@ -4,6 +4,7 @@ import { Repository, In, Like, Between, FindOptionsWhere } from 'typeorm';
 import { FlaggedLink, FlagReason, FlagSeverity, FlagStatus } from './entities/flagged-link.entity';
 import { LinkReport } from './entities/link-report.entity';
 import { Link, LinkStatus } from '../link/entities/link.entity';
+import { UserClientService } from '../../common/user-client/user-client.service';
 import {
   QueryFlaggedLinksDto,
   CreateReportDto,
@@ -47,6 +48,7 @@ export class ModerationService {
     private readonly linkReportRepository: Repository<LinkReport>,
     @InjectRepository(Link)
     private readonly linkRepository: Repository<Link>,
+    private readonly userClientService: UserClientService,
   ) {}
 
   async getStats(): Promise<ModerationStatsDto> {
@@ -318,7 +320,16 @@ export class ModerationService {
     // Suspend the link
     await this.linkRepository.update(flaggedLink.linkId, { status: LinkStatus.SUSPENDED });
 
-    // TODO: If blockUser is true, call user-service to block the user
+    // If blockUser is true, call user-service to suspend the user
+    if (dto.blockUser && flaggedLink.userId) {
+      const reason = `Link blocked due to: ${flaggedLink.reason}${dto.note ? ` - ${dto.note}` : ''}`;
+      const suspended = await this.userClientService.suspendUser(flaggedLink.userId, reason);
+      if (!suspended) {
+        this.logger.warn(`Failed to suspend user ${flaggedLink.userId}`);
+      } else {
+        this.logger.log(`User ${flaggedLink.userId} suspended due to link moderation`);
+      }
+    }
 
     return this.flaggedLinkRepository.save(flaggedLink);
   }

@@ -7,11 +7,22 @@ import {
   Body,
   Param,
   Query,
-  Headers,
   UseGuards,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
-import { Permission, RequirePermissions, RequireAnyPermission, PermissionGuard, AuthenticatedUser, CurrentUser } from '@lnk/nestjs-common';
+import {
+  Permission,
+  RequirePermissions,
+  PermissionGuard,
+  JwtAuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  ScopeGuard,
+  ScopedTeamId,
+  isPlatformAdmin,
+} from '@lnk/nestjs-common';
 
 import { LinkService } from './link.service';
 import { CreateLinkDto } from './dto/create-link.dto';
@@ -24,7 +35,7 @@ import { InternalAuthGuard } from '../../common/guards/internal-auth.guard';
 
 @ApiTags('links')
 @Controller('links')
-@UseGuards(PermissionGuard)
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @ApiBearerAuth()
 export class LinkController {
   constructor(private readonly linkService: LinkService) {}
@@ -35,9 +46,9 @@ export class LinkController {
   create(
     @Body() createLinkDto: CreateLinkDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.linkService.create(createLinkDto, user.id, teamId || user.teamId || user.id);
+    return this.linkService.create(createLinkDto, user.id, teamId);
   }
 
   @Get()
@@ -46,39 +57,78 @@ export class LinkController {
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   findAll(
-    @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.linkService.findAll(teamId || user.teamId || user.id, { page, limit });
+    return this.linkService.findAll(teamId, { page, limit });
   }
 
   @Get(':id')
   @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取单个链接' })
-  findOne(@Param('id') id: string) {
-    return this.linkService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const link = await this.linkService.findOne(id);
+    // 验证资源归属（平台管理员可访问任意资源）
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此链接');
+    }
+    return link;
   }
 
   @Get('code/:shortCode')
   @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '通过短码获取链接' })
-  findByShortCode(@Param('shortCode') shortCode: string) {
-    return this.linkService.findByShortCode(shortCode);
+  async findByShortCode(
+    @Param('shortCode') shortCode: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const link = await this.linkService.findByShortCode(shortCode);
+    if (!link) {
+      throw new NotFoundException('链接不存在');
+    }
+    // 验证资源归属
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此链接');
+    }
+    return link;
   }
 
   @Put(':id')
   @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '更新链接' })
-  update(@Param('id') id: string, @Body() updateLinkDto: UpdateLinkDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateLinkDto: UpdateLinkDto,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 先验证资源归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权修改此链接');
+    }
     return this.linkService.update(id, updateLinkDto);
   }
 
   @Delete(':id')
   @RequirePermissions(Permission.LINKS_DELETE)
   @ApiOperation({ summary: '删除链接' })
-  remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 先验证资源归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权删除此链接');
+    }
     return this.linkService.remove(id);
   }
 
@@ -89,10 +139,9 @@ export class LinkController {
   @ApiOperation({ summary: '批量操作链接' })
   bulkOperation(
     @Body() bulkOperationDto: BulkOperationDto,
-    @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.linkService.bulkOperation(bulkOperationDto, teamId || user.teamId || user.id);
+    return this.linkService.bulkOperation(bulkOperationDto, teamId);
   }
 
   @Post('bulk/create')
@@ -101,9 +150,9 @@ export class LinkController {
   bulkCreate(
     @Body() bulkCreateDto: BulkCreateDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.linkService.bulkCreate(bulkCreateDto, user.id, teamId || user.teamId || user.id);
+    return this.linkService.bulkCreate(bulkCreateDto, user.id, teamId);
   }
 
   // ========== 统计接口 ==========
@@ -111,17 +160,23 @@ export class LinkController {
   @Get('stats')
   @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取链接统计概览' })
-  getStats(
-    @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
-  ) {
-    return this.linkService.getStats(teamId || user.teamId || user.id);
+  getStats(@ScopedTeamId() teamId: string) {
+    return this.linkService.getStats(teamId);
   }
 
   @Get(':id/stats')
   @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取单个链接统计' })
-  getLinkStats(@Param('id') id: string) {
+  async getLinkStats(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 验证资源归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权访问此链接统计');
+    }
     return this.linkService.getLinkStats(id);
   }
 
@@ -130,13 +185,18 @@ export class LinkController {
   @Post(':id/clone')
   @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '克隆链接' })
-  cloneLink(
+  async cloneLink(
     @Param('id') id: string,
     @Body() cloneLinkDto: CloneLinkDto,
     @CurrentUser() user: AuthenticatedUser,
-    @Headers('x-team-id') teamId: string,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.linkService.cloneLink(id, cloneLinkDto, user.id, teamId || user.teamId || user.id);
+    // 验证源链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权克隆此链接');
+    }
+    return this.linkService.cloneLink(id, cloneLinkDto, user.id, teamId);
   }
 
   // ========== 定时发布 ==========
@@ -144,25 +204,49 @@ export class LinkController {
   @Post(':id/schedule')
   @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '创建定时任务' })
-  scheduleLink(
+  async scheduleLink(
     @Param('id') id: string,
     @Body() scheduleLinkDto: ScheduleLinkDto,
     @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
+    // 验证链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权为此链接创建定时任务');
+    }
     return this.linkService.scheduleLink(id, scheduleLinkDto, user.id);
   }
 
   @Get(':id/schedules')
   @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取链接的所有定时任务' })
-  getSchedules(@Param('id') id: string) {
+  async getSchedules(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 验证链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权查看此链接的定时任务');
+    }
     return this.linkService.getSchedules(id);
   }
 
   @Get(':id/schedules/pending')
   @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取链接的待执行定时任务' })
-  getPendingSchedules(@Param('id') id: string) {
+  async getPendingSchedules(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 验证链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权查看此链接的定时任务');
+    }
     return this.linkService.getPendingSchedules(id);
   }
 
@@ -172,15 +256,19 @@ export class LinkController {
   updateSchedule(
     @Param('scheduleId') scheduleId: string,
     @Body() updateScheduleDto: UpdateScheduleDto,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.linkService.updateSchedule(scheduleId, updateScheduleDto);
+    return this.linkService.updateSchedule(scheduleId, updateScheduleDto, teamId);
   }
 
   @Delete('schedules/:scheduleId')
   @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '取消定时任务' })
-  cancelSchedule(@Param('scheduleId') scheduleId: string) {
-    return this.linkService.cancelSchedule(scheduleId);
+  cancelSchedule(
+    @Param('scheduleId') scheduleId: string,
+    @ScopedTeamId() teamId: string,
+  ) {
+    return this.linkService.cancelSchedule(scheduleId, teamId);
   }
 
   // ========== 密码保护 ==========
@@ -188,17 +276,33 @@ export class LinkController {
   @Post(':id/password')
   @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '设置链接密码' })
-  setPassword(
+  async setPassword(
     @Param('id') id: string,
     @Body() dto: SetPasswordDto,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    // 验证链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权设置此链接的密码');
+    }
     return this.linkService.setLinkPassword(id, dto.password);
   }
 
   @Delete(':id/password')
   @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '移除链接密码' })
-  removePassword(@Param('id') id: string) {
+  async removePassword(
+    @Param('id') id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    // 验证链接归属
+    const link = await this.linkService.findOne(id);
+    if (!isPlatformAdmin(user) && link.teamId !== teamId) {
+      throw new ForbiddenException('无权移除此链接的密码');
+    }
     return this.linkService.removeLinkPassword(id);
   }
 

@@ -6,8 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  Query,
-  Headers,
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
@@ -20,7 +18,13 @@ import {
 } from '@nestjs/swagger';
 
 import { RedirectRulesService, VisitorContext } from './redirect-rules.service';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+} from '@lnk/nestjs-common';
 import {
   CreateRedirectRuleDto,
   UpdateRedirectRuleDto,
@@ -31,12 +35,13 @@ import { RedirectRule } from './entities/redirect-rule.entity';
 
 @ApiTags('redirect-rules')
 @Controller('links/:linkId/redirect-rules')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class RedirectRulesController {
   constructor(private readonly redirectRulesService: RedirectRulesService) {}
 
   @Post()
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '创建跳转规则' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiResponse({ status: 201, type: RedirectRuleResponseDto })
@@ -48,6 +53,7 @@ export class RedirectRulesController {
   }
 
   @Get()
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取链接的所有跳转规则' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiResponse({ status: 200, type: [RedirectRuleResponseDto] })
@@ -58,6 +64,7 @@ export class RedirectRulesController {
   }
 
   @Get('stats')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: '获取跳转规则统计' })
   @ApiParam({ name: 'linkId', type: String })
   async getStats(@Param('linkId', ParseUUIDPipe) linkId: string) {
@@ -65,6 +72,7 @@ export class RedirectRulesController {
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取跳转规则详情' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiParam({ name: 'id', type: String })
@@ -76,6 +84,7 @@ export class RedirectRulesController {
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '更新跳转规则' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiParam({ name: 'id', type: String })
@@ -88,6 +97,7 @@ export class RedirectRulesController {
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.LINKS_DELETE)
   @ApiOperation({ summary: '删除跳转规则' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiParam({ name: 'id', type: String })
@@ -99,6 +109,7 @@ export class RedirectRulesController {
   }
 
   @Post(':id/toggle')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '切换规则启用/禁用状态' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiParam({ name: 'id', type: String })
@@ -110,6 +121,7 @@ export class RedirectRulesController {
   }
 
   @Post('reorder')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '重新排序规则优先级' })
   @ApiParam({ name: 'linkId', type: String })
   @ApiResponse({ status: 200, type: [RedirectRuleResponseDto] })
@@ -121,6 +133,7 @@ export class RedirectRulesController {
   }
 
   @Post('evaluate')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '测试规则匹配（模拟访问者）' })
   @ApiParam({ name: 'linkId', type: String })
   async evaluate(
@@ -157,6 +170,7 @@ export class RedirectRulesController {
   }
 
   @Post('duplicate')
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '复制规则到另一个链接' })
   @ApiParam({ name: 'linkId', type: String })
   async duplicate(

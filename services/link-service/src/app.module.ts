@@ -17,6 +17,7 @@ import {
 import { RedisModule } from './common/redis/redis.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { NotificationModule } from './common/notification/notification.module';
+import { UserClientModule } from './common/user-client/user-client.module';
 import { LinkModule } from './modules/link/link.module';
 import { FolderModule } from './modules/folder/folder.module';
 import { ABTestModule } from './modules/abtest/abtest.module';
@@ -38,6 +39,7 @@ import { LinkSagaModule } from './saga/saga.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // ScheduleModule 必须在 @Global 模块之前导入
     ScheduleModule.forRoot(),
     MetricsModule.forRoot({
       serviceName: 'link-service',
@@ -53,6 +55,7 @@ import { LinkSagaModule } from './saga/saga.module';
     AuthModule.forValidation(),
     RedisModule,
     RabbitMQModule,
+    UserClientModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

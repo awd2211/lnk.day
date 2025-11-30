@@ -11,7 +11,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsPlatform } from './entities/pixel-config.entity';
 
@@ -48,15 +55,16 @@ class TestPixelDto {
 
 @ApiTags('analytics')
 @Controller('analytics')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Post('pixels')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Create a pixel configuration' })
   async createPixel(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Body() dto: CreatePixelConfigDto,
   ) {
     // Validate pixel format
@@ -70,63 +78,68 @@ export class AnalyticsController {
       throw new BadRequestException(validation.errors.join(', '));
     }
 
-    return this.analyticsService.createPixelConfig(user.teamId, dto);
+    return this.analyticsService.createPixelConfig(teamId, dto);
   }
 
   @Get('pixels')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Get all pixel configurations for team' })
   async getPixels(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Query('linkId') linkId?: string,
   ) {
     if (linkId) {
-      return this.analyticsService.getPixelConfigsForLink(user.teamId, linkId);
+      return this.analyticsService.getPixelConfigsForLink(teamId, linkId);
     }
-    return this.analyticsService.getTeamPixelConfigs(user.teamId);
+    return this.analyticsService.getTeamPixelConfigs(teamId);
   }
 
   @Get('pixels/:id')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Get a specific pixel configuration' })
   async getPixel(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Param('id') id: string,
   ) {
-    return this.analyticsService.getPixelConfig(id, user.teamId);
+    return this.analyticsService.getPixelConfig(id, teamId);
   }
 
   @Put('pixels/:id')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Update a pixel configuration' })
   async updatePixel(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Param('id') id: string,
     @Body() dto: UpdatePixelConfigDto,
   ) {
-    return this.analyticsService.updatePixelConfig(id, user.teamId, dto);
+    return this.analyticsService.updatePixelConfig(id, teamId, dto);
   }
 
   @Delete('pixels/:id')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Delete a pixel configuration' })
   async deletePixel(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Param('id') id: string,
   ) {
-    await this.analyticsService.deletePixelConfig(id, user.teamId);
+    await this.analyticsService.deletePixelConfig(id, teamId);
     return { success: true };
   }
 
   @Post('pixels/:id/toggle')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Toggle pixel enabled status' })
   async togglePixel(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Param('id') id: string,
   ) {
-    return this.analyticsService.togglePixelConfig(id, user.teamId);
+    return this.analyticsService.togglePixelConfig(id, teamId);
   }
 
   @Post('test')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Test a pixel configuration' })
   async testPixel(
-    @CurrentUser() user: { teamId: string },
     @Body() dto: TestPixelDto,
   ) {
     const validation = this.analyticsService.validatePixelConfig({
@@ -144,19 +157,21 @@ export class AnalyticsController {
   }
 
   @Get('script/:linkId')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Get tracking script for a link' })
   async getTrackingScript(
-    @CurrentUser() user: { teamId: string },
+    @ScopedTeamId() teamId: string,
     @Param('linkId') linkId: string,
   ) {
     const script = await this.analyticsService.generateTrackingScriptForLink(
-      user.teamId,
+      teamId,
       linkId,
     );
     return { script };
   }
 
   @Get('platforms')
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiOperation({ summary: 'Get supported analytics platforms' })
   getSupportedPlatforms() {
     return {

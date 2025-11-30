@@ -5,7 +5,6 @@ import {
   Get,
   Body,
   Query,
-  Headers,
   Res,
   UseGuards,
   UseInterceptors,
@@ -24,7 +23,16 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 
 import { BatchService } from './batch.service';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+} from '@lnk/nestjs-common';
 import { ImportLinksDto, ImportResultDto } from './dto/import-links.dto';
 import { ExportLinksQueryDto } from './dto/export-links.dto';
 import {
@@ -39,23 +47,25 @@ import {
 
 @ApiTags('batch')
 @Controller('links/batch')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class BatchController {
   constructor(private readonly batchService: BatchService) {}
 
   @Post('import')
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '批量导入链接 (JSON)' })
   @ApiResponse({ status: 201, type: ImportResultDto })
   async importLinks(
     @Body() dto: ImportLinksDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<ImportResultDto> {
-    return this.batchService.importLinks(dto, userId, teamId || userId);
+    return this.batchService.importLinks(dto, user.id, teamId);
   }
 
   @Post('import/csv')
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '从 CSV 文件批量导入链接' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -77,8 +87,8 @@ export class BatchController {
   @UseInterceptors(FileInterceptor('file'))
   async importFromCsv(
     @UploadedFile() file: Express.Multer.File,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
     @Body('skipDuplicates') skipDuplicates?: string,
   ): Promise<ImportResultDto> {
     if (!file) {
@@ -92,18 +102,18 @@ export class BatchController {
     const csvContent = file.buffer.toString('utf-8');
     const skip = skipDuplicates === 'true';
 
-    return this.batchService.importFromCsv(csvContent, userId, teamId || userId, skip);
+    return this.batchService.importFromCsv(csvContent, user.id, teamId, skip);
   }
 
   @Get('export')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '导出链接为 CSV 或 JSON' })
   async exportLinks(
     @Query() query: ExportLinksQueryDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
     @Res() res: Response,
   ): Promise<void> {
-    const result = await this.batchService.exportLinks(teamId || userId, query);
+    const result = await this.batchService.exportLinks(teamId, query);
 
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -123,71 +133,72 @@ export class BatchController {
   // ========== 批量编辑操作 ==========
 
   @Post('update')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量更新链接（标签、文件夹、状态等）' })
   @ApiResponse({ status: 200, type: BatchOperationResultDto })
   async batchUpdate(
     @Body() dto: BatchUpdateDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchUpdate(dto, teamId || userId);
+    return this.batchService.batchUpdate(dto, teamId);
   }
 
   @Post('delete')
+  @RequirePermissions(Permission.LINKS_DELETE)
   @ApiOperation({ summary: '批量删除链接' })
   @ApiResponse({ status: 200, type: BatchOperationResultDto })
   async batchDelete(
     @Body() dto: BatchDeleteDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchDelete(dto, teamId || userId);
+    return this.batchService.batchDelete(dto, teamId);
   }
 
   @Post('archive')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量归档链接' })
   @ApiResponse({ status: 200, type: BatchOperationResultDto })
   async batchArchive(
     @Body() dto: BatchArchiveDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchArchive(dto, teamId || userId);
+    return this.batchService.batchArchive(dto, teamId);
   }
 
   @Post('restore')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量恢复已归档/删除的链接' })
   @ApiResponse({ status: 200, type: BatchOperationResultDto })
   async batchRestore(
     @Body() dto: BatchRestoreDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchRestore(dto, teamId || userId);
+    return this.batchService.batchRestore(dto, teamId);
   }
 
   @Post('move')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量移动链接到文件夹' })
   @ApiResponse({ status: 200, type: BatchOperationResultDto })
   async batchMoveToFolder(
     @Body() dto: BatchMoveToFolderDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchMoveToFolder(dto, teamId || userId);
+    return this.batchService.batchMoveToFolder(dto, teamId);
   }
 
   @Get('select')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '根据条件批量选择链接ID（用于后续批量操作）' })
   async bulkSelectIds(
     @Query() query: BulkSelectQueryDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<{ ids: string[]; total: number }> {
-    return this.batchService.bulkSelectIds(query, teamId || userId);
+    return this.batchService.bulkSelectIds(query, teamId);
   }
 
   @Post('tags/add')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量添加标签' })
   @ApiBody({
     schema: {
@@ -201,13 +212,13 @@ export class BatchController {
   async batchAddTags(
     @Body('linkIds') linkIds: string[],
     @Body('tags') tags: string[],
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchAddTags(linkIds, tags, teamId || userId);
+    return this.batchService.batchAddTags(linkIds, tags, teamId);
   }
 
   @Post('tags/remove')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '批量移除标签' })
   @ApiBody({
     schema: {
@@ -221,9 +232,8 @@ export class BatchController {
   async batchRemoveTags(
     @Body('linkIds') linkIds: string[],
     @Body('tags') tags: string[],
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<BatchOperationResultDto> {
-    return this.batchService.batchRemoveTags(linkIds, tags, teamId || userId);
+    return this.batchService.batchRemoveTags(linkIds, tags, teamId);
   }
 }

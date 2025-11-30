@@ -4,12 +4,18 @@ import {
   Post,
   Query,
   Body,
-  Headers,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
-import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { SearchService, LinkDocument } from './search.service';
 
 class SearchDto {
@@ -30,12 +36,13 @@ class SearchDto {
 
 @ApiTags('search')
 @Controller('search')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Get()
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '搜索链接' })
   @ApiQuery({ name: 'q', required: true, description: '搜索关键词' })
   @ApiQuery({ name: 'page', required: false })
@@ -45,8 +52,7 @@ export class SearchController {
   @ApiQuery({ name: 'status', required: false })
   async search(
     @Query('q') query: string,
-    @Headers('x-team-id') teamId: string,
-    @CurrentUser() user: { id: string },
+    @ScopedTeamId() teamId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('domain') domain?: string,
@@ -71,7 +77,7 @@ export class SearchController {
       ? { field: sort, order: (order as 'asc' | 'desc') || 'desc' }
       : undefined;
 
-    return this.searchService.search(teamId || user.id, query, {
+    return this.searchService.search(teamId, query, {
       filters,
       sort: sortOption,
       page: page ? parseInt(page) : 1,
@@ -80,11 +86,11 @@ export class SearchController {
   }
 
   @Post('advanced')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '高级搜索' })
   async advancedSearch(
     @Body() searchDto: SearchDto,
-    @Headers('x-team-id') teamId: string,
-    @CurrentUser() user: { id: string },
+    @ScopedTeamId() teamId: string,
   ) {
     const filters = searchDto.filters
       ? {
@@ -98,7 +104,7 @@ export class SearchController {
         }
       : undefined;
 
-    return this.searchService.search(teamId || user.id, searchDto.query, {
+    return this.searchService.search(teamId, searchDto.query, {
       filters,
       sort: searchDto.sort,
       page: searchDto.page,

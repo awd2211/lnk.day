@@ -498,14 +498,28 @@ export class LinkService {
     });
   }
 
-  async updateSchedule(scheduleId: string, dto: UpdateScheduleDto): Promise<LinkSchedule> {
+  /**
+   * 获取定时任务并验证归属
+   */
+  async getScheduleWithOwnership(scheduleId: string, teamId: string): Promise<LinkSchedule> {
     const schedule = await this.scheduleRepository.findOne({
       where: { id: scheduleId },
+      relations: ['link'],
     });
 
     if (!schedule) {
       throw new NotFoundException('Schedule not found');
     }
+
+    if (schedule.link.teamId !== teamId) {
+      throw new NotFoundException('Schedule not found'); // 不暴露归属信息
+    }
+
+    return schedule;
+  }
+
+  async updateSchedule(scheduleId: string, dto: UpdateScheduleDto, teamId: string): Promise<LinkSchedule> {
+    const schedule = await this.getScheduleWithOwnership(scheduleId, teamId);
 
     if (schedule.status !== ScheduleStatus.PENDING) {
       throw new BadRequestException('Can only update pending schedules');
@@ -521,14 +535,8 @@ export class LinkService {
     return this.scheduleRepository.save(schedule);
   }
 
-  async cancelSchedule(scheduleId: string): Promise<LinkSchedule> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id: scheduleId },
-    });
-
-    if (!schedule) {
-      throw new NotFoundException('Schedule not found');
-    }
+  async cancelSchedule(scheduleId: string, teamId: string): Promise<LinkSchedule> {
+    const schedule = await this.getScheduleWithOwnership(scheduleId, teamId);
 
     if (schedule.status !== ScheduleStatus.PENDING) {
       throw new BadRequestException('Can only cancel pending schedules');

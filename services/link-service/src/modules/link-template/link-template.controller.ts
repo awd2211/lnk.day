@@ -7,7 +7,6 @@ import {
   Body,
   Param,
   Query,
-  Headers,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,7 +18,17 @@ import {
 } from '@nestjs/swagger';
 
 import { LinkTemplateService } from './link-template.service';
-import { JwtAuthGuard } from '@lnk/nestjs-common';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  Permission,
+  RequirePermissions,
+  CurrentUser,
+  ScopedTeamId,
+  AuthenticatedUser,
+  AdminOnly,
+} from '@lnk/nestjs-common';
 import {
   CreateLinkTemplateDto,
   UpdateLinkTemplateDto,
@@ -30,120 +39,124 @@ import { LinkTemplate, LinkTemplatePreset } from './entities/link-template.entit
 
 @ApiTags('link-templates')
 @Controller('link-templates')
-@UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class LinkTemplateController {
   constructor(private readonly templateService: LinkTemplateService) {}
 
   // ========== Custom Templates ==========
 
   @Post()
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '创建链接模板' })
   async create(
     @Body() dto: CreateLinkTemplateDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate> {
-    return this.templateService.create(dto, userId, teamId || userId);
+    return this.templateService.create(dto, user.id, teamId);
   }
 
   @Get()
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取模板列表' })
   async findAll(
     @Query() query: LinkTemplateQueryDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<{ templates: LinkTemplate[]; total: number }> {
-    return this.templateService.findAll(teamId || userId, query);
+    return this.templateService.findAll(teamId, query);
   }
 
   @Get('most-used')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取最常用的模板' })
   async getMostUsed(
     @Query('limit') limit: number = 5,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate[]> {
-    return this.templateService.getMostUsedTemplates(teamId || userId, limit);
+    return this.templateService.getMostUsedTemplates(teamId, limit);
   }
 
   @Get('recently-used')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取最近使用的模板' })
   async getRecentlyUsed(
     @Query('limit') limit: number = 5,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate[]> {
-    return this.templateService.getRecentlyUsedTemplates(teamId || userId, limit);
+    return this.templateService.getRecentlyUsedTemplates(teamId, limit);
   }
 
   @Get(':id')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取模板详情' })
   @ApiParam({ name: 'id', description: '模板ID' })
   async findOne(
     @Param('id') id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate> {
-    return this.templateService.findOne(id, teamId || userId);
+    return this.templateService.findOne(id, teamId);
   }
 
   @Put(':id')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '更新模板' })
   @ApiParam({ name: 'id', description: '模板ID' })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateLinkTemplateDto,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate> {
-    return this.templateService.update(id, dto, teamId || userId);
+    return this.templateService.update(id, dto, teamId);
   }
 
   @Delete(':id')
+  @RequirePermissions(Permission.LINKS_DELETE)
   @ApiOperation({ summary: '删除模板' })
   @ApiParam({ name: 'id', description: '模板ID' })
   async remove(
     @Param('id') id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<{ message: string }> {
-    await this.templateService.remove(id, teamId || userId);
+    await this.templateService.remove(id, teamId);
     return { message: 'Template deleted successfully' };
   }
 
   @Post(':id/favorite')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiOperation({ summary: '切换模板收藏状态' })
   @ApiParam({ name: 'id', description: '模板ID' })
   async toggleFavorite(
     @Param('id') id: string,
-    @Headers('x-team-id') teamId: string,
-    @Headers('x-user-id') userId: string,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate> {
-    return this.templateService.toggleFavorite(id, teamId || userId);
+    return this.templateService.toggleFavorite(id, teamId);
   }
 
   // ========== Create Link From Template ==========
 
   @Post('use')
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '使用模板创建链接' })
   async createLinkFromTemplate(
     @Body() dto: CreateLinkFromTemplateDto,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ) {
-    return this.templateService.createLinkFromTemplate(dto, userId, teamId || userId);
+    return this.templateService.createLinkFromTemplate(dto, user.id, teamId);
   }
 
   // ========== Presets ==========
 
   @Get('presets/all')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取所有预设模板' })
   async getPresets(): Promise<LinkTemplatePreset[]> {
     return this.templateService.getPresets();
   }
 
   @Get('presets/category/:category')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '按分类获取预设模板' })
   @ApiParam({ name: 'category', description: '分类: marketing, social, email, qr, custom' })
   async getPresetsByCategory(
@@ -153,20 +166,22 @@ export class LinkTemplateController {
   }
 
   @Post('presets/:presetId/create')
+  @RequirePermissions(Permission.LINKS_CREATE)
   @ApiOperation({ summary: '从预设创建自定义模板' })
   @ApiParam({ name: 'presetId', description: '预设模板ID' })
   async createFromPreset(
     @Param('presetId') presetId: string,
     @Body('name') name: string,
-    @Headers('x-user-id') userId: string,
-    @Headers('x-team-id') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
   ): Promise<LinkTemplate> {
-    return this.templateService.createFromPreset(presetId, name, userId, teamId || userId);
+    return this.templateService.createFromPreset(presetId, name, user.id, teamId);
   }
 
   // ========== Admin ==========
 
   @Post('presets/seed')
+  @AdminOnly()
   @ApiOperation({ summary: '初始化预设模板（管理员）' })
   async seedPresets(): Promise<{ message: string }> {
     await this.templateService.seedPresets();
