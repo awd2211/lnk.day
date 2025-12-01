@@ -120,7 +120,8 @@ export class ProxyService {
         params: { limit: 100 },
         headers: auth ? { Authorization: auth } : {},
       });
-      const teams = result?.items || result?.teams || result?.data || [];
+      // Handle both array and object response formats
+      const teams = Array.isArray(result) ? result : (result?.items || result?.teams || result?.data || []);
       const map: Record<string, string> = {};
       for (const team of teams) {
         if (teamIds.includes(team.id)) {
@@ -246,6 +247,22 @@ export class ProxyService {
     return this.forward('campaign', `/campaigns/${id}`, { method: 'DELETE', headers: auth ? { Authorization: auth } : {} });
   }
 
+  async getCampaignStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('campaign', '/internal/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if campaign service doesn't have stats endpoint
+      return {
+        totalCampaigns: 0,
+        activeCampaigns: 0,
+        suspendedCampaigns: 0,
+        flaggedCampaigns: 0,
+        totalLinks: 0,
+        totalClicks: 0,
+      };
+    }
+  }
+
   // Page Service Proxies
   async getPages(teamId: string, params?: { status?: string }, auth?: string): Promise<any> {
     return this.forward('page', '/pages', {
@@ -260,6 +277,22 @@ export class ProxyService {
 
   async deletePage(id: string, auth?: string): Promise<any> {
     return this.forward('page', `/pages/${id}`, { method: 'DELETE', headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async getPageStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('page', '/internal/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if page service doesn't have stats endpoint
+      return {
+        totalPages: 0,
+        publishedPages: 0,
+        blockedPages: 0,
+        flaggedPages: 0,
+        totalViews: 0,
+        totalClicks: 0,
+      };
+    }
   }
 
   // Notification Service Proxies
@@ -561,6 +594,21 @@ export class ProxyService {
     });
   }
 
+  async getQRCodeStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('qr', '/internal/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if qr service doesn't have stats endpoint
+      return {
+        totalQRCodes: 0,
+        activeQRCodes: 0,
+        blockedQRCodes: 0,
+        flaggedQRCodes: 0,
+        totalScans: 0,
+      };
+    }
+  }
+
   // Deep Link Service Proxies
   async getDeepLinks(teamId?: string, params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
     const headers: Record<string, string> = auth ? { Authorization: auth } : {};
@@ -594,6 +642,23 @@ export class ProxyService {
       method: 'DELETE',
       headers: auth ? { Authorization: auth } : {},
     });
+  }
+
+  async getDeepLinkStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('deeplink', '/internal/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if deeplink service doesn't have stats endpoint
+      return {
+        totalDeepLinks: 0,
+        activeDeepLinks: 0,
+        blockedDeepLinks: 0,
+        flaggedDeepLinks: 0,
+        totalClicks: 0,
+        iosClicks: 0,
+        androidClicks: 0,
+      };
+    }
   }
 
   // Domain Service Proxies
@@ -1062,6 +1127,170 @@ export class ProxyService {
 
   async testNotificationChannel(id: string, auth?: string): Promise<any> {
     return this.forward('notification', `/notifications/channels/${id}/test`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== User Bulk Operations ====================
+  async bulkDeleteUsers(ids: string[], auth?: string): Promise<any> {
+    return this.forward('user', '/users/bulk-delete', {
+      method: 'POST',
+      data: { ids },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async bulkToggleStatus(ids: string[], status: 'active' | 'disabled', auth?: string): Promise<any> {
+    return this.forward('user', '/users/bulk-status', {
+      method: 'POST',
+      data: { ids, status },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async forceLogout(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/users/${id}/force-logout`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getUserLoginHistory(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/users/${id}/login-history`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getUserActivity(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/users/${id}/activity`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Team Extended Operations ====================
+  async removeTeamMember(teamId: string, memberId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${teamId}/members/${memberId}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateTeamQuota(id: string, quota: any, auth?: string): Promise<any> {
+    return this.forward('user', `/teams/${id}/quota`, {
+      method: 'PATCH',
+      data: quota,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== QR Code Extended Operations ====================
+  async blockQRCode(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('qr', `/qr-records/${id}/block`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async unblockQRCode(id: string, auth?: string): Promise<any> {
+    return this.forward('qr', `/qr-records/${id}/unblock`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async flagQRCode(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('qr', `/qr-records/${id}/flag`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Deep Link Extended Operations ====================
+  async blockDeepLink(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('deeplink', `/deeplinks/${id}/block`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async unblockDeepLink(id: string, auth?: string): Promise<any> {
+    return this.forward('deeplink', `/deeplinks/${id}/unblock`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async flagDeepLink(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('deeplink', `/deeplinks/${id}/flag`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Page Extended Operations ====================
+  async blockPage(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('page', `/pages/${id}/block`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async unblockPage(id: string, auth?: string): Promise<any> {
+    return this.forward('page', `/pages/${id}/unblock`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async flagPage(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('page', `/pages/${id}/flag`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Campaign Extended Operations ====================
+  async suspendCampaign(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('campaign', `/campaigns/${id}/suspend`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async resumeCampaign(id: string, auth?: string): Promise<any> {
+    return this.forward('campaign', `/campaigns/${id}/resume`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async flagCampaign(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('campaign', `/campaigns/${id}/flag`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Link Extended Operations ====================
+  async blockLink(id: string, reason?: string, auth?: string): Promise<any> {
+    return this.forward('link', `/links/${id}/block`, {
+      method: 'POST',
+      data: { reason },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async unblockLink(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/links/${id}/unblock`, {
       method: 'POST',
       headers: auth ? { Authorization: auth } : {},
     });

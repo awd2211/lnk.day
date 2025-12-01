@@ -329,6 +329,44 @@ export class SystemService {
     return { queues };
   }
 
+  async clearQueue(queueName: string): Promise<{ success: boolean; message: string; purged?: number }> {
+    try {
+      const rabbitmqUrl = this.configService.get('RABBITMQ_MANAGEMENT_URL', 'http://localhost:60037');
+      const rabbitmqUser = this.configService.get('RABBITMQ_USER', 'rabbit');
+      const rabbitmqPass = this.configService.get('RABBITMQ_PASS', 'rabbit123');
+
+      // Purge queue via RabbitMQ Management API
+      const response = await axios.delete(
+        `${rabbitmqUrl}/api/queues/%2F/${encodeURIComponent(queueName)}/contents`,
+        {
+          auth: {
+            username: rabbitmqUser,
+            password: rabbitmqPass,
+          },
+          timeout: 5000,
+        },
+      );
+
+      this.logger.warn(`Queue ${queueName} cleared`);
+      return {
+        success: true,
+        message: `Queue ${queueName} cleared successfully`,
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to clear queue ${queueName}`, error);
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          message: `Queue ${queueName} not found`,
+        };
+      }
+      return {
+        success: false,
+        message: `Failed to clear queue: ${error?.message || 'Unknown error'}`,
+      };
+    }
+  }
+
   async getCacheStats(): Promise<{
     redis: {
       connected: boolean;
@@ -891,6 +929,166 @@ export class SystemService {
       success: true,
       updated: updatedKeys,
       message: 'Config changes will take effect after service restart',
+    };
+  }
+
+  async resetConfig(): Promise<{
+    success: boolean;
+    message: string;
+    features: Record<string, boolean>;
+  }> {
+    // Reset all feature flags to defaults
+    this.featureFlags.set('enableRegistration', true);
+    this.featureFlags.set('enableBioLinks', true);
+    this.featureFlags.set('enableQRCodes', true);
+    this.featureFlags.set('enableCampaigns', true);
+    this.featureFlags.set('enableTeams', true);
+    this.featureFlags.set('enableDeepLinks', true);
+    this.featureFlags.set('enableRedirectRules', true);
+    this.featureFlags.set('maintenanceMode', false);
+
+    const features: Record<string, boolean> = {};
+    this.featureFlags.forEach((value, key) => {
+      features[key] = value;
+    });
+
+    this.logger.log('System configuration reset to defaults');
+    return {
+      success: true,
+      message: 'System configuration reset to default values',
+      features,
+    };
+  }
+
+  // System Logs
+  async getSystemLogs(options?: { level?: string; service?: string; limit?: number }): Promise<{
+    logs: Array<{
+      timestamp: string;
+      level: string;
+      service: string;
+      message: string;
+    }>;
+    total: number;
+    filters: {
+      level?: string;
+      service?: string;
+      limit: number;
+    };
+  }> {
+    const limit = options?.limit || 100;
+    const level = options?.level;
+    const service = options?.service;
+
+    const allLogs: Array<{
+      timestamp: string;
+      level: string;
+      service: string;
+      message: string;
+    }> = [];
+
+    try {
+      const pm2LogDir = path.join(os.homedir(), '.pm2', 'logs');
+
+      // Get list of services to read logs from
+      const servicesToRead = service
+        ? [service]
+        : this.services.map(s => s.name);
+
+      for (const serviceName of servicesToRead) {
+        const outLogFile = path.join(pm2LogDir, `${serviceName}-out.log`);
+        const errLogFile = path.join(pm2LogDir, `${serviceName}-error.log`);
+
+        // Read out log
+        if (fs.existsSync(outLogFile)) {
+          try {
+            const { stdout } = await execAsync(`tail -n ${Math.ceil(limit / servicesToRead.length)} "${outLogFile}"`);
+            const lines = stdout.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              const parsed = this.parseLogLine(line, serviceName);
+              if (!level || parsed.level.toLowerCase() === level.toLowerCase()) {
+                allLogs.push(parsed);
+              }
+            }
+          } catch {
+            // Skip if file not readable
+          }
+        }
+
+        // Read error log
+        if (fs.existsSync(errLogFile)) {
+          try {
+            const { stdout } = await execAsync(`tail -n ${Math.ceil(limit / servicesToRead.length)} "${errLogFile}"`);
+            const lines = stdout.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              const parsed = this.parseLogLine(line, serviceName, 'error');
+              if (!level || parsed.level.toLowerCase() === level.toLowerCase()) {
+                allLogs.push(parsed);
+              }
+            }
+          } catch {
+            // Skip if file not readable
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to read system logs', error);
+    }
+
+    // Sort by timestamp (newest first) and limit
+    const sortedLogs = allLogs
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, limit);
+
+    return {
+      logs: sortedLogs,
+      total: sortedLogs.length,
+      filters: {
+        level,
+        service,
+        limit,
+      },
+    };
+  }
+
+  private parseLogLine(
+    line: string,
+    serviceName: string,
+    defaultLevel: string = 'info',
+  ): { timestamp: string; level: string; service: string; message: string } {
+    // Try to parse common log formats
+    // Format 1: 2024-01-01T12:00:00.000Z [INFO] message
+    // Format 2: [Nest] 1234 - 01/01/2024, 12:00:00 PM LOG [Context] message
+    // Format 3: Plain text
+
+    let timestamp = new Date().toISOString();
+    let level = defaultLevel;
+    let message = line;
+
+    // Try to extract timestamp
+    const isoMatch = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z?)/);
+    if (isoMatch && isoMatch[1]) {
+      timestamp = isoMatch[1];
+      message = line.slice(isoMatch[0].length).trim();
+    }
+
+    // Try to extract log level
+    const levelMatch = message.match(/\[(INFO|WARN|ERROR|DEBUG|LOG)\]/i);
+    if (levelMatch && levelMatch[1]) {
+      level = levelMatch[1].toLowerCase();
+      if (level === 'log') level = 'info';
+    } else if (/\bERROR\b/i.test(message)) {
+      level = 'error';
+    } else if (/\bWARN\b/i.test(message)) {
+      level = 'warn';
+    } else if (/\bDEBUG\b/i.test(message)) {
+      level = 'debug';
+    }
+
+    return {
+      timestamp,
+      level,
+      service: serviceName,
+      message: message.substring(0, 500), // Limit message length
     };
   }
 

@@ -86,7 +86,11 @@ export class AlertsController {
   @Patch('rules/:id/toggle')
   @ApiOperation({ summary: '启用/禁用告警规则' })
   @ApiResponse({ status: HttpStatus.OK, description: '规则状态已切换' })
-  async toggleRule(@Param('id') id: string) {
+  async toggleRule(@Param('id') id: string, @Body() body?: { enabled?: boolean }) {
+    // 如果传入了 enabled 参数，直接设置；否则切换当前状态
+    if (body?.enabled !== undefined) {
+      return this.alertsService.setRuleEnabled(id, body.enabled);
+    }
     return this.alertsService.toggleRule(id);
   }
 

@@ -10,18 +10,43 @@ import { AdminRoleService } from './admin-role.service';
 import { AdminRoleController } from './admin-role.controller';
 import { PresetRoleController, PresetRoleInternalController } from './preset-role.controller';
 import { PresetRoleService } from './preset-role.service';
+import { IntegrationConfig } from './entities/integration-config.entity';
+import { IntegrationConfigService } from './integration-config.service';
+import { IntegrationConfigController } from './integration-config.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SystemConfig, AdminRoleEntity]),
+    TypeOrmModule.forFeature([SystemConfig, AdminRoleEntity, IntegrationConfig]),
     HttpModule,
   ],
-  controllers: [SystemController, SystemInternalController, AdminRoleController, PresetRoleController, PresetRoleInternalController],
-  providers: [SystemService, SystemConfigService, AdminRoleService, PresetRoleService],
-  exports: [SystemService, SystemConfigService, AdminRoleService, PresetRoleService],
+  controllers: [
+    SystemController,
+    SystemInternalController,
+    AdminRoleController,
+    PresetRoleController,
+    PresetRoleInternalController,
+    IntegrationConfigController,
+  ],
+  providers: [
+    SystemService,
+    SystemConfigService,
+    AdminRoleService,
+    PresetRoleService,
+    IntegrationConfigService,
+  ],
+  exports: [
+    SystemService,
+    SystemConfigService,
+    AdminRoleService,
+    PresetRoleService,
+    IntegrationConfigService,
+  ],
 })
 export class SystemModule implements OnModuleInit {
-  constructor(private readonly adminRoleService: AdminRoleService) {}
+  constructor(
+    private readonly adminRoleService: AdminRoleService,
+    private readonly integrationConfigService: IntegrationConfigService,
+  ) {}
 
   async onModuleInit() {
     // 自动初始化默认角色

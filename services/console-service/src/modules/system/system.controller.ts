@@ -56,10 +56,22 @@ export class SystemController {
     return this.systemService.updateConfig(updates);
   }
 
+  @Post('config/reset')
+  @ApiOperation({ summary: '重置系统配置为默认值' })
+  resetConfig() {
+    return this.systemService.resetConfig();
+  }
+
   @Get('queues')
   @ApiOperation({ summary: '获取队列状态' })
   getQueueStats() {
     return this.systemService.getQueueStats();
+  }
+
+  @Post('queues/:queueName/clear')
+  @ApiOperation({ summary: '清空队列' })
+  clearQueue(@Param('queueName') queueName: string) {
+    return this.systemService.clearQueue(queueName);
   }
 
   @Get('cache')
@@ -77,16 +89,35 @@ export class SystemController {
   }
 
   @Delete('cache')
-  @ApiOperation({ summary: '清除缓存' })
+  @ApiOperation({ summary: '清除缓存 (DELETE 方式)' })
   @ApiQuery({ name: 'pattern', required: false, description: '匹配模式，不指定则清除全部' })
   clearCache(@Query('pattern') pattern?: string) {
     return this.systemService.clearCache(pattern);
+  }
+
+  @Post('cache/clear')
+  @ApiOperation({ summary: '清除缓存 (POST 方式)' })
+  clearCachePost(@Body() body?: { pattern?: string }) {
+    return this.systemService.clearCache(body?.pattern);
   }
 
   @Get('database')
   @ApiOperation({ summary: '获取数据库状态' })
   getDatabaseStats() {
     return this.systemService.getDatabaseStats();
+  }
+
+  @Get('logs')
+  @ApiOperation({ summary: '获取系统日志' })
+  @ApiQuery({ name: 'level', required: false, enum: ['debug', 'info', 'warn', 'error'] })
+  @ApiQuery({ name: 'service', required: false, description: '服务名称' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '返回数量限制，默认100' })
+  getSystemLogs(
+    @Query('level') level?: string,
+    @Query('service') service?: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.systemService.getSystemLogs({ level, service, limit });
   }
 
   // Feature Flags

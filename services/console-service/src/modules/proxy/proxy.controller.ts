@@ -86,6 +86,12 @@ export class ProxyController {
     return this.proxyService.getLinks(teamId, { page, limit, status }, auth);
   }
 
+  @Get('links/stats')
+  @ApiOperation({ summary: '获取链接统计' })
+  getLinkStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getLinkStats(auth);
+  }
+
   @Get('links/:id')
   @ApiOperation({ summary: '获取链接详情' })
   getLink(@Headers('authorization') auth: string, @Param('id') id: string) {
@@ -96,12 +102,6 @@ export class ProxyController {
   @ApiOperation({ summary: '删除链接' })
   deleteLink(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.deleteLink(id, auth);
-  }
-
-  @Get('links/stats')
-  @ApiOperation({ summary: '获取链接统计' })
-  getLinkStats(@Headers('authorization') auth: string) {
-    return this.proxyService.getLinkStats(auth);
   }
 
   // Analytics
@@ -154,6 +154,12 @@ export class ProxyController {
     return this.proxyService.getCampaigns(teamId, { status, page, limit }, auth);
   }
 
+  @Get('campaigns/stats')
+  @ApiOperation({ summary: '获取营销活动统计' })
+  getCampaignStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getCampaignStats(auth);
+  }
+
   @Get('campaigns/:id')
   @ApiOperation({ summary: '获取营销活动详情' })
   getCampaign(@Headers('authorization') auth: string, @Param('id') id: string) {
@@ -166,6 +172,24 @@ export class ProxyController {
     return this.proxyService.deleteCampaign(id, auth);
   }
 
+  @Post('campaigns/:id/suspend')
+  @ApiOperation({ summary: '暂停营销活动' })
+  suspendCampaign(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.suspendCampaign(id, data.reason, auth);
+  }
+
+  @Post('campaigns/:id/resume')
+  @ApiOperation({ summary: '恢复营销活动' })
+  resumeCampaign(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.resumeCampaign(id, auth);
+  }
+
+  @Post('campaigns/:id/flag')
+  @ApiOperation({ summary: '标记营销活动' })
+  flagCampaign(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.flagCampaign(id, data.reason, auth);
+  }
+
   // Page Management
   @Get('pages')
   @ApiOperation({ summary: '获取页面列表' })
@@ -173,6 +197,12 @@ export class ProxyController {
   @ApiQuery({ name: 'status', required: false })
   getPages(@Headers('authorization') auth: string, @Query('teamId') teamId: string, @Query('status') status?: string) {
     return this.proxyService.getPages(teamId, { status }, auth);
+  }
+
+  @Get('pages/stats')
+  @ApiOperation({ summary: '获取页面统计' })
+  getPageStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getPageStats(auth);
   }
 
   @Get('pages/:id')
@@ -185,6 +215,24 @@ export class ProxyController {
   @ApiOperation({ summary: '删除页面' })
   deletePage(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.deletePage(id, auth);
+  }
+
+  @Post('pages/:id/block')
+  @ApiOperation({ summary: '封禁页面' })
+  blockPage(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.blockPage(id, data.reason, auth);
+  }
+
+  @Post('pages/:id/unblock')
+  @ApiOperation({ summary: '解封页面' })
+  unblockPage(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.unblockPage(id, auth);
+  }
+
+  @Post('pages/:id/flag')
+  @ApiOperation({ summary: '标记页面' })
+  flagPage(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.flagPage(id, data.reason, auth);
   }
 
   // Notifications
@@ -233,6 +281,39 @@ export class ProxyController {
     return this.proxyService.resetUserPassword(id, auth);
   }
 
+  @Post('users/bulk-delete')
+  @ApiOperation({ summary: '批量删除用户' })
+  bulkDeleteUsers(@Headers('authorization') auth: string, @Body() data: { ids: string[] }) {
+    return this.proxyService.bulkDeleteUsers(data.ids, auth);
+  }
+
+  @Post('users/bulk-status')
+  @ApiOperation({ summary: '批量更新用户状态' })
+  bulkToggleStatus(
+    @Headers('authorization') auth: string,
+    @Body() data: { ids: string[]; status: 'active' | 'disabled' },
+  ) {
+    return this.proxyService.bulkToggleStatus(data.ids, data.status, auth);
+  }
+
+  @Post('users/:id/force-logout')
+  @ApiOperation({ summary: '强制用户登出' })
+  forceLogout(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.forceLogout(id, auth);
+  }
+
+  @Get('users/:id/login-history')
+  @ApiOperation({ summary: '获取用户登录历史' })
+  getUserLoginHistory(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getUserLoginHistory(id, auth);
+  }
+
+  @Get('users/:id/activity')
+  @ApiOperation({ summary: '获取用户活动记录' })
+  getUserActivity(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getUserActivity(id, auth);
+  }
+
   // Extended Team Management
   @Put('teams/:id')
   @ApiOperation({ summary: '更新团队' })
@@ -262,6 +343,26 @@ export class ProxyController {
   @ApiOperation({ summary: '获取团队成员' })
   getTeamMembers(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.getTeamMembers(id, auth);
+  }
+
+  @Delete('teams/:teamId/members/:memberId')
+  @ApiOperation({ summary: '移除团队成员' })
+  removeTeamMember(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.proxyService.removeTeamMember(teamId, memberId, auth);
+  }
+
+  @Patch('teams/:id/quota')
+  @ApiOperation({ summary: '更新团队配额' })
+  updateTeamQuota(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() quota: any,
+  ) {
+    return this.proxyService.updateTeamQuota(id, quota, auth);
   }
 
   // Subscription Management
@@ -481,6 +582,18 @@ export class ProxyController {
     return this.proxyService.unflagLink(id, auth);
   }
 
+  @Post('links/:id/block')
+  @ApiOperation({ summary: '封禁链接' })
+  blockLink(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.blockLink(id, data.reason, auth);
+  }
+
+  @Post('links/:id/unblock')
+  @ApiOperation({ summary: '解封链接' })
+  unblockLink(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.unblockLink(id, auth);
+  }
+
   // QR Code Management
   @Get('qrcodes')
   @ApiOperation({ summary: '获取二维码列表' })
@@ -498,6 +611,12 @@ export class ProxyController {
     return this.proxyService.getQRCodes(teamId, { page, limit, style }, auth);
   }
 
+  @Get('qrcodes/stats')
+  @ApiOperation({ summary: '获取二维码统计' })
+  getQRCodeStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getQRCodeStats(auth);
+  }
+
   @Get('qrcodes/:id')
   @ApiOperation({ summary: '获取二维码详情' })
   getQRCode(@Headers('authorization') auth: string, @Param('id') id: string) {
@@ -508,6 +627,24 @@ export class ProxyController {
   @ApiOperation({ summary: '删除二维码' })
   deleteQRCode(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.deleteQRCode(id, auth);
+  }
+
+  @Post('qrcodes/:id/block')
+  @ApiOperation({ summary: '封禁二维码' })
+  blockQRCode(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.blockQRCode(id, data.reason, auth);
+  }
+
+  @Post('qrcodes/:id/unblock')
+  @ApiOperation({ summary: '解封二维码' })
+  unblockQRCode(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.unblockQRCode(id, auth);
+  }
+
+  @Post('qrcodes/:id/flag')
+  @ApiOperation({ summary: '标记二维码' })
+  flagQRCode(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.flagQRCode(id, data.reason, auth);
   }
 
   // Deep Link Management
@@ -527,6 +664,12 @@ export class ProxyController {
     return this.proxyService.getDeepLinks(teamId, { page, limit, status }, auth);
   }
 
+  @Get('deeplinks/stats')
+  @ApiOperation({ summary: '获取深度链接统计' })
+  getDeepLinkStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getDeepLinkStats(auth);
+  }
+
   @Get('deeplinks/:id')
   @ApiOperation({ summary: '获取深度链接详情' })
   getDeepLink(@Headers('authorization') auth: string, @Param('id') id: string) {
@@ -537,6 +680,24 @@ export class ProxyController {
   @ApiOperation({ summary: '删除深度链接' })
   deleteDeepLink(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.deleteDeepLink(id, auth);
+  }
+
+  @Post('deeplinks/:id/block')
+  @ApiOperation({ summary: '封禁深度链接' })
+  blockDeepLink(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.blockDeepLink(id, data.reason, auth);
+  }
+
+  @Post('deeplinks/:id/unblock')
+  @ApiOperation({ summary: '解封深度链接' })
+  unblockDeepLink(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.unblockDeepLink(id, auth);
+  }
+
+  @Post('deeplinks/:id/flag')
+  @ApiOperation({ summary: '标记深度链接' })
+  flagDeepLink(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: { reason: string }) {
+    return this.proxyService.flagDeepLink(id, data.reason, auth);
   }
 
   // Domain Management

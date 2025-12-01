@@ -293,6 +293,12 @@ export class AlertsService {
     return this.ruleRepository.save(rule);
   }
 
+  async setRuleEnabled(id: string, enabled: boolean): Promise<AlertRule> {
+    const rule = await this.findOneRule(id);
+    rule.enabled = enabled;
+    return this.ruleRepository.save(rule);
+  }
+
   // ========== Helpers ==========
 
   getSeverityLevels(): AlertSeverity[] {
