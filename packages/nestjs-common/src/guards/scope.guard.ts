@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthenticatedUser, isPlatformAdmin } from '../auth/jwt.types';
+import { IS_PUBLIC_KEY } from './decorators';
 
 /**
  * 跳过作用域检查的装饰器 key
@@ -54,6 +55,16 @@ export class ScopeGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // 检查是否为公开路由（@Public() 装饰器）
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
     // 检查是否跳过作用域检查
     const skipScopeCheck = this.reflector.getAllAndOverride<boolean>(SKIP_SCOPE_CHECK_KEY, [
       context.getHandler(),

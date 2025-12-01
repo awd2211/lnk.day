@@ -15,6 +15,7 @@ import {
   isTeamOwner,
 } from '../auth/jwt.types';
 import { hasAnyPermission, hasAllPermissions } from '../permissions/permissions.enum';
+import { IS_PUBLIC_KEY } from './decorators';
 
 /**
  * 权限检查模式
@@ -60,13 +61,23 @@ export class PermissionGuard implements CanActivate {
   private readonly reflector = new Reflector();
 
   canActivate(context: ExecutionContext): boolean {
-    // 1. 检查是否标记为公开权限
-    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_PERMISSION_KEY, [
+    // 1. 检查是否为公开路由（@Public() 装饰器）
+    const isPublicRoute = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (isPublic) {
+    if (isPublicRoute) {
+      return true;
+    }
+
+    // 2. 检查是否标记为公开权限（@PublicPermission() 装饰器）
+    const isPublicPermission = this.reflector.getAllAndOverride<boolean>(PUBLIC_PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublicPermission) {
       return true;
     }
 

@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from './cache.constants';
 import { CacheService } from './cache.service';
+import { DistributedCacheService } from './distributed-cache.service';
 
 export interface CacheModuleOptions {
   redisUrl?: string;
@@ -53,8 +54,9 @@ export class CacheModule {
           inject: [ConfigService],
         },
         CacheService,
+        DistributedCacheService,
       ],
-      exports: [REDIS_CLIENT, CacheService],
+      exports: [REDIS_CLIENT, CacheService, DistributedCacheService],
     };
   }
 
@@ -103,8 +105,9 @@ export class CacheModule {
           inject: [ConfigService, ...(options.inject || [])],
         },
         CacheService,
+        DistributedCacheService,
       ],
-      exports: [REDIS_CLIENT, CacheService],
+      exports: [REDIS_CLIENT, CacheService, DistributedCacheService],
     };
   }
 }
