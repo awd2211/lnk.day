@@ -116,4 +116,77 @@ export class AuthService {
       throw new BadRequestException(error.response?.data?.message || 'Password reset failed');
     }
   }
+
+  // ========== 2FA Methods ==========
+
+  async get2FAStatus(token: string) {
+    try {
+      const response = await this.executeWithProtection('get2FAStatus', () =>
+        axios.get(`${this.userServiceUrl}/api/v1/auth/2fa/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Get 2FA status failed: ${error.message}`);
+      throw new BadRequestException(error.response?.data?.message || 'Failed to get 2FA status');
+    }
+  }
+
+  async enable2FA(token: string) {
+    try {
+      const response = await this.executeWithProtection('enable2FA', () =>
+        axios.post(`${this.userServiceUrl}/api/v1/auth/2fa/enable`, {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Enable 2FA failed: ${error.message}`);
+      throw new BadRequestException(error.response?.data?.message || 'Failed to enable 2FA');
+    }
+  }
+
+  async verify2FA(token: string, code: string) {
+    try {
+      const response = await this.executeWithProtection('verify2FA', () =>
+        axios.post(`${this.userServiceUrl}/api/v1/auth/2fa/verify`, { code }, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Verify 2FA failed: ${error.message}`);
+      throw new BadRequestException(error.response?.data?.message || 'Invalid 2FA code');
+    }
+  }
+
+  async disable2FA(token: string, code: string) {
+    try {
+      const response = await this.executeWithProtection('disable2FA', () =>
+        axios.delete(`${this.userServiceUrl}/api/v1/auth/2fa/disable`, {
+          headers: { Authorization: `Bearer ${token}` },
+          data: { code },
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Disable 2FA failed: ${error.message}`);
+      throw new BadRequestException(error.response?.data?.message || 'Failed to disable 2FA');
+    }
+  }
+
+  async regenerateBackupCodes(token: string, code: string) {
+    try {
+      const response = await this.executeWithProtection('regenerateBackupCodes', () =>
+        axios.post(`${this.userServiceUrl}/api/v1/auth/2fa/regenerate-backup-codes`, { code }, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Regenerate backup codes failed: ${error.message}`);
+      throw new BadRequestException(error.response?.data?.message || 'Failed to regenerate backup codes');
+    }
+  }
 }

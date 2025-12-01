@@ -60,6 +60,18 @@ export class ProxyService {
         requireAuth: true,
       },
       {
+        name: 'user-service-subscriptions',
+        prefix: '/api/subscriptions',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
+      {
+        name: 'user-service-sso',
+        prefix: '/api/sso',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
+      {
         name: 'user-service-privacy',
         prefix: '/api/privacy',
         url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
@@ -114,6 +126,24 @@ export class ProxyService {
         url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
         requireAuth: true,
       },
+      {
+        name: 'link-service-search',
+        prefix: '/api/search',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
+      {
+        name: 'link-service-previews',
+        prefix: '/api/previews',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
+      {
+        name: 'link-service-moderation',
+        prefix: '/api/moderation',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
       // Campaign Service (60004)
       {
         name: 'campaign-service-campaigns',
@@ -127,10 +157,28 @@ export class ProxyService {
         url: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'),
         requireAuth: true,
       },
+      {
+        name: 'campaign-service-templates',
+        prefix: '/api/campaign-templates',
+        url: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'),
+        requireAuth: true,
+      },
       // QR Service (60005)
       {
         name: 'qr-service',
         prefix: '/api/qr',
+        url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
+        requireAuth: true,
+      },
+      {
+        name: 'qr-service-records',
+        prefix: '/api/qr-records',
+        url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
+        requireAuth: true,
+      },
+      {
+        name: 'qr-service-gs1',
+        prefix: '/api/gs1',
         url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
         requireAuth: true,
       },
@@ -144,6 +192,18 @@ export class ProxyService {
       {
         name: 'page-service-bio-links',
         prefix: '/api/bio-links',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: true,
+      },
+      {
+        name: 'page-service-templates',
+        prefix: '/api/templates',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: true,
+      },
+      {
+        name: 'page-service-seo',
+        prefix: '/api/seo',
         url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
         requireAuth: true,
       },
@@ -205,6 +265,42 @@ export class ProxyService {
         url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
         requireAuth: true,
       },
+      {
+        name: 'notification-service-email',
+        prefix: '/api/email',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
+      {
+        name: 'notification-service-sms',
+        prefix: '/api/sms',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
+      {
+        name: 'notification-service-slack',
+        prefix: '/api/slack',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
+      {
+        name: 'notification-service-teams',
+        prefix: '/api/teams-notifications',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
+      {
+        name: 'notification-service-websocket',
+        prefix: '/api/websocket',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
+      {
+        name: 'notification-service-config',
+        prefix: '/api/config',
+        url: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+        requireAuth: true,
+      },
       // Webhook Service (60017)
       {
         name: 'webhook-service',
@@ -250,47 +346,61 @@ export class ProxyService {
         url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
         requireAuth: true,
       },
-      // Analytics Service (60050) - Python FastAPI, 使用 /api 前缀（无版本号）
+      // Analytics Service (60050) - Python FastAPI
       {
         name: 'analytics-service',
         prefix: '/api/analytics',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api', // FastAPI 不使用版本前缀
         requireAuth: true,
       },
       {
         name: 'analytics-service-reports',
         prefix: '/api/reports',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api',
         requireAuth: true,
       },
       {
         name: 'analytics-service-export',
         prefix: '/api/export',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api',
         requireAuth: true,
       },
       {
         name: 'analytics-service-schedules',
         prefix: '/api/schedules',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api',
+        requireAuth: true,
+      },
+      {
+        name: 'analytics-service-tasks',
+        prefix: '/api/tasks',
+        url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
         requireAuth: true,
       },
       {
         name: 'analytics-service-funnels',
         prefix: '/api/funnels',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api',
         requireAuth: true,
       },
       {
         name: 'analytics-service-cohorts',
         prefix: '/api/cohorts',
         url: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
-        targetPrefix: '/api',
+        requireAuth: true,
+      },
+      // Datastream Service (60001) - Python FastAPI
+      {
+        name: 'datastream-service-stream',
+        prefix: '/api/stream',
+        url: this.configService.get('DATASTREAM_SERVICE_URL', 'http://localhost:60001'),
+        requireAuth: true,
+      },
+      {
+        name: 'datastream-service-streams',
+        prefix: '/api/data-streams',
+        url: this.configService.get('DATASTREAM_SERVICE_URL', 'http://localhost:60001'),
+        targetPrefix: '/api/v1', // 映射 /api/data-streams -> /api/v1/data-streams
         requireAuth: true,
       },
     ];

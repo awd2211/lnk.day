@@ -63,9 +63,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(stream.router, prefix="/api/stream", tags=["stream"])
-app.include_router(export.router, prefix="/api/export", tags=["export"])
-app.include_router(streams.router, prefix="/api", tags=["data-streams"])
+app.include_router(stream.router, prefix="/api/v1/stream", tags=["stream"])
+app.include_router(export.router, prefix="/api/v1/export", tags=["export"])
+app.include_router(streams.router, prefix="/api/v1", tags=["data-streams"])
 
 
 @app.get("/health")

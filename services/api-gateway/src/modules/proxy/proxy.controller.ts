@@ -5,6 +5,7 @@ import {
   Res,
   UseGuards,
   HttpException,
+  Version,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Request, Response } from 'express';
@@ -18,6 +19,7 @@ export class ProxyController {
   constructor(private readonly proxyService: ProxyService) {}
 
   @All('*')
+  @Version('1')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Proxy requests to backend services' })

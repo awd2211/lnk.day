@@ -1,6 +1,6 @@
-import { Controller, Post, Body, Get, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
 
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -45,6 +45,21 @@ class ResetPasswordDto {
   newPassword: string;
 }
 
+class Verify2FADto {
+  @IsString()
+  code: string;
+}
+
+class Disable2FADto {
+  @IsString()
+  code: string;
+}
+
+class RegenerateBackupCodesDto {
+  @IsString()
+  code: string;
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -87,5 +102,52 @@ export class AuthController {
   @ApiOperation({ summary: 'Reset password with token' })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
+
+  // ========== 2FA Endpoints ==========
+
+  @Get('2fa/status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get 2FA status' })
+  get2FAStatus(@Headers('authorization') auth: string) {
+    const token = auth?.replace('Bearer ', '');
+    return this.authService.get2FAStatus(token);
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Enable 2FA (get secret and QR code)' })
+  enable2FA(@Headers('authorization') auth: string) {
+    const token = auth?.replace('Bearer ', '');
+    return this.authService.enable2FA(token);
+  }
+
+  @Post('2fa/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify and activate 2FA' })
+  verify2FA(@Headers('authorization') auth: string, @Body() dto: Verify2FADto) {
+    const token = auth?.replace('Bearer ', '');
+    return this.authService.verify2FA(token, dto.code);
+  }
+
+  @Delete('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disable 2FA' })
+  disable2FA(@Headers('authorization') auth: string, @Body() dto: Disable2FADto) {
+    const token = auth?.replace('Bearer ', '');
+    return this.authService.disable2FA(token, dto.code);
+  }
+
+  @Post('2fa/regenerate-backup-codes')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Regenerate backup codes' })
+  regenerateBackupCodes(@Headers('authorization') auth: string, @Body() dto: RegenerateBackupCodesDto) {
+    const token = auth?.replace('Bearer ', '');
+    return this.authService.regenerateBackupCodes(token, dto.code);
   }
 }

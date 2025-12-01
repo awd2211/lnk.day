@@ -92,13 +92,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
-app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
-app.include_router(export.router, prefix="/api/export", tags=["export"])
-app.include_router(schedules.router, prefix="/api/schedules", tags=["schedules"])
-app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
-app.include_router(funnels, prefix="/api/funnels", tags=["funnels"])
-app.include_router(cohorts, prefix="/api/cohorts", tags=["cohorts"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
+app.include_router(export.router, prefix="/api/v1/export", tags=["export"])
+app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["schedules"])
+app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(funnels, prefix="/api/v1/funnels", tags=["funnels"])
+app.include_router(cohorts, prefix="/api/v1/cohorts", tags=["cohorts"])
 
 
 @app.get("/health")
