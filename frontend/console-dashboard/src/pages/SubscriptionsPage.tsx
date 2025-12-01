@@ -137,26 +137,8 @@ export default function SubscriptionsPage() {
   const { data: stats } = useQuery<SubscriptionStats>({
     queryKey: ['subscription-stats'],
     queryFn: async () => {
-      try {
-        const response = await subscriptionsService.getStats();
-        return response.data;
-      } catch {
-        // Return mock data for demo
-        return {
-          totalMRR: 125680,
-          totalARR: 1508160,
-          activeSubscriptions: 3256,
-          newThisMonth: 127,
-          churnRate: 2.3,
-          planDistribution: [
-            { plan: 'free', count: 15280, revenue: 0 },
-            { plan: 'core', count: 1850, revenue: 16650 },
-            { plan: 'growth', count: 980, revenue: 28420 },
-            { plan: 'premium', count: 356, revenue: 49840 },
-            { plan: 'enterprise', count: 70, revenue: 30770 },
-          ],
-        };
-      }
+      const response = await subscriptionsService.getStats();
+      return response.data;
     },
   });
 
@@ -164,97 +146,14 @@ export default function SubscriptionsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['subscriptions', { search, page, plan: planFilter, status: statusFilter }],
     queryFn: async () => {
-      try {
-        const response = await subscriptionsService.getSubscriptions({
-          search: search || undefined,
-          plan: planFilter !== 'all' ? planFilter : undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          page,
-          limit: 20,
-        });
-        return response.data;
-      } catch {
-        // Return mock data for demo
-        const mockSubscriptions: Subscription[] = [
-          {
-            id: '1',
-            userId: 'u1',
-            userName: '张伟',
-            userEmail: 'zhang.wei@example.com',
-            teamId: '11111111-1111-1111-1111-111111111111',
-            plan: 'pro',
-            status: 'active',
-            billingCycle: 'monthly',
-            amount: 99,
-            currentPeriodStart: '2025-11-01',
-            currentPeriodEnd: '2025-12-01',
-            cancelAtPeriodEnd: false,
-            createdAt: '2023-06-15',
-          },
-          {
-            id: '2',
-            userId: 'u2',
-            userName: '李娜',
-            userEmail: 'li.na@example.com',
-            teamId: '22222222-2222-2222-2222-222222222222',
-            plan: 'starter',
-            status: 'active',
-            billingCycle: 'yearly',
-            amount: 199,
-            currentPeriodStart: '2025-01-01',
-            currentPeriodEnd: '2026-01-01',
-            cancelAtPeriodEnd: false,
-            createdAt: '2023-03-10',
-          },
-          {
-            id: '3',
-            userId: 'u3',
-            userName: '王芳',
-            userEmail: 'wang.fang@example.com',
-            teamId: '33333333-3333-3333-3333-333333333333',
-            plan: 'enterprise',
-            status: 'active',
-            billingCycle: 'yearly',
-            amount: 4990,
-            currentPeriodStart: '2025-06-01',
-            currentPeriodEnd: '2026-06-01',
-            cancelAtPeriodEnd: false,
-            createdAt: '2022-11-20',
-          },
-          {
-            id: '4',
-            userId: 'u4',
-            userName: '周华',
-            userEmail: 'zhou.hua@example.com',
-            teamId: '88888888-8888-8888-8888-888888888888',
-            plan: 'pro',
-            status: 'past_due',
-            billingCycle: 'monthly',
-            amount: 99,
-            currentPeriodStart: '2025-10-01',
-            currentPeriodEnd: '2025-11-01',
-            cancelAtPeriodEnd: false,
-            createdAt: '2023-09-05',
-          },
-          {
-            id: '5',
-            userId: 'u5',
-            userName: '赵静',
-            userEmail: 'zhao.jing@example.com',
-            teamId: '66666666-6666-6666-6666-666666666666',
-            plan: 'pro',
-            status: 'trialing',
-            billingCycle: 'monthly',
-            amount: 99,
-            currentPeriodStart: '2025-11-20',
-            currentPeriodEnd: '2025-12-20',
-            trialEndsAt: '2025-12-05',
-            cancelAtPeriodEnd: false,
-            createdAt: '2025-11-20',
-          },
-        ];
-        return { items: mockSubscriptions, total: 5 };
-      }
+      const response = await subscriptionsService.getSubscriptions({
+        search: search || undefined,
+        plan: planFilter !== 'all' ? planFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page,
+        limit: 20,
+      });
+      return response.data;
     },
   });
 
@@ -263,17 +162,8 @@ export default function SubscriptionsPage() {
     queryKey: ['subscription-invoices', selectedSubscription?.id],
     queryFn: async () => {
       if (!selectedSubscription) return [];
-      try {
-        const response = await subscriptionsService.getInvoices(selectedSubscription.id);
-        return response.data as Invoice[];
-      } catch {
-        // Mock invoices
-        return [
-          { id: 'inv1', amount: selectedSubscription.amount, status: 'paid', paidAt: '2024-01-01', createdAt: '2024-01-01' },
-          { id: 'inv2', amount: selectedSubscription.amount, status: 'paid', paidAt: '2023-12-01', createdAt: '2023-12-01' },
-          { id: 'inv3', amount: selectedSubscription.amount, status: 'paid', paidAt: '2023-11-01', createdAt: '2023-11-01' },
-        ] as Invoice[];
-      }
+      const response = await subscriptionsService.getInvoices(selectedSubscription.id);
+      return response.data as Invoice[];
     },
     enabled: !!selectedSubscription,
   });

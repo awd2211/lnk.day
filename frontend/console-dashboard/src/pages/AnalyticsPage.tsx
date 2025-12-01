@@ -105,26 +105,16 @@ function ChangeIndicator({ value }: { value: number }) {
   );
 }
 
-// Generate mock trend data for demo
-function generateMockTrends(period: Period): ClickTrend[] {
+// Helper to calculate date range based on period
+function getPeriodDates(period: Period): { startDate: string; endDate: string } {
+  const endDate = new Date();
+  const startDate = new Date();
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
-  const trends: ClickTrend[] = [];
-  const baseClicks = 1000;
-
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const randomFactor = 0.5 + Math.random();
-    const dayOfWeek = date.getDay();
-    const weekendFactor = dayOfWeek === 0 || dayOfWeek === 6 ? 0.7 : 1;
-
-    trends.push({
-      date: date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }),
-      clicks: Math.round(baseClicks * randomFactor * weekendFactor),
-      uniqueClicks: Math.round(baseClicks * randomFactor * weekendFactor * 0.7),
-    });
-  }
-  return trends;
+  startDate.setDate(startDate.getDate() - days);
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  };
 }
 
 export default function AnalyticsPage() {
@@ -133,46 +123,45 @@ export default function AnalyticsPage() {
   const { data: summary, isLoading, refetch } = useQuery({
     queryKey: ['admin-analytics-summary', period],
     queryFn: async () => {
-      try {
-        const response = await proxyService.getAnalyticsSummary();
-        return response.data;
-      } catch {
-        // Return mock data for demo
-        return {
-          todayClicks: 2847,
-          weekClicks: 18923,
-          monthClicks: 76234,
-          totalClicks: 1234567,
-          todayChange: 12.5,
-          weekChange: 8.3,
-          monthChange: -2.1,
-          clickTrends: generateMockTrends(period),
-          topCountries: [
-            { country: '中国', clicks: 45000 },
-            { country: '美国', clicks: 12000 },
-            { country: '日本', clicks: 8500 },
-            { country: '韩国', clicks: 5200 },
-            { country: '新加坡', clicks: 3100 },
-          ],
-          deviceDistribution: {
-            desktop: 45,
-            mobile: 48,
-            tablet: 7,
-          },
-          browserDistribution: [
-            { browser: 'Chrome', clicks: 35000, percentage: 52 },
-            { browser: 'Safari', clicks: 15000, percentage: 22 },
-            { browser: 'Firefox', clicks: 8000, percentage: 12 },
-            { browser: 'Edge', clicks: 6000, percentage: 9 },
-            { browser: '其他', clicks: 3400, percentage: 5 },
-          ],
-          recentActivity: [
-            { id: '1', shortCode: 'abc123', clicks: 156, timestamp: new Date().toISOString() },
-            { id: '2', shortCode: 'xyz789', clicks: 89, timestamp: new Date(Date.now() - 300000).toISOString() },
-            { id: '3', shortCode: 'promo01', clicks: 234, timestamp: new Date(Date.now() - 600000).toISOString() },
-          ],
-        };
-      }
+      const { startDate, endDate } = getPeriodDates(period);
+      const response = await proxyService.getAnalyticsSummary();
+      const data = response.data;
+
+      // Transform API response to match expected interface
+      return {
+        todayClicks: data?.today_clicks || data?.todayClicks || 0,
+        weekClicks: data?.week_clicks || data?.weekClicks || 0,
+        monthClicks: data?.month_clicks || data?.monthClicks || 0,
+        totalClicks: data?.total_clicks || data?.totalClicks || 0,
+        todayChange: data?.today_change || data?.todayChange || 0,
+        weekChange: data?.week_change || data?.weekChange || 0,
+        monthChange: data?.month_change || data?.monthChange || 0,
+        clickTrends: (data?.click_trends || data?.clickTrends || data?.timeSeries || []).map((item: any) => ({
+          date: item.date ? new Date(item.date).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : item.date,
+          clicks: item.clicks || item.total_clicks || 0,
+          uniqueClicks: item.unique_clicks || item.uniqueClicks || Math.round((item.clicks || 0) * 0.7),
+        })),
+        topCountries: (data?.top_countries || data?.topCountries || data?.geo || []).map((item: any) => ({
+          country: item.country || item.name || '未知',
+          clicks: item.clicks || item.count || 0,
+        })),
+        deviceDistribution: {
+          desktop: data?.device_distribution?.desktop || data?.deviceDistribution?.desktop || data?.devices?.desktop || 0,
+          mobile: data?.device_distribution?.mobile || data?.deviceDistribution?.mobile || data?.devices?.mobile || 0,
+          tablet: data?.device_distribution?.tablet || data?.deviceDistribution?.tablet || data?.devices?.tablet || 0,
+        },
+        browserDistribution: (data?.browser_distribution || data?.browserDistribution || data?.browsers || []).map((item: any) => ({
+          browser: item.browser || item.name || '未知',
+          clicks: item.clicks || item.count || 0,
+          percentage: item.percentage || 0,
+        })),
+        recentActivity: (data?.recent_activity || data?.recentActivity || []).map((item: any) => ({
+          id: item.id || item.link_id,
+          shortCode: item.short_code || item.shortCode || '',
+          clicks: item.clicks || 0,
+          timestamp: item.timestamp || item.created_at || new Date().toISOString(),
+        })),
+      };
     },
     refetchInterval: 60000,
   });
@@ -195,9 +184,25 @@ export default function AnalyticsPage() {
       ]
     : [];
 
-  const handleExport = () => {
-    // TODO: Implement export
-    alert('导出功能开发中');
+  const handleExport = async () => {
+    try {
+      const { startDate, endDate } = getPeriodDates(period);
+      const response = await import('@/lib/api').then(m => m.exportService.exportAnalytics({
+        format: 'csv',
+        startDate,
+        endDate,
+      }));
+      // Download the file
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `analytics-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('导出失败，请稍后重试');
+    }
   };
 
   return (

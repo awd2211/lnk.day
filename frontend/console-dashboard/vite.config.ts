@@ -13,6 +13,7 @@ export default defineConfig({
   server: {
     port: 60011,
     host: true,
+    allowedHosts: ['console.lnk.day', 'localhost'],
     proxy: {
       '/api': {
         target: 'http://localhost:60009',

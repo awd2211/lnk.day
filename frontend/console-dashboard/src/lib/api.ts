@@ -285,6 +285,7 @@ export const apiKeysService = {
 
 // Webhooks
 export const webhooksService = {
+  getStats: () => api.get('/proxy/webhooks/stats'),
   getWebhooks: (params?: { page?: number; limit?: number; teamId?: string; status?: string }) =>
     api.get('/proxy/webhooks', { params }),
   getWebhook: (id: string) => api.get(`/proxy/webhooks/${id}`),
@@ -298,6 +299,7 @@ export const webhooksService = {
 
 // Domains
 export const domainsService = {
+  getStats: () => api.get('/proxy/domains/stats'),
   getDomains: (params?: { page?: number; limit?: number; status?: string }) =>
     api.get('/proxy/domains', { params }),
   getDomain: (id: string) => api.get(`/proxy/domains/${id}`),

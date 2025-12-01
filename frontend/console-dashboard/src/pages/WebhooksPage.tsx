@@ -122,15 +122,8 @@ export default function WebhooksPage() {
   const { data: stats } = useQuery<WebhookStats>({
     queryKey: ['webhook-stats'],
     queryFn: async () => {
-      return {
-        totalWebhooks: 856,
-        activeWebhooks: 720,
-        failingWebhooks: 45,
-        totalDeliveries: 1250000,
-        successfulDeliveries: 1180000,
-        failedDeliveries: 70000,
-        averageResponseTime: 245,
-      };
+      const response = await webhooksService.getStats();
+      return response.data;
     },
   });
 
@@ -138,73 +131,12 @@ export default function WebhooksPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['webhooks', { search, page, status: statusFilter }],
     queryFn: async () => {
-      try {
-        const response = await webhooksService.getWebhooks({
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          page,
-          limit: 20,
-        });
-        return response.data;
-      } catch {
-        const mockWebhooks: WebhookConfig[] = [
-          {
-            id: '1',
-            name: 'Slack Notifications',
-            url: 'https://hooks.slack.com/services/xxx',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            events: ['link.created', 'link.clicked'],
-            status: 'active',
-            lastTriggeredAt: '2024-01-20T10:30:00Z',
-            successRate: 99.5,
-            totalDeliveries: 15680,
-            failedDeliveries: 78,
-            createdAt: '2023-06-15',
-          },
-          {
-            id: '2',
-            name: 'Analytics Webhook',
-            url: 'https://analytics.example.com/webhook',
-            teamId: 't2',
-            teamName: 'Tech Startup',
-            events: ['click.recorded'],
-            status: 'active',
-            lastTriggeredAt: '2024-01-20T09:15:00Z',
-            successRate: 98.2,
-            totalDeliveries: 256000,
-            failedDeliveries: 4608,
-            createdAt: '2023-09-20',
-          },
-          {
-            id: '3',
-            name: 'CRM Integration',
-            url: 'https://crm.example.com/api/webhooks',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            events: ['link.created', 'campaign.created'],
-            status: 'failing',
-            lastTriggeredAt: '2024-01-19T18:00:00Z',
-            successRate: 45.0,
-            totalDeliveries: 1200,
-            failedDeliveries: 660,
-            createdAt: '2023-11-01',
-          },
-          {
-            id: '4',
-            name: 'Old System Hook',
-            url: 'https://old.example.com/hook',
-            teamId: 't3',
-            teamName: 'Legacy System',
-            events: ['link.created'],
-            status: 'disabled',
-            successRate: 0,
-            totalDeliveries: 5000,
-            failedDeliveries: 2500,
-            createdAt: '2022-05-10',
-          },
-        ];
-        return { items: mockWebhooks, total: 4 };
-      }
+      const response = await webhooksService.getWebhooks({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page,
+        limit: 20,
+      });
+      return response.data;
     },
   });
 
@@ -213,16 +145,8 @@ export default function WebhooksPage() {
     queryKey: ['webhook-logs', selectedWebhook?.id],
     queryFn: async () => {
       if (!selectedWebhook) return [];
-      try {
-        const response = await webhooksService.getLogs(selectedWebhook.id, { limit: 20 });
-        return response.data as WebhookLog[];
-      } catch {
-        return [
-          { id: '1', webhookId: selectedWebhook.id, event: 'link.created', statusCode: 200, success: true, responseTime: 156, triggeredAt: '2024-01-20T10:30:00Z' },
-          { id: '2', webhookId: selectedWebhook.id, event: 'link.clicked', statusCode: 200, success: true, responseTime: 203, triggeredAt: '2024-01-20T10:25:00Z' },
-          { id: '3', webhookId: selectedWebhook.id, event: 'link.created', statusCode: 500, success: false, responseTime: 1500, triggeredAt: '2024-01-20T10:20:00Z' },
-        ] as WebhookLog[];
-      }
+      const response = await webhooksService.getLogs(selectedWebhook.id, { limit: 20 });
+      return response.data as WebhookLog[];
     },
     enabled: !!selectedWebhook,
   });

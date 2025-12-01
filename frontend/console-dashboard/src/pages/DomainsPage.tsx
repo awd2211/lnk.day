@@ -129,13 +129,8 @@ export default function DomainsPage() {
   const { data: stats } = useQuery<DomainStats>({
     queryKey: ['domain-stats'],
     queryFn: async () => {
-      return {
-        totalDomains: 456,
-        activeDomains: 380,
-        pendingDomains: 45,
-        failedDomains: 31,
-        sslEnabled: 365,
-      };
+      const response = await domainsService.getStats();
+      return response.data;
     },
   });
 
@@ -143,84 +138,17 @@ export default function DomainsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['domains', { search, page, status: statusFilter }],
     queryFn: async () => {
-      try {
-        const response = await domainsService.getDomains({
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          page,
-          limit: 20,
-        });
-        // API 返回 { domains: [...], total: n } 或 { items: [...], total: n }
-        const data = response.data;
-        return {
-          items: data.items || data.domains || [],
-          total: data.total || 0,
-        };
-      } catch {
-        const mockDomains: Domain[] = [
-          {
-            id: '1',
-            domain: 'links.acme.com',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            status: 'active',
-            sslStatus: 'active',
-            verificationMethod: 'dns',
-            linkCount: 1560,
-            createdAt: '2023-06-15',
-            verifiedAt: '2023-06-15',
-          },
-          {
-            id: '2',
-            domain: 'go.techstartup.io',
-            teamId: 't2',
-            teamName: 'Tech Startup',
-            status: 'active',
-            sslStatus: 'active',
-            verificationMethod: 'dns',
-            linkCount: 856,
-            createdAt: '2023-09-20',
-            verifiedAt: '2023-09-21',
-          },
-          {
-            id: '3',
-            domain: 'short.enterprise.com',
-            teamId: 't3',
-            teamName: 'Enterprise Inc',
-            status: 'pending',
-            sslStatus: 'pending',
-            verificationMethod: 'dns',
-            verificationToken: 'lnk-verify=abc123xyz',
-            linkCount: 0,
-            createdAt: '2024-01-18',
-          },
-          {
-            id: '4',
-            domain: 'l.smallbiz.co',
-            teamId: 't4',
-            teamName: 'Small Biz',
-            status: 'failed',
-            sslStatus: 'none',
-            verificationMethod: 'dns',
-            verificationToken: 'lnk-verify=def456uvw',
-            linkCount: 0,
-            createdAt: '2024-01-10',
-          },
-          {
-            id: '5',
-            domain: 'old.legacy.net',
-            teamId: 't5',
-            teamName: 'Legacy System',
-            status: 'expired',
-            sslStatus: 'failed',
-            verificationMethod: 'file',
-            linkCount: 25,
-            createdAt: '2022-05-10',
-            verifiedAt: '2022-05-11',
-            expiresAt: '2023-12-31',
-          },
-        ];
-        return { items: mockDomains, total: 5 };
-      }
+      const response = await domainsService.getDomains({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page,
+        limit: 20,
+      });
+      // API 返回 { domains: [...], total: n } 或 { items: [...], total: n }
+      const data = response.data;
+      return {
+        items: data.items || data.domains || [],
+        total: data.total || 0,
+      };
     },
   });
 

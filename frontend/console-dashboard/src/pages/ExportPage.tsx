@@ -83,66 +83,8 @@ export default function ExportPage() {
   const { data: jobs, isLoading } = useQuery({
     queryKey: ['export-jobs'],
     queryFn: async () => {
-      try {
-        const response = await exportService.getJobs({});
-        return response.data;
-      } catch {
-        const mockJobs: ExportJob[] = [
-          {
-            id: '1',
-            type: 'users',
-            status: 'completed',
-            format: 'csv',
-            fileName: 'users_export_20240120.csv',
-            fileSize: 1245680,
-            recordCount: 15680,
-            createdAt: '2024-01-20T10:30:00Z',
-            completedAt: '2024-01-20T10:32:15Z',
-            expiresAt: '2024-01-27T10:32:15Z',
-            requestedBy: 'admin@lnk.day',
-          },
-          {
-            id: '2',
-            type: 'analytics',
-            status: 'processing',
-            format: 'xlsx',
-            progress: 65,
-            createdAt: '2024-01-20T11:00:00Z',
-            requestedBy: 'admin@lnk.day',
-          },
-          {
-            id: '3',
-            type: 'links',
-            status: 'pending',
-            format: 'json',
-            createdAt: '2024-01-20T11:05:00Z',
-            requestedBy: 'admin@lnk.day',
-          },
-          {
-            id: '4',
-            type: 'invoices',
-            status: 'failed',
-            format: 'csv',
-            error: '数据量过大，请缩小日期范围',
-            createdAt: '2024-01-19T15:30:00Z',
-            requestedBy: 'admin@lnk.day',
-          },
-          {
-            id: '5',
-            type: 'teams',
-            status: 'completed',
-            format: 'csv',
-            fileName: 'teams_export_20240118.csv',
-            fileSize: 524288,
-            recordCount: 856,
-            createdAt: '2024-01-18T09:00:00Z',
-            completedAt: '2024-01-18T09:01:30Z',
-            expiresAt: '2024-01-25T09:01:30Z',
-            requestedBy: 'admin@lnk.day',
-          },
-        ];
-        return { items: mockJobs, total: 5 };
-      }
+      const response = await exportService.getJobs({});
+      return response.data;
     },
     refetchInterval: 5000, // Auto refresh every 5 seconds
   });

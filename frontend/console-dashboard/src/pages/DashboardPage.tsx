@@ -33,12 +33,12 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { dashboardService } from '@/lib/api';
+import { dashboardService, subscriptionsService } from '@/lib/api';
 
 interface DashboardStats {
   totalUsers: number;
@@ -49,6 +49,7 @@ interface DashboardStats {
   activeUsers: number;
   growth: {
     users: number;
+    teams: number;
     links: number;
     clicks: number;
   };
@@ -66,43 +67,16 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard', 'stats'],
     queryFn: async () => {
-      try {
-        const res = await dashboardService.getStats();
-        return res.data as DashboardStats;
-      } catch {
-        // Mock data fallback
-        return {
-          totalUsers: 12543,
-          totalTeams: 892,
-          totalLinks: 125430,
-          totalClicks: 4532100,
-          todayClicks: 45230,
-          activeUsers: 1234,
-          growth: { users: 12, links: 8, clicks: 15 },
-        };
-      }
+      const res = await dashboardService.getStats();
+      return res.data as DashboardStats;
     },
   });
 
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ['dashboard', 'health'],
     queryFn: async () => {
-      try {
-        const res = await dashboardService.getHealth();
-        return res.data;
-      } catch {
-        // Mock data fallback
-        return {
-          overall: 'healthy',
-          services: [
-            { name: 'API Gateway', status: 'healthy', latency: 12 },
-            { name: 'User Service', status: 'healthy', latency: 8 },
-            { name: 'Link Service', status: 'healthy', latency: 5 },
-            { name: 'Redirect Service', status: 'healthy', latency: 2 },
-            { name: 'Analytics Service', status: 'healthy', latency: 15 },
-          ],
-        };
-      }
+      const res = await dashboardService.getHealth();
+      return res.data;
     },
     refetchInterval: 30000,
   });
@@ -110,69 +84,77 @@ export default function DashboardPage() {
   const { data: topLinks } = useQuery({
     queryKey: ['dashboard', 'topLinks'],
     queryFn: async () => {
-      try {
-        const res = await dashboardService.getTopLinks(5);
-        return res.data;
-      } catch {
-        // Mock data
-        return [
-          { id: '1', shortCode: 'promo2024', originalUrl: 'https://example.com/promo', clicks: 12543 },
-          { id: '2', shortCode: 'blog-post', originalUrl: 'https://blog.example.com/article', clicks: 8921 },
-          { id: '3', shortCode: 'signup', originalUrl: 'https://app.example.com/register', clicks: 5432 },
-          { id: '4', shortCode: 'docs', originalUrl: 'https://docs.example.com', clicks: 3210 },
-          { id: '5', shortCode: 'demo', originalUrl: 'https://demo.example.com', clicks: 2100 },
-        ];
-      }
+      const res = await dashboardService.getTopLinks(5);
+      return res.data;
     },
   });
 
   const { data: metrics } = useQuery({
     queryKey: ['dashboard', 'metrics'],
     queryFn: async () => {
-      try {
-        const res = await dashboardService.getMetrics('7d');
-        return res.data;
-      } catch {
-        // Generate mock data for last 7 days
-        return Array.from({ length: 7 }, (_, i) => {
-          const date = subDays(new Date(), 6 - i);
-          return {
-            date: format(date, 'MM/dd'),
-            clicks: Math.floor(Math.random() * 50000) + 30000,
-            users: Math.floor(Math.random() * 500) + 200,
-            links: Math.floor(Math.random() * 1000) + 500,
-          };
-        });
-      }
+      const res = await dashboardService.getMetrics('week');
+      // Transform timeSeries data to chart format
+      return res.data?.timeSeries?.map((item: any) => ({
+        date: format(new Date(item.date), 'MM/dd'),
+        clicks: item.clicks || 0,
+        users: item.users || 0,
+      })) || [];
     },
   });
 
   const { data: activity } = useQuery({
     queryKey: ['dashboard', 'activity'],
     queryFn: async () => {
-      try {
-        const res = await dashboardService.getActivity(10);
-        return res.data as ActivityItem[];
-      } catch {
-        // Mock activity
-        return [
-          { id: '1', type: 'user_signup', message: '新用户注册: john@example.com', timestamp: new Date().toISOString() },
-          { id: '2', type: 'subscription_upgrade', message: 'Acme Corp 升级到 Premium 套餐', timestamp: subDays(new Date(), 0.1).toISOString() },
-          { id: '3', type: 'link_created', message: '批量创建 150 个链接', timestamp: subDays(new Date(), 0.2).toISOString() },
-          { id: '4', type: 'alert_triggered', message: '检测到可疑链接活动', timestamp: subDays(new Date(), 0.3).toISOString() },
-          { id: '5', type: 'team_created', message: '新团队创建: Marketing Team', timestamp: subDays(new Date(), 0.5).toISOString() },
-        ] as ActivityItem[];
-      }
+      const res = await dashboardService.getActivity(10);
+      // Transform backend activity format to frontend format
+      return (res.data || []).map((item: any) => ({
+        id: item.id,
+        type: item.type === 'user' ? (item.action === 'registered' ? 'user_signup' : 'user_login') :
+              item.type === 'link' ? 'link_created' :
+              item.type === 'team' ? 'team_created' :
+              item.type === 'system' ? 'alert_triggered' : 'subscription_upgrade',
+        message: item.description,
+        timestamp: item.timestamp,
+        metadata: item.metadata,
+      })) as ActivityItem[];
     },
   });
 
-  // Plan distribution mock data
-  const planDistribution = [
-    { name: 'Free', value: 65, color: '#94a3b8' },
-    { name: 'Core', value: 20, color: '#3b82f6' },
-    { name: 'Growth', value: 10, color: '#8b5cf6' },
-    { name: 'Premium', value: 5, color: '#f59e0b' },
-  ];
+  // Plan distribution from subscription stats
+  const { data: subscriptionStats } = useQuery({
+    queryKey: ['dashboard', 'subscriptionStats'],
+    queryFn: async () => {
+      const res = await subscriptionsService.getStats();
+      return res.data;
+    },
+  });
+
+  const planColors: Record<string, string> = {
+    free: '#94a3b8',
+    core: '#3b82f6',
+    growth: '#8b5cf6',
+    premium: '#f59e0b',
+    enterprise: '#ef4444',
+  };
+
+  const planDistribution = subscriptionStats?.planDistribution?.map((item: { plan: string; percentage: number }) => ({
+    name: item.plan?.charAt(0).toUpperCase() + item.plan?.slice(1) || 'Unknown',
+    value: item.percentage || 0,
+    color: planColors[item.plan?.toLowerCase()] || '#6b7280',
+  })) || [];
+
+  // Hourly metrics for today
+  const { data: hourlyMetrics } = useQuery({
+    queryKey: ['dashboard', 'hourlyMetrics'],
+    queryFn: async () => {
+      const res = await dashboardService.getMetrics('day');
+      // Transform to hourly format
+      return res.data?.timeSeries?.map((item: { date: string; clicks: number }) => ({
+        hour: new Date(item.date).getHours(),
+        clicks: item.clicks || 0,
+      })) || [];
+    },
+  });
 
   const statCards = [
     {
@@ -186,7 +168,7 @@ export default function DashboardPage() {
       name: '总团队数',
       value: stats?.totalTeams || 0,
       icon: Building2,
-      change: 5,
+      change: stats?.growth?.teams || 0,
       color: 'bg-purple-500',
     },
     {
@@ -341,7 +323,7 @@ export default function DashboardPage() {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {planDistribution.map((entry, index) => (
+                  {planDistribution.map((entry: { name: string; value: number; color: string }, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -350,7 +332,7 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            {planDistribution.map((plan) => (
+            {planDistribution.map((plan: { name: string; value: number; color: string }) => (
               <div key={plan.name} className="flex items-center gap-2 text-sm">
                 <div className="h-3 w-3 rounded-full" style={{ backgroundColor: plan.color }} />
                 <span>{plan.name}</span>
@@ -383,10 +365,7 @@ export default function DashboardPage() {
           {/* Mini bar chart for hourly distribution */}
           <div className="mt-4 h-24">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={Array.from({ length: 24 }, (_, i) => ({
-                hour: i,
-                clicks: Math.floor(Math.random() * 2000) + 500,
-              }))}>
+              <BarChart data={hourlyMetrics || []}>
                 <Bar dataKey="clicks" fill="#3b82f6" radius={[2, 2, 0, 0]} />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 import {
   Save,
   RefreshCw,
@@ -983,7 +984,7 @@ export default function SettingsPage() {
                       <Label className="text-gray-500">邮件内容</Label>
                       <div
                         className="mt-1 min-h-[300px] rounded-lg border bg-white p-4"
-                        dangerouslySetInnerHTML={{ __html: templateHtml }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(templateHtml) }}
                       />
                     </div>
                   </div>

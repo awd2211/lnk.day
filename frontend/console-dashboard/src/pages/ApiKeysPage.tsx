@@ -110,23 +110,8 @@ export default function ApiKeysPage() {
   const { data: stats } = useQuery<UsageStats>({
     queryKey: ['apikey-stats'],
     queryFn: async () => {
-      try {
-        const response = await apiKeysService.getUsage({});
-        return response.data;
-      } catch {
-        return {
-          totalKeys: 1250,
-          activeKeys: 980,
-          revokedKeys: 270,
-          totalRequests: 15680000,
-          requestsToday: 125000,
-          topKeys: [
-            { keyId: '1', name: 'Production API', requests: 856000 },
-            { keyId: '2', name: 'Mobile App', requests: 542000 },
-            { keyId: '3', name: 'Analytics Bot', requests: 125000 },
-          ],
-        };
-      }
+      const response = await apiKeysService.getUsage({});
+      return response.data;
     },
   });
 
@@ -134,87 +119,12 @@ export default function ApiKeysPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['apikeys', { search, page, status: statusFilter }],
     queryFn: async () => {
-      try {
-        const response = await apiKeysService.getApiKeys({
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          page,
-          limit: 20,
-        });
-        return response.data;
-      } catch {
-        const mockKeys: ApiKey[] = [
-          {
-            id: '1',
-            name: 'Production API Key',
-            keyPrefix: 'lnk_prod_****',
-            userId: 'u1',
-            userName: 'John Doe',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            status: 'active',
-            scopes: ['links:read', 'links:write', 'analytics:read'],
-            lastUsedAt: '2024-01-20T10:30:00Z',
-            createdAt: '2023-06-15',
-            requestCount: 856420,
-          },
-          {
-            id: '2',
-            name: 'Mobile App Key',
-            keyPrefix: 'lnk_mob_****',
-            userId: 'u2',
-            userName: 'Jane Smith',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            status: 'active',
-            scopes: ['links:read', 'qr:read'],
-            lastUsedAt: '2024-01-20T09:15:00Z',
-            createdAt: '2023-09-20',
-            requestCount: 542180,
-          },
-          {
-            id: '3',
-            name: 'Analytics Bot',
-            keyPrefix: 'lnk_bot_****',
-            userId: 'u3',
-            userName: 'Bob Wilson',
-            teamId: 't2',
-            teamName: 'Tech Startup',
-            status: 'active',
-            scopes: ['analytics:read'],
-            lastUsedAt: '2024-01-19T18:00:00Z',
-            createdAt: '2023-11-01',
-            requestCount: 125680,
-          },
-          {
-            id: '4',
-            name: 'Old Integration Key',
-            keyPrefix: 'lnk_old_****',
-            userId: 'u4',
-            userName: 'Alice Brown',
-            teamId: 't3',
-            teamName: 'Legacy System',
-            status: 'revoked',
-            scopes: ['links:read'],
-            createdAt: '2022-05-10',
-            requestCount: 0,
-          },
-          {
-            id: '5',
-            name: 'Test Key',
-            keyPrefix: 'lnk_test_****',
-            userId: 'u5',
-            userName: 'Charlie Davis',
-            teamId: 't4',
-            teamName: 'Dev Team',
-            status: 'expired',
-            scopes: ['*'],
-            expiresAt: '2023-12-31',
-            createdAt: '2023-01-01',
-            requestCount: 15000,
-          },
-        ];
-        return { items: mockKeys, total: 5 };
-      }
+      const response = await apiKeysService.getApiKeys({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page,
+        limit: 20,
+      });
+      return response.data;
     },
   });
 

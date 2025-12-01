@@ -153,18 +153,8 @@ export default function AuditLogsPage() {
   const { data: stats } = useQuery<AuditStats>({
     queryKey: ['audit-stats'],
     queryFn: async () => {
-      try {
-        const res = await auditService.getStats();
-        return res.data;
-      } catch {
-        // Mock data fallback
-        return {
-          todayLogs: 1256,
-          activeAdmins: 5,
-          securityEvents: 12,
-          systemOperations: 45,
-        };
-      }
+      const res = await auditService.getStats();
+      return res.data;
     },
   });
 
@@ -214,115 +204,25 @@ export default function AuditLogsPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['audit-logs', { search, page, category: categoryFilter, actorType: actorTypeFilter, status: statusFilter, dateRange }],
     queryFn: async () => {
-      try {
-        const { startDate, endDate } = getDateRange();
-        const res = await auditService.getLogs({
-          page,
-          limit: 20,
-          search: search || undefined,
-          actorType: actorTypeFilter !== 'all' ? actorTypeFilter : undefined,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          startDate,
-          endDate,
-        });
-        // Transform backend data to frontend format
-        const logs = res.data?.logs || [];
-        const transformedLogs = transformLogs(logs);
-        return {
-          items: transformedLogs,
-          total: res.data?.total || 0,
-          page: res.data?.page || 1,
-          totalPages: res.data?.totalPages || 1,
-        };
-      } catch {
-        // Mock data fallback
-        const mockLogs: AuditLog[] = [
-          {
-            id: '1',
-            timestamp: '2024-01-15T10:30:00Z',
-            actor: { id: 'a1', type: 'admin', name: 'Super Admin', email: 'admin@lnk.day', ip: '192.168.1.100' },
-            action: 'user.ban',
-            actionCategory: 'user',
-            resource: { type: 'user', id: 'u123', name: 'Bad User' },
-            status: 'success',
-            metadata: { reason: '违反使用条款' },
-          },
-          {
-            id: '2',
-            timestamp: '2024-01-15T10:15:00Z',
-            actor: { id: 'a1', type: 'admin', name: 'Super Admin', email: 'admin@lnk.day', ip: '192.168.1.100' },
-            action: 'link.block',
-            actionCategory: 'link',
-            resource: { type: 'link', id: 'l456', name: 'lnk.day/abc123' },
-            status: 'success',
-            metadata: { reason: '恶意链接' },
-          },
-          {
-            id: '3',
-            timestamp: '2024-01-15T09:45:00Z',
-            actor: { id: 's1', type: 'system', name: 'Auto Moderation' },
-            action: 'link.auto_block',
-            actionCategory: 'security',
-            resource: { type: 'link', id: 'l789', name: 'lnk.day/xyz789' },
-            status: 'success',
-            metadata: { detectionType: 'phishing', confidence: 0.95 },
-          },
-          {
-            id: '4',
-            timestamp: '2024-01-15T09:30:00Z',
-            actor: { id: 'a2', type: 'admin', name: 'Support Admin', email: 'support@lnk.day', ip: '192.168.1.101' },
-            action: 'subscription.upgrade',
-            actionCategory: 'billing',
-            resource: { type: 'subscription', id: 's123', name: 'User Premium Plan' },
-            status: 'success',
-            changes: [
-              { field: 'plan', oldValue: 'core', newValue: 'premium' },
-              { field: 'amount', oldValue: 12, newValue: 99 },
-            ],
-          },
-          {
-            id: '5',
-            timestamp: '2024-01-15T09:00:00Z',
-            actor: { id: 'api1', type: 'api', name: 'API Key: prod-xxxx' },
-            action: 'link.create_bulk',
-            actionCategory: 'link',
-            resource: { type: 'links', name: '批量创建' },
-            status: 'success',
-            metadata: { count: 150 },
-          },
-          {
-            id: '6',
-            timestamp: '2024-01-15T08:30:00Z',
-            actor: { id: 'u1', type: 'user', name: 'John Doe', email: 'john@example.com', ip: '203.0.113.50' },
-            action: 'auth.login',
-            actionCategory: 'auth',
-            resource: { type: 'session' },
-            status: 'success',
-            metadata: { device: 'Chrome on macOS', location: 'Shanghai, CN' },
-          },
-          {
-            id: '7',
-            timestamp: '2024-01-15T08:15:00Z',
-            actor: { id: 'unknown', type: 'user', name: 'Unknown', ip: '198.51.100.1' },
-            action: 'auth.login_failed',
-            actionCategory: 'security',
-            resource: { type: 'session' },
-            status: 'failure',
-            metadata: { reason: '密码错误', attempts: 3 },
-          },
-          {
-            id: '8',
-            timestamp: '2024-01-15T07:00:00Z',
-            actor: { id: 's1', type: 'system', name: 'Scheduler' },
-            action: 'system.backup',
-            actionCategory: 'system',
-            resource: { type: 'database' },
-            status: 'success',
-            metadata: { size: '2.5GB', duration: '45s' },
-          },
-        ];
-        return { items: mockLogs, total: mockLogs.length, page: 1, totalPages: 1 };
-      }
+      const { startDate, endDate } = getDateRange();
+      const res = await auditService.getLogs({
+        page,
+        limit: 20,
+        search: search || undefined,
+        actorType: actorTypeFilter !== 'all' ? actorTypeFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        startDate,
+        endDate,
+      });
+      // Transform backend data to frontend format
+      const logs = res.data?.logs || res.data?.items || [];
+      const transformedLogs = transformLogs(logs);
+      return {
+        items: transformedLogs,
+        total: res.data?.total || 0,
+        page: res.data?.page || 1,
+        totalPages: res.data?.totalPages || 1,
+      };
     },
   });
 

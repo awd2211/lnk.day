@@ -127,27 +127,8 @@ export default function ContentModerationPage() {
   const { data: stats, isLoading: statsLoading } = useQuery<ModerationStats>({
     queryKey: ['moderation-stats'],
     queryFn: async () => {
-      try {
-        const res = await moderationService.getStats();
-        return res.data;
-      } catch {
-        // Mock data fallback
-        return {
-          pendingReview: 23,
-          blockedToday: 15,
-          approvedToday: 42,
-          totalReports: 156,
-          autoBlocked: 89,
-          byReason: [
-            { reason: 'phishing', count: 45 },
-            { reason: 'spam', count: 38 },
-            { reason: 'malware', count: 28 },
-            { reason: 'scam', count: 22 },
-            { reason: 'adult', count: 15 },
-            { reason: 'other', count: 8 },
-          ],
-        };
-      }
+      const res = await moderationService.getStats();
+      return res.data;
     },
   });
 
@@ -155,70 +136,15 @@ export default function ContentModerationPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['flagged-links', { search, status: statusFilter, reason: reasonFilter, severity: severityFilter, page }],
     queryFn: async () => {
-      try {
-        const res = await moderationService.getFlaggedLinks({
-          page,
-          limit: 20,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          reason: reasonFilter !== 'all' ? reasonFilter : undefined,
-          severity: severityFilter !== 'all' ? severityFilter : undefined,
-          search: search || undefined,
-        });
-        return res.data;
-      } catch {
-        // Mock data fallback
-        const mockLinks: FlaggedLink[] = [
-          {
-            id: '1',
-            shortUrl: 'lnk.day/abc123',
-            destinationUrl: 'https://phishing-site.com/login',
-            userId: 'u1',
-            userName: 'Bad Actor',
-            userEmail: 'bad@example.com',
-            reason: 'phishing',
-            severity: 'critical',
-            status: 'pending',
-            reportCount: 12,
-            autoDetected: true,
-            detectedAt: '2024-01-15T10:30:00Z',
-          },
-          {
-            id: '2',
-            shortUrl: 'lnk.day/xyz789',
-            destinationUrl: 'https://spam-site.com/offer',
-            userId: 'u2',
-            userName: 'Spammer',
-            userEmail: 'spam@example.com',
-            reason: 'spam',
-            severity: 'medium',
-            status: 'pending',
-            reportCount: 5,
-            autoDetected: false,
-            detectedAt: '2024-01-15T09:15:00Z',
-          },
-          {
-            id: '3',
-            shortUrl: 'lnk.day/def456',
-            destinationUrl: 'https://legit-site.com/promo',
-            userId: 'u3',
-            userName: 'John Doe',
-            userEmail: 'john@company.com',
-            reason: 'spam',
-            severity: 'low',
-            status: 'pending',
-            reportCount: 1,
-            autoDetected: false,
-            detectedAt: '2024-01-15T08:00:00Z',
-          },
-        ];
-        const filtered = mockLinks.filter(
-          (l) =>
-            (statusFilter === 'all' || l.status === statusFilter) &&
-            (reasonFilter === 'all' || l.reason === reasonFilter) &&
-            (severityFilter === 'all' || l.severity === severityFilter)
-        );
-        return { items: filtered, total: filtered.length, page: 1, totalPages: 1 };
-      }
+      const res = await moderationService.getFlaggedLinks({
+        page,
+        limit: 20,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        reason: reasonFilter !== 'all' ? reasonFilter : undefined,
+        severity: severityFilter !== 'all' ? severityFilter : undefined,
+        search: search || undefined,
+      });
+      return res.data;
     },
   });
 
@@ -227,30 +153,8 @@ export default function ContentModerationPage() {
     queryKey: ['link-reports', selectedLink?.id],
     queryFn: async () => {
       if (!selectedLink) return [];
-      try {
-        const res = await moderationService.getReports(selectedLink.id);
-        return res.data;
-      } catch {
-        // Mock reports
-        return [
-          {
-            id: 'r1',
-            reporterId: 'user1',
-            reporterEmail: 'reporter1@example.com',
-            reason: 'phishing',
-            description: '这个链接看起来像钓鱼网站，试图获取用户凭据',
-            createdAt: '2024-01-15T08:00:00Z',
-          },
-          {
-            id: 'r2',
-            reporterId: 'user2',
-            reporterEmail: 'reporter2@example.com',
-            reason: 'phishing',
-            description: '收到来自这个链接的可疑邮件',
-            createdAt: '2024-01-15T09:30:00Z',
-          },
-        ];
-      }
+      const res = await moderationService.getReports(selectedLink.id);
+      return res.data;
     },
     enabled: !!selectedLink && showReportsSheet,
   });

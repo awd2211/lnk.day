@@ -112,23 +112,8 @@ export default function BillingPage() {
   const { data: revenue } = useQuery<Revenue>({
     queryKey: ['billing-revenue'],
     queryFn: async () => {
-      try {
-        const response = await billingService.getRevenue({});
-        return response.data;
-      } catch {
-        return {
-          totalRevenue: 856750,
-          monthlyRevenue: 125680,
-          pendingAmount: 12350,
-          refundedAmount: 8420,
-          invoiceCount: 15680,
-          revenueByMonth: [
-            { month: '2024-01', revenue: 125680 },
-            { month: '2023-12', revenue: 118520 },
-            { month: '2023-11', revenue: 112340 },
-          ],
-        };
-      }
+      const response = await billingService.getRevenue({});
+      return response.data;
     },
   });
 
@@ -136,91 +121,12 @@ export default function BillingPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['invoices', { search, page, status: statusFilter }],
     queryFn: async () => {
-      try {
-        const response = await billingService.getInvoices({
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          page,
-          limit: 20,
-        });
-        return response.data;
-      } catch {
-        const mockInvoices: Invoice[] = [
-          {
-            id: '1',
-            teamId: 't1',
-            teamName: 'Acme Corp',
-            userId: 'u1',
-            userName: 'John Doe',
-            amount: 99,
-            currency: 'USD',
-            status: 'paid',
-            description: 'Growth Plan - Monthly',
-            paidAt: '2024-01-15',
-            createdAt: '2024-01-01',
-            invoiceNumber: 'INV-2024-001',
-            items: [{ description: 'Growth Plan', amount: 99, quantity: 1 }],
-          },
-          {
-            id: '2',
-            teamId: 't2',
-            teamName: 'Tech Startup',
-            userId: 'u2',
-            userName: 'Jane Smith',
-            amount: 299,
-            currency: 'USD',
-            status: 'pending',
-            description: 'Premium Plan - Monthly',
-            createdAt: '2024-01-20',
-            invoiceNumber: 'INV-2024-002',
-            items: [{ description: 'Premium Plan', amount: 299, quantity: 1 }],
-          },
-          {
-            id: '3',
-            teamId: 't3',
-            teamName: 'Enterprise Inc',
-            userId: 'u3',
-            userName: 'Bob Wilson',
-            amount: 999,
-            currency: 'USD',
-            status: 'paid',
-            description: 'Enterprise Plan - Annual',
-            paidAt: '2024-01-10',
-            createdAt: '2024-01-01',
-            invoiceNumber: 'INV-2024-003',
-            items: [{ description: 'Enterprise Plan', amount: 999, quantity: 1 }],
-          },
-          {
-            id: '4',
-            teamId: 't4',
-            teamName: 'Small Biz',
-            userId: 'u4',
-            userName: 'Alice Brown',
-            amount: 29,
-            currency: 'USD',
-            status: 'failed',
-            description: 'Core Plan - Monthly',
-            createdAt: '2024-01-18',
-            invoiceNumber: 'INV-2024-004',
-            items: [{ description: 'Core Plan', amount: 29, quantity: 1 }],
-          },
-          {
-            id: '5',
-            teamId: 't5',
-            teamName: 'Refund Test',
-            userId: 'u5',
-            userName: 'Charlie Davis',
-            amount: 49,
-            currency: 'USD',
-            status: 'refunded',
-            description: 'Growth Plan - Monthly',
-            paidAt: '2024-01-05',
-            createdAt: '2024-01-01',
-            invoiceNumber: 'INV-2024-005',
-            items: [{ description: 'Growth Plan', amount: 49, quantity: 1 }],
-          },
-        ];
-        return { items: mockInvoices, total: 5 };
-      }
+      const response = await billingService.getInvoices({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page,
+        limit: 20,
+      });
+      return response.data;
     },
   });
 
