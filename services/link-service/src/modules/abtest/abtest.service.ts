@@ -1,7 +1,6 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -23,9 +22,13 @@ const Z_SCORES: Record<number, number> = {
   0.99: 2.576,
 };
 
+// 定时间隔常量
+const EVERY_HOUR = 60 * 60 * 1000;
+
 @Injectable()
-export class ABTestService {
+export class ABTestService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ABTestService.name);
+  private testDurationCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectRepository(ABTest)
@@ -33,6 +36,24 @@ export class ABTestService {
     @InjectRepository(ABTestEvent)
     private readonly eventRepository: Repository<ABTestEvent>,
   ) {}
+
+  onModuleInit() {
+    // 每小时检查测试持续时间
+    this.testDurationCheckInterval = setInterval(() => {
+      this.checkTestDurations().catch((err) => {
+        this.logger.error(`检查测试持续时间失败: ${err.message}`);
+      });
+    }, EVERY_HOUR);
+    this.logger.log('A/B测试持续时间检查定时任务已启动 (每小时)');
+  }
+
+  onModuleDestroy() {
+    if (this.testDurationCheckInterval) {
+      clearInterval(this.testDurationCheckInterval);
+      this.testDurationCheckInterval = null;
+      this.logger.log('A/B测试持续时间检查定时任务已停止');
+    }
+  }
 
   async create(
     createDto: CreateABTestDto,
@@ -519,7 +540,7 @@ export class ABTestService {
   }
 
   // Check for tests that should end due to max duration
-  @Cron(CronExpression.EVERY_HOUR)
+  // 定时任务通过 setInterval 在 onModuleInit 中启动 (每小时)
   async checkTestDurations(): Promise<void> {
     const runningTests = await this.abtestRepository.find({
       where: { status: ABTestStatus.RUNNING },

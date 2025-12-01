@@ -344,3 +344,17 @@ export class LinkInternalController {
     return { success: true };
   }
 }
+
+// ========== 控制台统计内部 API（无需认证） ==========
+
+@ApiTags('internal')
+@Controller('internal')
+export class LinkStatsInternalController {
+  constructor(private readonly linkService: LinkService) {}
+
+  @Get('stats')
+  @ApiOperation({ summary: '获取平台链接统计 (内部API)' })
+  async getGlobalStats() {
+    return this.linkService.getGlobalStats();
+  }
+}

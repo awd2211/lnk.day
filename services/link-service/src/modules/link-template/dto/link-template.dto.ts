@@ -232,16 +232,19 @@ export class LinkTemplateQueryDto {
 
   @ApiPropertyOptional({ description: '只显示收藏' })
   @IsOptional()
+  @Type(() => Boolean)
   @IsBoolean()
   favoritesOnly?: boolean;
 
   @ApiPropertyOptional({ description: '页码' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   page?: number;
 
   @ApiPropertyOptional({ description: '每页数量' })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   limit?: number;
 }

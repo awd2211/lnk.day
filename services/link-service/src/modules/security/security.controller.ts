@@ -4,10 +4,19 @@ import {
   Post,
   Body,
   Query,
+  Param,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser } from '@lnk/nestjs-common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  CurrentUser,
+  ScopeGuard,
+  PermissionGuard,
+  ScopedTeamId,
+  RequirePermissions,
+  Permission,
+} from '@lnk/nestjs-common';
 import { SecurityService } from './security.service';
 
 class ScanUrlDto {
@@ -139,5 +148,76 @@ export class SecurityController {
         },
       ],
     };
+  }
+
+  // ========== 前端兼容端点 ==========
+
+  @Post('analyze')
+  @ApiOperation({ summary: 'Analyze URL security (alias for scan)' })
+  async analyzeUrl(@Body() dto: ScanUrlDto) {
+    return this.scanUrl(dto);
+  }
+
+  @Post('quick-check')
+  @ApiOperation({ summary: 'Quick URL safety check (alias for check)' })
+  async quickCheckUrl(@Body() dto: QuickCheckDto) {
+    return this.quickCheck(dto);
+  }
+
+  @Post('batch-scan')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Batch scan URLs (alias for scan/batch)' })
+  async batchScanUrls(@Body() dto: BatchScanDto) {
+    return this.batchScan(dto);
+  }
+
+  @Get('suspended-links')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @ApiBearerAuth()
+  @RequirePermissions(Permission.LINKS_VIEW)
+  @ApiOperation({ summary: 'Get suspended links' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'offset', required: false })
+  async getSuspendedLinks(
+    @ScopedTeamId() teamId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.securityService.getSuspendedLinks(teamId, {
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined,
+    });
+  }
+
+  @Post('suspended-links/:linkId/reinstate')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @ApiBearerAuth()
+  @RequirePermissions(Permission.LINKS_EDIT)
+  @ApiOperation({ summary: 'Reinstate a suspended link' })
+  async reinstateLink(
+    @Param('linkId') linkId: string,
+    @Body() body: { reason: string },
+    @ScopedTeamId() teamId: string,
+  ) {
+    return this.securityService.reinstateLink(linkId, teamId, body.reason);
+  }
+
+  @Post('check-and-handle')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @ApiBearerAuth()
+  @RequirePermissions(Permission.LINKS_EDIT)
+  @ApiOperation({ summary: 'Check URL and handle if malicious' })
+  async checkAndHandle(@Body() dto: QuickCheckDto) {
+    return this.securityService.checkAndHandleUrl(dto.url);
+  }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @ApiBearerAuth()
+  @RequirePermissions(Permission.LINKS_VIEW)
+  @ApiOperation({ summary: 'Get security stats for team' })
+  async getSecurityStats(@ScopedTeamId() teamId: string) {
+    return this.securityService.getSecurityStats(teamId);
   }
 }

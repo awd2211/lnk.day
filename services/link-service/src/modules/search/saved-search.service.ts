@@ -3,10 +3,11 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 import {
   SavedSearch,
@@ -24,9 +25,15 @@ import {
   NewMatchNotificationData,
 } from '../../common/notification/link-notification.service';
 
+// 定时间隔常量
+const EVERY_DAY = 24 * 60 * 60 * 1000;
+const EVERY_WEEK = 7 * 24 * 60 * 60 * 1000;
+
 @Injectable()
-export class SavedSearchService {
+export class SavedSearchService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SavedSearchService.name);
+  private dailyNotificationInterval: NodeJS.Timeout | null = null;
+  private weeklyNotificationInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectRepository(SavedSearch)
@@ -34,6 +41,36 @@ export class SavedSearchService {
     private readonly searchService: SearchService,
     private readonly notificationClient: LinkNotificationService,
   ) {}
+
+  onModuleInit() {
+    // 每日通知 (每24小时)
+    this.dailyNotificationInterval = setInterval(() => {
+      this.sendDailyNotifications().catch((err) => {
+        this.logger.error(`发送每日通知失败: ${err.message}`);
+      });
+    }, EVERY_DAY);
+
+    // 每周通知 (每7天)
+    this.weeklyNotificationInterval = setInterval(() => {
+      this.sendWeeklyNotifications().catch((err) => {
+        this.logger.error(`发送每周通知失败: ${err.message}`);
+      });
+    }, EVERY_WEEK);
+
+    this.logger.log('搜索通知定时任务已启动 (每日/每周)');
+  }
+
+  onModuleDestroy() {
+    if (this.dailyNotificationInterval) {
+      clearInterval(this.dailyNotificationInterval);
+      this.dailyNotificationInterval = null;
+    }
+    if (this.weeklyNotificationInterval) {
+      clearInterval(this.weeklyNotificationInterval);
+      this.weeklyNotificationInterval = null;
+    }
+    this.logger.log('搜索通知定时任务已停止');
+  }
 
   async create(
     dto: CreateSavedSearchDto,
@@ -238,13 +275,12 @@ export class SavedSearchService {
   }
 
   // ==================== Notification Scheduling ====================
+  // 定时任务通过 setInterval 在 onModuleInit 中启动
 
-  @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async sendDailyNotifications(): Promise<void> {
     await this.sendScheduledNotifications('daily');
   }
 
-  @Cron(CronExpression.EVERY_WEEK)
   async sendWeeklyNotifications(): Promise<void> {
     await this.sendScheduledNotifications('weekly');
   }

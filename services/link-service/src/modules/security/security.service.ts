@@ -1,11 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { UrlScanResult } from './entities/url-scan-result.entity';
 import { Link, LinkStatus } from '../link/entities/link.entity';
 import { NotificationClientService } from '@lnk/nestjs-common';
+
+// 定时间隔常量
+const EVERY_HOUR = 60 * 60 * 1000;
+const EVERY_DAY = 24 * 60 * 60 * 1000;
 
 export interface SafeBrowsingResult {
   safe: boolean;
@@ -43,7 +46,7 @@ export interface UrlAnalysis {
 }
 
 @Injectable()
-export class SecurityService {
+export class SecurityService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SecurityService.name);
 
   // API keys
@@ -54,6 +57,10 @@ export class SecurityService {
   // Cache for recent scans
   private scanCache: Map<string, { result: UrlAnalysis; expiry: Date }> = new Map();
   private readonly CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  // 定时任务句柄
+  private rescanInterval: NodeJS.Timeout | null = null;
+  private cacheCleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -66,6 +73,34 @@ export class SecurityService {
     this.googleSafeBrowsingApiKey = this.configService.get<string>('GOOGLE_SAFE_BROWSING_API_KEY') || '';
     this.virusTotalApiKey = this.configService.get<string>('VIRUSTOTAL_API_KEY') || '';
     this.urlScanApiKey = this.configService.get<string>('URLSCAN_API_KEY') || '';
+  }
+
+  onModuleInit() {
+    // 每天重新扫描过期的安全检查
+    this.rescanInterval = setInterval(() => {
+      this.rescanOldUrls().catch((err) => {
+        this.logger.error(`重新扫描URL失败: ${err.message}`);
+      });
+    }, EVERY_DAY);
+
+    // 每小时清理过期缓存
+    this.cacheCleanupInterval = setInterval(() => {
+      this.cleanupCache();
+    }, EVERY_HOUR);
+
+    this.logger.log('安全服务定时任务已启动 (URL重扫/缓存清理)');
+  }
+
+  onModuleDestroy() {
+    if (this.rescanInterval) {
+      clearInterval(this.rescanInterval);
+      this.rescanInterval = null;
+    }
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+    this.logger.log('安全服务定时任务已停止');
   }
 
   async analyzeUrl(url: string, options?: { force?: boolean }): Promise<UrlAnalysis> {
@@ -483,9 +518,9 @@ export class SecurityService {
   }
 
   // ========== 定时任务：重新扫描 ==========
+  // 定时任务通过 setInterval 在 onModuleInit 中启动
 
-  // 每天凌晨 3 点重新扫描过期的安全检查
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  // 每天重新扫描过期的安全检查
   async rescanOldUrls(): Promise<void> {
     this.logger.log('Starting scheduled URL rescan...');
 
@@ -543,8 +578,7 @@ export class SecurityService {
     }
   }
 
-  // 清理过期的扫描缓存
-  @Cron(CronExpression.EVERY_HOUR)
+  // 清理过期的扫描缓存 (每小时通过 setInterval 调用)
   cleanupCache(): void {
     const now = new Date();
     let cleaned = 0;

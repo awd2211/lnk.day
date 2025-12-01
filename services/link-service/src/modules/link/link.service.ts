@@ -1,8 +1,7 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThanOrEqual } from 'typeorm';
 import { customAlphabet } from 'nanoid';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import * as bcrypt from 'bcrypt';
 
 import { Link, LinkStatus } from './entities/link.entity';
@@ -18,9 +17,13 @@ import { SecurityService } from '../security/security.service';
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 7);
 
+// 定时间隔常量
+const EVERY_MINUTE = 60 * 1000;
+
 @Injectable()
-export class LinkService {
+export class LinkService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LinkService.name);
+  private scheduledLinksInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectRepository(Link)
@@ -31,6 +34,24 @@ export class LinkService {
     private readonly linkEventService: LinkEventService,
     private readonly securityService: SecurityService,
   ) {}
+
+  onModuleInit() {
+    // 启动定时任务：每分钟检查计划链接
+    this.scheduledLinksInterval = setInterval(() => {
+      this.processScheduledLinks().catch((err) => {
+        this.logger.error(`处理计划链接失败: ${err.message}`);
+      });
+    }, EVERY_MINUTE);
+    this.logger.log('计划链接定时任务已启动 (每分钟)');
+  }
+
+  onModuleDestroy() {
+    if (this.scheduledLinksInterval) {
+      clearInterval(this.scheduledLinksInterval);
+      this.scheduledLinksInterval = null;
+      this.logger.log('计划链接定时任务已停止');
+    }
+  }
 
   async create(createLinkDto: CreateLinkDto, userId: string, teamId: string): Promise<Link> {
     // 安全检查：验证目标 URL 是否安全
@@ -546,8 +567,7 @@ export class LinkService {
     return this.scheduleRepository.save(schedule);
   }
 
-  // 定时任务 - 每分钟执行一次检查
-  @Cron(CronExpression.EVERY_MINUTE)
+  // 定时任务 - 每分钟执行一次检查 (通过 setInterval 在 onModuleInit 中启动)
   async processScheduledLinks(): Promise<void> {
     const now = new Date();
 
@@ -597,5 +617,49 @@ export class LinkService {
     }
 
     await this.linkRepository.save(link);
+  }
+
+  /**
+   * Get platform-wide link statistics (for admin console)
+   */
+  async getGlobalStats(): Promise<{
+    totalLinks: number;
+    activeLinks: number;
+    inactiveLinks: number;
+    expiredLinks: number;
+    suspendedLinks: number;
+    totalClicks: number;
+    totalUniqueClicks: number;
+  }> {
+    const [
+      totalLinks,
+      activeLinks,
+      inactiveLinks,
+      expiredLinks,
+      suspendedLinks,
+    ] = await Promise.all([
+      this.linkRepository.count(),
+      this.linkRepository.count({ where: { status: LinkStatus.ACTIVE } }),
+      this.linkRepository.count({ where: { status: LinkStatus.INACTIVE } }),
+      this.linkRepository.count({ where: { status: LinkStatus.EXPIRED } }),
+      this.linkRepository.count({ where: { status: LinkStatus.SUSPENDED } }),
+    ]);
+
+    // Get aggregated click stats
+    const aggregateResult = await this.linkRepository
+      .createQueryBuilder('link')
+      .select('SUM(link.totalClicks)', 'totalClicks')
+      .addSelect('SUM(link.uniqueClicks)', 'totalUniqueClicks')
+      .getRawOne();
+
+    return {
+      totalLinks,
+      activeLinks,
+      inactiveLinks,
+      expiredLinks,
+      suspendedLinks,
+      totalClicks: parseInt(aggregateResult?.totalClicks || '0', 10),
+      totalUniqueClicks: parseInt(aggregateResult?.totalUniqueClicks || '0', 10),
+    };
   }
 }

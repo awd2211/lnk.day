@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+// ScheduleModule 暂时禁用，因为与多个 @Global() 模块存在冲突
+// TODO: 使用 setInterval 替代 @Cron 装饰器实现定时任务
+// import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import {
   MetricsModule,
@@ -39,8 +41,7 @@ import { LinkSagaModule } from './saga/saga.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    // ScheduleModule 必须在 @Global 模块之前导入
-    ScheduleModule.forRoot(),
+    // ScheduleModule.forRoot(), // 暂时禁用
     MetricsModule.forRoot({
       serviceName: 'link-service',
     }),
