@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from '../utils/api';
 
-type View = 'main' | 'settings' | 'history';
+type View = 'main' | 'settings' | 'history' | 'qrcode';
 
 export function Popup() {
   const [view, setView] = useState<View>('main');
@@ -136,14 +136,15 @@ export function Popup() {
       </div>
 
       {/* Content */}
-      {view === 'main' && <MainView />}
+      {view === 'main' && <MainView onGenerateQR={() => setView('qrcode')} />}
       {view === 'history' && <HistoryView onBack={() => setView('main')} />}
       {view === 'settings' && <SettingsView onBack={() => setView('main')} onLogout={handleLogout} />}
+      {view === 'qrcode' && <QRCodeView onBack={() => setView('main')} />}
     </div>
   );
 }
 
-function MainView() {
+function MainView({ onGenerateQR }: { onGenerateQR: () => void }) {
   const [url, setUrl] = useState('');
   const [customCode, setCustomCode] = useState('');
   const [title, setTitle] = useState('');
@@ -254,12 +255,23 @@ function MainView() {
           <p className="text-xs text-gray-500 mt-1 truncate">{result.originalUrl}</p>
         </div>
 
-        <button
-          onClick={handleReset}
-          className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-        >
-          Shorten Another Link
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={onGenerateQR}
+            className="flex-1 py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+            QR Code
+          </button>
+          <button
+            onClick={handleReset}
+            className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+          >
+            New Link
+          </button>
+        </div>
       </div>
     );
   }
@@ -435,6 +447,143 @@ function HistoryView({ onBack }: { onBack: () => void }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function QRCodeView({ onBack }: { onBack: () => void }) {
+  const [url, setUrl] = useState('');
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [size, setSize] = useState(200);
+  const [color, setColor] = useState('#000000');
+  const [bgColor, setBgColor] = useState('#ffffff');
+
+  useEffect(() => {
+    loadCurrentTab();
+  }, []);
+
+  async function loadCurrentTab() {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_CURRENT_TAB' });
+    if (response.url && !response.url.startsWith('chrome://')) {
+      setUrl(response.url);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!url.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'GENERATE_QR',
+        payload: {
+          url: url.trim(),
+          size,
+          color: color.replace('#', ''),
+          backgroundColor: bgColor.replace('#', ''),
+        },
+      });
+
+      if (response.error) {
+        alert(response.error);
+      } else {
+        setQrCodeUrl(response.url);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to generate QR code');
+    }
+    setIsLoading(false);
+  }
+
+  async function handleDownload() {
+    if (!qrCodeUrl) return;
+
+    const link = document.createElement('a');
+    link.href = qrCodeUrl;
+    link.download = 'qrcode.png';
+    link.click();
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
+        <button onClick={onBack} className="p-1 hover:bg-gray-100 rounded">
+          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h2 className="font-semibold text-gray-900">Generate QR Code</h2>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Size</label>
+            <select
+              value={size}
+              onChange={(e) => setSize(Number(e.target.value))}
+              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+            >
+              <option value={150}>150px</option>
+              <option value={200}>200px</option>
+              <option value={300}>300px</option>
+              <option value={400}>400px</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Background</label>
+            <input
+              type="color"
+              value={bgColor}
+              onChange={(e) => setBgColor(e.target.value)}
+              className="w-full h-8 border border-gray-300 rounded cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <button
+          onClick={handleGenerate}
+          disabled={!url.trim() || isLoading}
+          className="w-full py-2 px-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+        >
+          {isLoading ? 'Generating...' : 'Generate QR Code'}
+        </button>
+
+        {qrCodeUrl && (
+          <div className="text-center space-y-3">
+            <div className="bg-white p-4 rounded-lg border border-gray-200 inline-block">
+              <img src={qrCodeUrl} alt="QR Code" className="mx-auto" style={{ maxWidth: '200px' }} />
+            </div>
+            <button
+              onClick={handleDownload}
+              className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              Download PNG
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

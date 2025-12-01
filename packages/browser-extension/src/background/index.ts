@@ -3,6 +3,11 @@
  */
 
 import { api, CreateLinkParams, Link } from '../utils/api';
+import {
+  addToLinkHistory,
+  incrementUsageStat,
+  getSettings,
+} from '../utils/storage';
 
 // Initialize API on startup
 chrome.runtime.onInstalled.addListener(async () => {
@@ -89,8 +94,19 @@ async function handleMessage(
   await api.init();
 
   switch (message.type) {
-    case 'CREATE_LINK':
-      return api.createLink(message.payload as CreateLinkParams);
+    case 'CREATE_LINK': {
+      const link = await api.createLink(message.payload as CreateLinkParams);
+      // Save to history
+      await addToLinkHistory({
+        id: link.id,
+        shortUrl: link.shortUrl,
+        originalUrl: link.originalUrl,
+        title: link.title,
+        createdAt: link.createdAt,
+      });
+      await incrementUsageStat('linksCreated');
+      return link;
+    }
 
     case 'GET_RECENT_LINKS':
       return api.getRecentLinks(message.payload?.limit);
@@ -124,6 +140,69 @@ async function handleMessage(
     case 'COPY_TO_CLIPBOARD':
       await copyToClipboard(message.payload.text);
       return { success: true };
+
+    case 'GENERATE_QR': {
+      const qrUrl = await api.generateQRCode(message.payload);
+      await incrementUsageStat('qrCodesGenerated');
+      return { url: qrUrl };
+    }
+
+    case 'GET_LINK_ANALYTICS':
+      return api.getLinkAnalytics(message.payload.linkId, message.payload.period);
+
+    case 'GET_FOLDERS':
+      return api.getFolders();
+
+    case 'GET_USER_INFO':
+      return api.getUserInfo();
+
+    case 'UPDATE_LINK':
+      return api.updateLink(message.payload.linkId, message.payload.data);
+
+    case 'BULK_CREATE_LINKS':
+      return api.bulkCreateLinks(message.payload.links);
+
+    case 'GET_DOMAINS':
+      return api.getDomains();
+
+    case 'GET_DEFAULT_DOMAIN':
+      return api.getDefaultDomain();
+
+    case 'GET_SETTINGS':
+      return getSettings();
+
+    case 'GET_USAGE_STATS': {
+      const { getUsageStats } = await import('../utils/storage');
+      return getUsageStats();
+    }
+
+    case 'GET_LINK_HISTORY': {
+      const { getLinkHistory } = await import('../utils/storage');
+      return getLinkHistory();
+    }
+
+    case 'CLEAR_LINK_HISTORY': {
+      const { clearLinkHistory } = await import('../utils/storage');
+      await clearLinkHistory();
+      return { success: true };
+    }
+
+    case 'GET_FAVORITES': {
+      const { getFavorites } = await import('../utils/storage');
+      return getFavorites();
+    }
+
+    case 'ADD_FAVORITE': {
+      const { addFavorite } = await import('../utils/storage');
+      await addFavorite(message.payload.linkId);
+      return { success: true };
+    }
+
+    case 'REMOVE_FAVORITE': {
+      const { removeFavorite } = await import('../utils/storage');
+      await removeFavorite(message.payload.linkId);
+      return { success: true };
+    }
 
     default:
       throw new Error(`Unknown message type: ${message.type}`);

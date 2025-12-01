@@ -176,6 +176,38 @@ export function Options() {
 
           <div className="flex items-center justify-between">
             <div>
+              <p className="font-medium text-gray-900">Auto-copy Short URL</p>
+              <p className="text-sm text-gray-500">Automatically copy shortened link to clipboard</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.autoCopy}
+                onChange={(e) => handleSettingChange('autoCopy', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gray-900">Highlight lnk.day Links</p>
+              <p className="text-sm text-gray-500">Add a badge to lnk.day links on web pages</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.highlightLinks}
+                onChange={(e) => handleSettingChange('highlightLinks', e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
               <p className="font-medium text-gray-900">Theme</p>
               <p className="text-sm text-gray-500">Choose your preferred theme</p>
             </div>
@@ -188,6 +220,68 @@ export function Options() {
               <option value="light">Light</option>
               <option value="dark">Dark</option>
             </select>
+          </div>
+        </div>
+      </section>
+
+      {/* QR Code Defaults */}
+      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">QR Code Defaults</h2>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Default Size</label>
+            <select
+              value={settings.qrCodeDefaults?.size || 200}
+              onChange={(e) => handleSettingChange('qrCodeDefaults', {
+                ...settings.qrCodeDefaults,
+                size: Number(e.target.value),
+              })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={150}>150px</option>
+              <option value={200}>200px</option>
+              <option value={300}>300px</option>
+              <option value={400}>400px</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Default Format</label>
+            <select
+              value={settings.qrCodeDefaults?.format || 'png'}
+              onChange={(e) => handleSettingChange('qrCodeDefaults', {
+                ...settings.qrCodeDefaults,
+                format: e.target.value,
+              })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="png">PNG</option>
+              <option value="svg">SVG</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Foreground Color</label>
+            <input
+              type="color"
+              value={`#${settings.qrCodeDefaults?.color || '000000'}`}
+              onChange={(e) => handleSettingChange('qrCodeDefaults', {
+                ...settings.qrCodeDefaults,
+                color: e.target.value.replace('#', ''),
+              })}
+              className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+            <input
+              type="color"
+              value={`#${settings.qrCodeDefaults?.backgroundColor || 'ffffff'}`}
+              onChange={(e) => handleSettingChange('qrCodeDefaults', {
+                ...settings.qrCodeDefaults,
+                backgroundColor: e.target.value.replace('#', ''),
+              })}
+              className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+            />
           </div>
         </div>
       </section>
