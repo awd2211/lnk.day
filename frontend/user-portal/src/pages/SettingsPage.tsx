@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Key, Save, CheckCircle, AlertCircle, Mail } from 'lucide-react';
+import { Lock, Key } from 'lucide-react';
 
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,12 @@ import { ApiKeyManager } from '@/components/settings/ApiKeyManager';
 import { TwoFactorSetup } from '@/components/settings/TwoFactorSetup';
 import { PasswordStrengthIndicator, calculatePasswordStrength } from '@/components/settings/PasswordStrengthIndicator';
 
-type Tab = 'profile' | 'security' | 'api';
+type Tab = 'security' | 'api';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('profile');
-  const { user, updateUser, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>('security');
+  const { logout } = useAuth();
   const { toast } = useToast();
-
-  const [profile, setProfile] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-  });
 
   const [passwords, setPasswords] = useState({
     currentPassword: '',
@@ -31,46 +26,11 @@ export default function SettingsPage() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isSendingVerification, setIsSendingVerification] = useState(false);
 
   const tabs = [
-    { id: 'profile' as Tab, label: '个人资料', icon: User },
     { id: 'security' as Tab, label: '安全设置', icon: Lock },
     { id: 'api' as Tab, label: 'API 密钥', icon: Key },
   ];
-
-  const handleSaveProfile = async () => {
-    setIsSaving(true);
-    try {
-      await authService.updateProfile(profile);
-      updateUser(profile);
-      toast({ title: '保存成功' });
-    } catch (error: any) {
-      toast({
-        title: '保存失败',
-        description: error.response?.data?.message || '请稍后重试',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSendVerificationEmail = async () => {
-    setIsSendingVerification(true);
-    try {
-      await authService.sendVerificationEmail();
-      toast({ title: '验证邮件已发送', description: '请检查您的邮箱' });
-    } catch (error: any) {
-      toast({
-        title: '发送失败',
-        description: error.response?.data?.message || '请稍后重试',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSendingVerification(false);
-    }
-  };
 
   const handleChangePassword = async () => {
     if (!passwords.currentPassword) {
@@ -138,7 +98,7 @@ export default function SettingsPage() {
     <Layout>
       <div className="mb-8">
         <h1 className="text-2xl font-bold">设置</h1>
-        <p className="text-gray-500">管理您的账户和偏好设置</p>
+        <p className="text-gray-500">管理安全设置和 API 密钥</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-4">
@@ -167,64 +127,6 @@ export default function SettingsPage() {
 
         {/* Content */}
         <div className="lg:col-span-3">
-          {activeTab === 'profile' && (
-            <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-              <h2 className="mb-6 text-lg font-semibold dark:text-white">个人资料</h2>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">姓名</Label>
-                  <Input
-                    id="name"
-                    value={profile.name}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">邮箱</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    className="mt-1"
-                  />
-                  <div className="mt-2 flex items-center gap-2">
-                    {user?.emailVerifiedAt ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 dark:text-green-400">
-                          邮箱已验证
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                        <span className="text-sm text-amber-600 dark:text-amber-400">
-                          邮箱未验证
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSendVerificationEmail}
-                          disabled={isSendingVerification}
-                          className="ml-2"
-                        >
-                          <Mail className="mr-1 h-3 w-3" />
-                          {isSendingVerification ? '发送中...' : '发送验证邮件'}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <Button onClick={handleSaveProfile} disabled={isSaving}>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? '保存中...' : '保存更改'}
-                </Button>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'security' && (
             <div className="space-y-6">
               {/* 2FA Section */}
