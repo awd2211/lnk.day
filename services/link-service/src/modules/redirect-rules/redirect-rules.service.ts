@@ -53,6 +53,29 @@ export interface RuleMatchResult {
   matchedConditions?: string[];
 }
 
+// Frontend-compatible condition interface
+export interface FrontendCondition {
+  type: 'country' | 'device' | 'browser' | 'os' | 'language' | 'time' | 'date' | 'referrer' | 'query_param';
+  operator: string;
+  value: string | string[] | number | { start: string | number; end: string | number };
+  key?: string;
+}
+
+export interface FrontendRule {
+  id: string;
+  linkId: string;
+  name: string;
+  description?: string;
+  priority: number;
+  isActive: boolean;
+  conditions: FrontendCondition[];
+  conditionLogic: 'and' | 'or';
+  targetUrl: string;
+  matchCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class RedirectRulesService {
   private readonly logger = new Logger(RedirectRulesService.name);
@@ -63,6 +86,137 @@ export class RedirectRulesService {
     @InjectRepository(RedirectRuleGroup)
     private readonly ruleGroupRepository: Repository<RedirectRuleGroup>,
   ) {}
+
+  // Convert backend rule to frontend format
+  private toFrontendFormat(rule: RedirectRule): FrontendRule {
+    const conditions: FrontendCondition[] = [];
+
+    // Convert geo conditions
+    if (rule.conditions.geo) {
+      if (rule.conditions.geo.countries?.length) {
+        conditions.push({
+          type: 'country',
+          operator: 'in',
+          value: rule.conditions.geo.countries,
+        });
+      }
+      if (rule.conditions.geo.excludeCountries?.length) {
+        conditions.push({
+          type: 'country',
+          operator: 'not_in',
+          value: rule.conditions.geo.excludeCountries,
+        });
+      }
+    }
+
+    // Convert device conditions
+    if (rule.conditions.device) {
+      if (rule.conditions.device.deviceTypes?.length) {
+        conditions.push({
+          type: 'device',
+          operator: 'in',
+          value: rule.conditions.device.deviceTypes,
+        });
+      }
+      if (rule.conditions.device.browsers?.length) {
+        conditions.push({
+          type: 'browser',
+          operator: 'in',
+          value: rule.conditions.device.browsers,
+        });
+      }
+      if (rule.conditions.device.operatingSystems?.length) {
+        conditions.push({
+          type: 'os',
+          operator: 'in',
+          value: rule.conditions.device.operatingSystems,
+        });
+      }
+    }
+
+    // Convert language conditions
+    if (rule.conditions.language) {
+      if (rule.conditions.language.languages?.length) {
+        conditions.push({
+          type: 'language',
+          operator: 'in',
+          value: rule.conditions.language.languages,
+        });
+      }
+    }
+
+    // Convert time conditions
+    if (rule.conditions.time) {
+      if (rule.conditions.time.startTime && rule.conditions.time.endTime) {
+        conditions.push({
+          type: 'time',
+          operator: 'between',
+          value: { start: rule.conditions.time.startTime, end: rule.conditions.time.endTime },
+        });
+      }
+      if (rule.conditions.time.daysOfWeek?.length) {
+        conditions.push({
+          type: 'date',
+          operator: 'in',
+          value: rule.conditions.time.daysOfWeek.map(d => d.toString()),
+        });
+      }
+    }
+
+    // Convert referrer conditions
+    if (rule.conditions.referrer) {
+      if (rule.conditions.referrer.domains?.length) {
+        conditions.push({
+          type: 'referrer',
+          operator: 'in',
+          value: rule.conditions.referrer.domains,
+        });
+      }
+      if (rule.conditions.referrer.utmSource) {
+        conditions.push({
+          type: 'query_param',
+          operator: 'equals',
+          value: rule.conditions.referrer.utmSource,
+          key: 'utm_source',
+        });
+      }
+      if (rule.conditions.referrer.utmMedium) {
+        conditions.push({
+          type: 'query_param',
+          operator: 'equals',
+          value: rule.conditions.referrer.utmMedium,
+          key: 'utm_medium',
+        });
+      }
+    }
+
+    // Convert query param conditions
+    if (rule.conditions.queryParams?.length) {
+      for (const param of rule.conditions.queryParams) {
+        conditions.push({
+          type: 'query_param',
+          operator: param.operator,
+          value: param.value,
+          key: param.paramName,
+        });
+      }
+    }
+
+    return {
+      id: rule.id,
+      linkId: rule.linkId,
+      name: rule.name,
+      description: rule.description,
+      priority: rule.priority,
+      isActive: rule.enabled,
+      conditions,
+      conditionLogic: rule.types.length > 1 ? 'and' : 'and', // Default to 'and'
+      targetUrl: rule.targetUrl,
+      matchCount: rule.matchCount,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt,
+    };
+  }
 
   // ==================== CRUD Operations ====================
 
@@ -82,6 +236,20 @@ export class RedirectRulesService {
       where: { linkId },
       order: { priority: 'DESC', createdAt: 'ASC' },
     });
+  }
+
+  // Returns rules in frontend-compatible format
+  async findAllByLinkFormatted(linkId: string): Promise<FrontendRule[]> {
+    const rules = await this.findAllByLink(linkId);
+    return rules.map(rule => this.toFrontendFormat(rule));
+  }
+
+  async findOneFormatted(id: string): Promise<FrontendRule> {
+    const rule = await this.ruleRepository.findOne({ where: { id } });
+    if (!rule) {
+      throw new NotFoundException('Redirect rule not found');
+    }
+    return this.toFrontendFormat(rule);
   }
 
   async findOne(id: string): Promise<RedirectRule> {

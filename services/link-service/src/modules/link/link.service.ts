@@ -181,7 +181,7 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     const sortBy = options?.sortBy || 'createdAt';
     const sortOrder = options?.sortOrder || 'DESC';
 
-    this.logger.debug(`findAll called with teamId=${teamId}, page=${page}, limit=${limit}, sortBy=${sortBy}, sortOrder=${sortOrder}`);
+    this.logger.debug(`findAll called with teamId=${teamId}, page=${page}, limit=${limit}, sortBy=${sortBy}, sortOrder=${sortOrder}, folderId=${options?.folderId || 'none'}`);
 
     // 构建查询条件
     const queryBuilder = this.linkRepository.createQueryBuilder('link');

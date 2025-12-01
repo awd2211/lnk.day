@@ -59,8 +59,8 @@ export class RedirectRulesController {
   @ApiResponse({ status: 200, type: [RedirectRuleResponseDto] })
   async findAll(
     @Param('linkId', ParseUUIDPipe) linkId: string,
-  ): Promise<RedirectRule[]> {
-    return this.redirectRulesService.findAllByLink(linkId);
+  ) {
+    return this.redirectRulesService.findAllByLinkFormatted(linkId);
   }
 
   @Get('stats')
@@ -79,8 +79,8 @@ export class RedirectRulesController {
   @ApiResponse({ status: 200, type: RedirectRuleResponseDto })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<RedirectRule> {
-    return this.redirectRulesService.findOne(id);
+  ) {
+    return this.redirectRulesService.findOneFormatted(id);
   }
 
   @Put(':id')

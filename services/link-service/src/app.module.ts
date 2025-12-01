@@ -34,6 +34,8 @@ import { LinkTemplateModule } from './modules/link-template/link-template.module
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { HealthModule } from './modules/health/health.module';
 import { LinkSagaModule } from './saga/saga.module';
+import { UTMTemplateModule } from './modules/utm-template/utm-template.module';
+import { TagModule } from './modules/tag/tag.module';
 
 @Module({
   imports: [
@@ -88,6 +90,8 @@ import { LinkSagaModule } from './saga/saga.module';
     ModerationModule,
     HealthModule,
     LinkSagaModule,
+    UTMTemplateModule,
+    TagModule,
   ],
   providers: [
     {
