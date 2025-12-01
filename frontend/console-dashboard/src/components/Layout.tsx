@@ -31,6 +31,8 @@ import {
   Cog,
   Plug,
   Mail,
+  Gauge,
+  Building,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -62,6 +64,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: '用户管理', href: '/users', icon: Users },
       { name: '团队管理', href: '/teams', icon: Building2 },
+      { name: '租户管理', href: '/tenants', icon: Building },
       { name: '角色权限', href: '/roles', icon: Shield },
     ],
   },
@@ -116,6 +119,7 @@ const navigationGroups: NavGroup[] = [
     icon: Cog,
     items: [
       { name: '系统监控', href: '/system', icon: Server },
+      { name: '性能指标', href: '/metrics', icon: Gauge },
       { name: '管理员角色', href: '/admin-roles', icon: ShieldCheck },
       { name: '通知管理', href: '/notifications', icon: Mail },
       { name: '系统设置', href: '/settings', icon: Settings },

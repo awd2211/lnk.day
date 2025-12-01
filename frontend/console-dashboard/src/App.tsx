@@ -4,9 +4,11 @@ import Layout from '@/components/Layout';
 import DashboardPage from '@/pages/DashboardPage';
 import UsersPage from '@/pages/UsersPage';
 import TeamsPage from '@/pages/TeamsPage';
+import TenantsPage from '@/pages/TenantsPage';
 import LinksPage from '@/pages/LinksPage';
 import CampaignsPage from '@/pages/CampaignsPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
+import MetricsPage from '@/pages/MetricsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SystemPage from '@/pages/SystemPage';
 import LoginPage from '@/pages/LoginPage';
@@ -41,6 +43,7 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="teams" element={<TeamsPage />} />
+        <Route path="tenants" element={<TenantsPage />} />
         <Route path="roles" element={<RolesPage />} />
         <Route path="links" element={<LinksPage />} />
         <Route path="campaigns" element={<CampaignsPage />} />
@@ -50,6 +53,7 @@ function App() {
         <Route path="pages" element={<PagesPage />} />
         <Route path="moderation" element={<ContentModerationPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="metrics" element={<MetricsPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="api-keys" element={<ApiKeysPage />} />
