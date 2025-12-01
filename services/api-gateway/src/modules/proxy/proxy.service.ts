@@ -189,6 +189,19 @@ export class ProxyService {
         url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
         requireAuth: true,
       },
+      // Public bio-link endpoints (username lookup, check availability)
+      {
+        name: 'page-service-bio-links-public-username',
+        prefix: '/api/bio-links/username',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: false,
+      },
+      {
+        name: 'page-service-bio-links-public-check',
+        prefix: '/api/bio-links/check-username',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: false,
+      },
       {
         name: 'page-service-bio-links',
         prefix: '/api/bio-links',

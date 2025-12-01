@@ -8,6 +8,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProxyModule } from './modules/proxy/proxy.module';
 import { HealthModule } from './modules/health/health.module';
 import { RateLimitModule } from './modules/ratelimit/ratelimit.module';
+import { MobileModule } from './modules/mobile/mobile.module';
+import { OpenApiModule } from './modules/openapi/openapi.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
@@ -50,6 +52,8 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     AuthModule,
     HealthModule,  // 放在 ProxyModule 之前，确保 /health 路由优先匹配
     RateLimitModule,
+    MobileModule,  // 移动端 API 模块
+    OpenApiModule, // 开放 API 模块
     ProxyModule,   // 代理模块最后导入，因为它使用 @All('*') 捕获所有请求
   ],
   providers: [
