@@ -5,6 +5,17 @@ import { Reflector } from '@nestjs/core';
 
 import { JwtAuthGuard } from './jwt-auth.guard';
 
+// Mock AuthGuard to avoid passport dependency
+jest.mock('@nestjs/passport', () => ({
+  AuthGuard: jest.fn().mockImplementation(() => {
+    return class MockAuthGuard {
+      canActivate() {
+        return true;
+      }
+    };
+  }),
+}));
+
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
   let configService: jest.Mocked<ConfigService>;
@@ -21,7 +32,7 @@ describe('JwtAuthGuard', () => {
   const createMockExecutionContext = (headers: Record<string, string> = {}): ExecutionContext => {
     const mockRequest = {
       headers,
-      user: null,
+      user: null as any,
     };
 
     return {
@@ -103,35 +114,38 @@ describe('JwtAuthGuard', () => {
         });
       });
 
-      it('should not set user when Bearer token does not match', () => {
+      it('should fall through to parent guard when Bearer token does not match', () => {
         mockConfigService.get.mockReturnValue('internal-secret-key');
 
         const context = createMockExecutionContext({
           authorization: 'Bearer wrong-key',
         });
 
-        // Mock super.canActivate to return true for this test
-        jest.spyOn(guard, 'canActivate').mockImplementation((ctx) => {
-          const request = ctx.switchToHttp().getRequest();
-          // Simulate that parent guard would be called
-          return request.user !== null || true;
-        });
+        // Should return true from mocked parent canActivate
+        const result = guard.canActivate(context);
 
-        guard.canActivate(context);
+        expect(result).toBe(true);
 
-        // Should fall through to parent guard
+        // User should not be set (parent guard would set it)
+        const request = context.switchToHttp().getRequest();
+        expect(request.user).toBeNull();
       });
 
-      it('should not set user when x-internal-api-key does not match', () => {
+      it('should fall through to parent guard when x-internal-api-key does not match', () => {
         mockConfigService.get.mockReturnValue('internal-secret-key');
 
         const context = createMockExecutionContext({
           'x-internal-api-key': 'wrong-key',
         });
 
-        // The guard should fall through to parent AuthGuard
-        // We can't easily test super.canActivate, so just verify
-        // that the wrong key doesn't set user directly
+        // Should return true from mocked parent canActivate
+        const result = guard.canActivate(context);
+
+        expect(result).toBe(true);
+
+        // User should not be set (parent guard would set it)
+        const request = context.switchToHttp().getRequest();
+        expect(request.user).toBeNull();
       });
     });
 
@@ -143,10 +157,10 @@ describe('JwtAuthGuard', () => {
           authorization: 'Bearer some-jwt-token',
         });
 
-        // The guard should delegate to parent AuthGuard
-        // We verify the config was checked
-        guard.canActivate(context);
+        // Should delegate to parent AuthGuard
+        const result = guard.canActivate(context);
 
+        expect(result).toBe(true);
         expect(mockConfigService.get).toHaveBeenCalledWith('INTERNAL_API_KEY');
       });
 
@@ -158,6 +172,10 @@ describe('JwtAuthGuard', () => {
         });
 
         // Empty string is falsy, so should fall through
+        const result = guard.canActivate(context);
+
+        expect(result).toBe(true);
+
         // The user should not be set to system user
         const request = context.switchToHttp().getRequest();
         expect(request.user).toBeNull();

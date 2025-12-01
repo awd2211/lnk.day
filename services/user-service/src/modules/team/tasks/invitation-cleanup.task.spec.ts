@@ -12,7 +12,8 @@ describe('InvitationCleanupTask', () => {
   };
 
   beforeEach(async () => {
-    jest.useFakeTimers();
+    // Use legacy fake timers to preserve setInterval/clearInterval
+    jest.useFakeTimers({ legacyFakeTimers: true });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -29,10 +30,10 @@ describe('InvitationCleanupTask', () => {
   });
 
   afterEach(() => {
+    // Clean up interval if it was set (before restoring timers)
+    task.onModuleDestroy();
     jest.clearAllMocks();
     jest.useRealTimers();
-    // Clean up interval if it was set
-    task.onModuleDestroy();
   });
 
   describe('onModuleInit', () => {
