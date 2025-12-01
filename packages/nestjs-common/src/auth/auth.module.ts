@@ -1,4 +1,4 @@
-import { Module, DynamicModule, Global } from '@nestjs/common';
+import { Module, DynamicModule } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule, JwtModuleOptions as NestJwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -6,7 +6,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtModuleOptions } from './jwt.types';
 
-@Global()
+// 移除 @Global() 以避免与 ScheduleModule 的 Reflector 依赖冲突
 @Module({})
 export class AuthModule {
   /**

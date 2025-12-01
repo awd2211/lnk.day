@@ -1,4 +1,4 @@
-import { Module, Global, DynamicModule } from '@nestjs/common';
+import { Module, DynamicModule } from '@nestjs/common';
 import { SagaOrchestrator } from './saga.orchestrator';
 import { InMemorySagaStore, ISagaStore, SAGA_STORE } from './saga.store';
 
@@ -8,9 +8,13 @@ export interface SagaModuleOptions {
    * 默认使用内存存储
    */
   store?: ISagaStore;
+  /**
+   * 是否设置为全局模块
+   * 默认为 false，避免与 ScheduleModule 等其他模块冲突
+   */
+  isGlobal?: boolean;
 }
 
-@Global()
 @Module({})
 export class SagaModule {
   /**
@@ -29,6 +33,7 @@ export class SagaModule {
 
     return {
       module: SagaModule,
+      global: options?.isGlobal ?? false,
       providers: [storeProvider, SagaOrchestrator],
       exports: [SagaOrchestrator, SAGA_STORE],
     };
@@ -40,9 +45,11 @@ export class SagaModule {
   static forRootAsync(options: {
     useFactory: (...args: any[]) => Promise<SagaModuleOptions> | SagaModuleOptions;
     inject?: any[];
+    isGlobal?: boolean;
   }): DynamicModule {
     return {
       module: SagaModule,
+      global: options.isGlobal ?? false,
       providers: [
         {
           provide: SAGA_STORE,
