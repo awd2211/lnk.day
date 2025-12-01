@@ -90,6 +90,46 @@ export class TemplateService {
     await this.templateRepository.remove(template);
   }
 
+  async duplicate(id: string, userId: string, teamId: string): Promise<CampaignTemplate> {
+    const template = await this.findOne(id);
+
+    const duplicated = this.templateRepository.create({
+      name: `${template.name} (副本)`,
+      description: template.description,
+      type: template.type,
+      channels: template.channels,
+      utmParams: template.utmParams,
+      settings: template.settings,
+      tags: template.tags,
+      defaultGoals: template.defaultGoals,
+      isPublic: false, // 复制后默认为私有
+      userId,
+      teamId,
+      usageCount: 0,
+    });
+
+    return this.templateRepository.save(duplicated);
+  }
+
+  async getCategories(): Promise<{ id: string; name: string; description: string; templates: CampaignTemplate[] }[]> {
+    // 返回按类型分组的系统模板类别
+    const publicTemplates = await this.findPublic();
+
+    const categories = [
+      { id: 'social-media', name: '社交媒体营销', description: '适用于社交平台推广' },
+      { id: 'email-marketing', name: '邮件营销', description: '适用于电子邮件推广' },
+      { id: 'paid-ads', name: '付费广告', description: '适用于付费广告推广' },
+      { id: 'influencer', name: '网红合作', description: '适用于 KOL 推广' },
+      { id: 'product-launch', name: '产品发布', description: '适用于新产品推广' },
+      { id: 'seasonal', name: '季节性促销', description: '适用于节假日促销' },
+    ];
+
+    return categories.map(cat => ({
+      ...cat,
+      templates: publicTemplates.filter(t => t.tags?.includes(cat.id) || t.type === cat.id),
+    }));
+  }
+
   async createCampaignFromTemplate(
     templateId: string,
     campaignData: {

@@ -70,13 +70,19 @@ export class BioLinkController {
   @ApiQuery({ name: 'status', enum: BioLinkStatus, required: false })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, updatedAt, title, totalViews, totalClicks)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索关键词' })
   async findAll(
     @ScopedTeamId() teamId: string,
     @Query('status') status?: BioLinkStatus,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('search') search?: string,
   ) {
-    return this.bioLinkService.findAll(teamId, { status, page, limit });
+    return this.bioLinkService.findAll(teamId, { status, page, limit, sortBy, sortOrder, search });
   }
 
   @Get('check-username/:username')

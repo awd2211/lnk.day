@@ -92,6 +92,9 @@ export class SavedSearch {
   @Column({ default: false })
   isPinned: boolean;
 
+  @Column({ default: false })
+  isDefault: boolean;
+
   @Column({ default: 0 })
   usageCount: number;
 

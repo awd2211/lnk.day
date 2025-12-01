@@ -35,13 +35,39 @@ export class WebhookController {
   @Get()
   @RequirePermissions(Permission.WEBHOOKS_VIEW)
   @ApiOperation({ summary: '获取所有 Webhooks' })
-  @ApiQuery({ name: 'platform', required: false, enum: WebhookPlatform })
+  @ApiQuery({ name: 'platform', required: false, enum: WebhookPlatform, description: '按平台筛选' })
+  @ApiQuery({ name: 'enabled', required: false, description: '按启用状态筛选 (true/false)' })
+  @ApiQuery({ name: 'page', required: false, description: '页码' })
+  @ApiQuery({ name: 'limit', required: false, description: '每页数量' })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, updatedAt, name, successCount, failureCount, lastTriggeredAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索关键词' })
   async listWebhooks(
     @ScopedTeamId() teamId: string,
     @Query('platform') platform?: WebhookPlatform,
+    @Query('enabled') enabled?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('search') search?: string,
   ) {
-    const webhooks = await this.webhookService.findAll(teamId, platform);
-    return { webhooks };
+    const enabledBool = enabled === 'true' ? true : enabled === 'false' ? false : undefined;
+    const result = await this.webhookService.findAllWithPagination(teamId, {
+      platform,
+      enabled: enabledBool,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+      search,
+    });
+    return {
+      webhooks: result.items,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
   }
 
   @Post()
@@ -172,6 +198,68 @@ export class WebhookController {
     return { webhook };
   }
 
+  @Post(':id/enable')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
+  @ApiOperation({ summary: '启用 Webhook' })
+  @ApiParam({ name: 'id', type: String })
+  async enableWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const webhook = await this.webhookService.setEnabled(id, teamId, true);
+    return webhook;
+  }
+
+  @Post(':id/disable')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
+  @ApiOperation({ summary: '禁用 Webhook' })
+  @ApiParam({ name: 'id', type: String })
+  async disableWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const webhook = await this.webhookService.setEnabled(id, teamId, false);
+    return webhook;
+  }
+
+  @Post(':id/regenerate-secret')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
+  @ApiOperation({ summary: '重新生成 Webhook Secret' })
+  @ApiParam({ name: 'id', type: String })
+  async regenerateSecret(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const secret = await this.webhookService.regenerateSecret(id, teamId);
+    return { secret };
+  }
+
+  @Get(':id/deliveries')
+  @RequirePermissions(Permission.WEBHOOKS_VIEW)
+  @ApiOperation({ summary: '获取 Webhook 投递历史' })
+  @ApiParam({ name: 'id', type: String })
+  async getDeliveries(
+    @ScopedTeamId() teamId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 20,
+  ) {
+    const deliveries = await this.webhookService.getDeliveries(id, teamId, page, limit);
+    return deliveries;
+  }
+
+  @Post('deliveries/:deliveryId/retry')
+  @RequirePermissions(Permission.WEBHOOKS_MANAGE)
+  @ApiOperation({ summary: '重试 Webhook 投递' })
+  @ApiParam({ name: 'deliveryId', type: String })
+  async retryDelivery(
+    @ScopedTeamId() teamId: string,
+    @Param('deliveryId', ParseUUIDPipe) deliveryId: string,
+  ) {
+    const result = await this.webhookService.retryDelivery(deliveryId, teamId);
+    return result;
+  }
+
   @Post(':id/test')
   @RequirePermissions(Permission.WEBHOOKS_MANAGE)
   @ApiOperation({ summary: '测试 Webhook' })
@@ -256,5 +344,19 @@ export class WebhookController {
   ) {
     await this.webhookService.delete(id, teamId);
     return { success: true };
+  }
+}
+
+// ========== Internal Controller (for console-service) ==========
+@ApiTags('webhooks-internal')
+@Controller('internal')
+export class WebhookInternalController {
+  constructor(private readonly webhookService: WebhookService) {}
+
+  @Get('webhooks/stats')
+  @ApiOperation({ summary: '获取全局 Webhook 统计数据（内部使用）' })
+  @ApiHeader({ name: 'x-internal-api-key', required: true })
+  async getGlobalStats() {
+    return this.webhookService.getGlobalStats();
   }
 }

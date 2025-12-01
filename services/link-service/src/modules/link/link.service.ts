@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, LessThanOrEqual } from 'typeorm';
 import { customAlphabet } from 'nanoid';
@@ -14,6 +14,7 @@ import { ScheduleLinkDto, UpdateScheduleDto } from './dto/schedule-link.dto';
 import { RedisService } from '../../common/redis/redis.service';
 import { LinkEventService } from '../../common/rabbitmq/link-event.service';
 import { SecurityService } from '../security/security.service';
+import { FolderService } from '../folder/folder.service';
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 7);
 
@@ -33,6 +34,8 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     private readonly redisService: RedisService,
     private readonly linkEventService: LinkEventService,
     private readonly securityService: SecurityService,
+    @Inject(forwardRef(() => FolderService))
+    private readonly folderService: FolderService,
   ) {}
 
   onModuleInit() {
@@ -98,6 +101,11 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
 
     const savedLink = await this.linkRepository.save(link);
 
+    // 更新文件夹链接计数
+    if (savedLink.folderId) {
+      await this.folderService.updateLinkCount(savedLink.folderId, 1);
+    }
+
     // 缓存新创建的链接
     await this.redisService.setLink(savedLink);
 
@@ -156,18 +164,61 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     return bcrypt.compare(password, link.settings.password);
   }
 
-  async findAll(teamId: string, options?: { page?: number; limit?: number }): Promise<{ links: Link[]; total: number }> {
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+  async findAll(
+    teamId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      status?: string;
+      search?: string;
+      folderId?: string;
+    },
+  ): Promise<{ links: Link[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100); // 最大100条
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
-    const [links, total] = await this.linkRepository.findAndCount({
-      where: { teamId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    this.logger.debug(`findAll called with teamId=${teamId}, page=${page}, limit=${limit}, sortBy=${sortBy}, sortOrder=${sortOrder}`);
 
-    return { links, total };
+    // 构建查询条件
+    const queryBuilder = this.linkRepository.createQueryBuilder('link');
+    queryBuilder.where('link.teamId = :teamId', { teamId });
+
+    // 状态筛选
+    if (options?.status) {
+      queryBuilder.andWhere('link.status = :status', { status: options.status.toUpperCase() });
+    }
+
+    // 文件夹筛选
+    if (options?.folderId) {
+      queryBuilder.andWhere('link.folderId = :folderId', { folderId: options.folderId });
+    }
+
+    // 搜索（标题、短码、原始URL）
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(link.title ILIKE :search OR link.shortCode ILIKE :search OR link.originalUrl ILIKE :search)',
+        { search: `%${options.search}%` },
+      );
+    }
+
+    // 排序（只允许特定字段）
+    const allowedSortFields = ['createdAt', 'updatedAt', 'clicks', 'title', 'shortCode', 'totalClicks'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`link.${safeSortBy}`, safeSortOrder);
+
+    // 分页
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [links, total] = await queryBuilder.getManyAndCount();
+
+    this.logger.debug(`findAll result: found ${total} links for teamId=${teamId}`);
+
+    return { links, total, page, limit };
   }
 
   async findOne(id: string): Promise<Link> {
@@ -208,9 +259,20 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
   async update(id: string, updateLinkDto: UpdateLinkDto): Promise<Link> {
     const link = await this.findOne(id);
     const oldShortCode = link.shortCode;
+    const oldFolderId = link.folderId;
 
     Object.assign(link, updateLinkDto);
     const savedLink = await this.linkRepository.save(link);
+
+    // 更新文件夹链接计数（如果文件夹发生变化）
+    if (oldFolderId !== savedLink.folderId) {
+      if (oldFolderId) {
+        await this.folderService.updateLinkCount(oldFolderId, -1);
+      }
+      if (savedLink.folderId) {
+        await this.folderService.updateLinkCount(savedLink.folderId, 1);
+      }
+    }
 
     // 如果 shortCode 变更，删除旧缓存
     if (oldShortCode !== savedLink.shortCode) {
@@ -243,8 +305,14 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     const shortCode = link.shortCode;
     const linkId = link.id;
     const userId = link.userId;
+    const folderId = link.folderId;
 
     await this.linkRepository.remove(link);
+
+    // 更新文件夹链接计数
+    if (folderId) {
+      await this.folderService.updateLinkCount(folderId, -1);
+    }
 
     // 删除缓存
     await this.redisService.deleteLink(shortCode);
@@ -291,7 +359,17 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
 
     switch (dto.action) {
       case BulkAction.DELETE:
+        // 更新文件夹链接计数
+        const folderCountMap = new Map<string, number>();
+        for (const link of links) {
+          if (link.folderId) {
+            folderCountMap.set(link.folderId, (folderCountMap.get(link.folderId) || 0) + 1);
+          }
+        }
         await this.linkRepository.remove(links);
+        for (const [folderId, count] of folderCountMap) {
+          await this.folderService.updateLinkCount(folderId, -count);
+        }
         success = links.length;
         break;
 
@@ -661,5 +739,29 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
       totalClicks: parseInt(aggregateResult?.totalClicks || '0', 10),
       totalUniqueClicks: parseInt(aggregateResult?.totalUniqueClicks || '0', 10),
     };
+  }
+
+  /**
+   * 转移文件夹中的链接到另一个文件夹或移除文件夹关联
+   * @param fromFolderId 源文件夹ID
+   * @param toFolderId 目标文件夹ID，null 表示移除文件夹关联（链接变为未分类）
+   */
+  async transferLinksFromFolder(fromFolderId: string, toFolderId: string | null): Promise<number> {
+    // 批量更新链接的 folderId
+    const result = await this.linkRepository
+      .createQueryBuilder()
+      .update(Link)
+      .set({ folderId: toFolderId ?? undefined })
+      .where('folderId = :fromFolderId', { fromFolderId })
+      .execute();
+
+    const affectedCount = result.affected || 0;
+
+    // 更新目标文件夹的链接计数
+    if (toFolderId && affectedCount > 0) {
+      await this.folderService.updateLinkCount(toFolderId, affectedCount);
+    }
+
+    return affectedCount;
   }
 }

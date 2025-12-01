@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // ScheduleModule 暂时禁用，因为与多个 @Global() 模块存在冲突
-// TODO: 使用 setInterval 替代 @Cron 装饰器实现定时任务
+// 定时任务已通过 setInterval 实现 (见 link.service.ts onModuleInit)
 // import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import {

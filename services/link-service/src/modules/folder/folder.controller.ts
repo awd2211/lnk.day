@@ -96,12 +96,13 @@ export class FolderController {
     @Param('id') id: string,
     @ScopedTeamId() teamId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Body() body?: { transferToFolderId?: string | null },
   ) {
     const folder = await this.folderService.findOne(id);
     if (!isPlatformAdmin(user) && folder.teamId !== teamId) {
       throw new ForbiddenException('无权删除此文件夹');
     }
-    return this.folderService.remove(id);
+    return this.folderService.remove(id, { transferToFolderId: body?.transferToFolderId });
   }
 
   @Post('reorder')
@@ -112,5 +113,13 @@ export class FolderController {
     @ScopedTeamId() teamId: string,
   ) {
     return this.folderService.reorder(teamId, body.orderedIds);
+  }
+
+  @Post('recalculate-link-counts')
+  @RequirePermissions(Permission.LINKS_EDIT)
+  @ApiOperation({ summary: '重新计算文件夹链接数量（修复历史数据）' })
+  async recalculateLinkCounts(@ScopedTeamId() teamId: string) {
+    await this.folderService.recalculateLinkCounts(teamId);
+    return { success: true, message: '链接数量已重新计算' };
   }
 }

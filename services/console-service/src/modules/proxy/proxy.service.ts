@@ -662,6 +662,20 @@ export class ProxyService {
   }
 
   // Domain Service Proxies
+  async getDomainStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('domain', '/internal/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if domain service doesn't have stats endpoint
+      return {
+        totalDomains: 0,
+        verifiedDomains: 0,
+        pendingDomains: 0,
+        failedDomains: 0,
+      };
+    }
+  }
+
   async getDomains(params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
     const result = await this.forward('domain', '/domains', {
       params,
@@ -793,6 +807,21 @@ export class ProxyService {
   }
 
   // ==================== Webhooks ====================
+  async getWebhookStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('webhook', '/internal/webhooks/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      // Return default stats if webhook service doesn't have stats endpoint
+      return {
+        totalWebhooks: 0,
+        activeWebhooks: 0,
+        failedWebhooks: 0,
+        totalDeliveries: 0,
+        successRate: 0,
+      };
+    }
+  }
+
   async getWebhooks(params?: { page?: number; limit?: number; teamId?: string; status?: string }, auth?: string): Promise<any> {
     return this.forward('webhook', '/webhooks', {
       params,

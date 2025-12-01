@@ -280,6 +280,77 @@ def generate_csv_report(report_data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+@router.get("")
+async def list_reports(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    type: Optional[str] = None,
+):
+    """获取报告列表"""
+    # Scan Redis for all report keys
+    cursor = 0
+    report_keys = []
+    while True:
+        cursor, keys = redis_client.scan(cursor, match="report:*", count=100)
+        report_keys.extend(keys)
+        if cursor == 0:
+            break
+
+    # Filter out file keys
+    report_keys = [k for k in report_keys if not k.startswith("report_file:")]
+
+    # Get report data
+    reports = []
+    for key in report_keys:
+        report_id = key.replace("report:", "")
+        data = redis_client.hgetall(key)
+        if data:
+            report_type = data.get("type", "custom")
+            if type and report_type != type:
+                continue
+            reports.append({
+                "id": report_id,
+                "type": report_type,
+                "name": data.get("name", f"Report {report_id[:8]}"),
+                "status": data.get("status", "unknown"),
+                "config": {
+                    "format": data.get("format", "json"),
+                    "dateRange": {
+                        "start": data.get("start_date"),
+                        "end": data.get("end_date"),
+                    }
+                },
+                "fileUrl": data.get("download_url"),
+                "createdAt": data.get("created_at"),
+            })
+
+    # Sort by created_at descending
+    reports.sort(key=lambda x: x.get("createdAt") or "", reverse=True)
+
+    # Paginate
+    total = len(reports)
+    start = (page - 1) * limit
+    end = start + limit
+    items = reports[start:end]
+
+    return {"items": items, "total": total}
+
+
+@router.delete("/{report_id}")
+async def delete_report(report_id: str):
+    """删除报告"""
+    report_key = f"report:{report_id}"
+    file_key = f"report_file:{report_id}"
+
+    if not redis_client.exists(report_key):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    redis_client.delete(report_key)
+    redis_client.delete(file_key)
+
+    return {"message": "Report deleted"}
+
+
 @router.post("/generate", response_model=ReportResponse)
 async def generate_report(request: ReportRequest, background_tasks: BackgroundTasks):
     """生成分析报告"""

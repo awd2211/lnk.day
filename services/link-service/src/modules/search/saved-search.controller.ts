@@ -207,4 +207,17 @@ export class SavedSearchController {
   ): Promise<{ success: boolean; errors: string[] }> {
     return this.savedSearchService.testNotification(id, user.id, teamId);
   }
+
+  @Post(':id/set-default')
+  @RequirePermissions(Permission.LINKS_EDIT)
+  @ApiOperation({ summary: '设置为默认搜索' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, type: SavedSearchResponseDto })
+  async setDefault(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
+  ): Promise<SavedSearch> {
+    return this.savedSearchService.setDefault(id, user.id, teamId);
+  }
 }

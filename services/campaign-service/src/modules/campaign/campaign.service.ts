@@ -15,20 +15,52 @@ export class CampaignService {
     return this.campaignRepository.save(campaign);
   }
 
-  async findAll(teamId?: string, options?: { status?: CampaignStatus; page?: number; limit?: number }): Promise<{ items: Campaign[]; total: number; page: number; limit: number }> {
-    const where: any = {};
-    if (teamId) where.teamId = teamId;
-    if (options?.status) where.status = options.status;
+  async findAll(
+    teamId?: string,
+    options?: {
+      status?: CampaignStatus;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      search?: string;
+    },
+  ): Promise<{ items: Campaign[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    const queryBuilder = this.campaignRepository.createQueryBuilder('campaign');
 
-    const [items, total] = await this.campaignRepository.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // 团队筛选
+    if (teamId) {
+      queryBuilder.where('campaign.teamId = :teamId', { teamId });
+    }
+
+    // 状态筛选
+    if (options?.status) {
+      queryBuilder.andWhere('campaign.status = :status', { status: options.status });
+    }
+
+    // 搜索（名称、描述）
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(campaign.name ILIKE :search OR campaign.description ILIKE :search)',
+        { search: `%${options.search}%` },
+      );
+    }
+
+    // 排序（只允许特定字段）
+    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'startDate', 'endDate', 'status'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`campaign.${safeSortBy}`, safeSortOrder);
+
+    // 分页
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
 
     return { items, total, page, limit };
   }

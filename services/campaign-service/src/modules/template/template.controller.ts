@@ -68,6 +68,12 @@ export class TemplateController {
     return this.templateService.findPublic();
   }
 
+  @Get('categories')
+  @ApiOperation({ summary: '获取模板类别列表' })
+  getCategories() {
+    return this.templateService.getCategories();
+  }
+
   @Get(':id')
   @ApiHeader({ name: 'x-team-id', required: true })
   @RequirePermissions(Permission.CAMPAIGNS_VIEW)
@@ -90,6 +96,18 @@ export class TemplateController {
   @ApiOperation({ summary: '删除模板' })
   delete(@Param('id') id: string) {
     return this.templateService.delete(id);
+  }
+
+  @Post(':id/duplicate')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_CREATE)
+  @ApiOperation({ summary: '复制模板' })
+  duplicate(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @ScopedTeamId() teamId: string,
+  ) {
+    return this.templateService.duplicate(id, user.sub, teamId);
   }
 
   @Post(':id/create-campaign')

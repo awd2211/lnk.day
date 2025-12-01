@@ -1,5 +1,7 @@
 import { Controller, Post, Body, Res, Get, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, IsOptional, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
   JwtAuthGuard,
   ScopeGuard,
@@ -74,8 +76,16 @@ class QrOptionsDto implements QrOptions {
 }
 
 class GenerateQrDto {
-  @ApiProperty() url: string;
-  @ApiProperty({ required: false, type: QrOptionsDto }) options?: QrOptions;
+  @ApiProperty({ description: 'URL to encode in QR code' })
+  @IsNotEmpty({ message: 'URL is required' })
+  @IsString()
+  url: string;
+
+  @ApiProperty({ required: false, type: QrOptionsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => QrOptionsDto)
+  options?: QrOptions;
 }
 
 class BatchGenerateDto {

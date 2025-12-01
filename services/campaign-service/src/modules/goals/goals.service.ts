@@ -86,6 +86,70 @@ export class GoalsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async findByTeam(teamId: string): Promise<CampaignGoal[]> {
+    return this.goalRepository.find({
+      where: { teamId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findAllWithPagination(
+    teamId: string,
+    options?: {
+      campaignId?: string;
+      status?: GoalStatus;
+      type?: GoalType;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      search?: string;
+    },
+  ): Promise<{ items: CampaignGoal[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
+
+    const queryBuilder = this.goalRepository.createQueryBuilder('goal');
+
+    // Team filter
+    queryBuilder.where('goal.teamId = :teamId', { teamId });
+
+    // Campaign filter
+    if (options?.campaignId) {
+      queryBuilder.andWhere('goal.campaignId = :campaignId', { campaignId: options.campaignId });
+    }
+
+    // Status filter
+    if (options?.status) {
+      queryBuilder.andWhere('goal.status = :status', { status: options.status });
+    }
+
+    // Type filter
+    if (options?.type) {
+      queryBuilder.andWhere('goal.type = :type', { type: options.type });
+    }
+
+    // Search
+    if (options?.search) {
+      queryBuilder.andWhere('goal.name ILIKE :search', { search: `%${options.search}%` });
+    }
+
+    // Sorting (whitelist allowed fields)
+    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'target', 'current', 'deadline', 'status', 'type'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`goal.${safeSortBy}`, safeSortOrder);
+
+    // Pagination
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+
+    return { items, total, page, limit };
+  }
+
   async findOne(id: string): Promise<CampaignGoal> {
     const goal = await this.goalRepository.findOne({ where: { id } });
     if (!goal) {

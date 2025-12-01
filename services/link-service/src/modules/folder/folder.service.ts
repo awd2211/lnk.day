@@ -1,16 +1,19 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 
 import { Folder } from './folder.entity';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
+import { LinkService } from '../link/link.service';
 
 @Injectable()
 export class FolderService {
   constructor(
     @InjectRepository(Folder)
     private readonly folderRepository: Repository<Folder>,
+    @Inject(forwardRef(() => LinkService))
+    private readonly linkService: LinkService,
   ) {}
 
   async create(
@@ -97,7 +100,7 @@ export class FolderService {
     return this.folderRepository.save(folder);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, options?: { transferToFolderId?: string | null }): Promise<void> {
     const folder = await this.findOne(id);
 
     // Check if folder has children
@@ -108,6 +111,15 @@ export class FolderService {
     if (hasChildren > 0) {
       throw new BadRequestException(
         'Cannot delete folder with subfolders. Delete subfolders first.',
+      );
+    }
+
+    // Handle links in the folder
+    if (folder.linkCount > 0) {
+      // Transfer links to another folder or remove folder association
+      await this.linkService.transferLinksFromFolder(
+        id,
+        options?.transferToFolderId ?? null,
       );
     }
 
@@ -128,5 +140,21 @@ export class FolderService {
         { sortOrder: i },
       );
     }
+  }
+
+  /**
+   * 重新计算所有文件夹的 linkCount（用于修复历史数据）
+   */
+  async recalculateLinkCounts(teamId: string): Promise<void> {
+    // 使用原生 SQL 来更新所有文件夹的 linkCount
+    await this.folderRepository.query(`
+      UPDATE folders f
+      SET "linkCount" = (
+        SELECT COUNT(*)
+        FROM links l
+        WHERE l."folderId"::text = f.id::text
+      )
+      WHERE f."teamId" = $1
+    `, [teamId]);
   }
 }

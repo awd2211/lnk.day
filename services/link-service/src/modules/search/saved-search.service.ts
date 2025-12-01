@@ -274,6 +274,24 @@ export class SavedSearchService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async setDefault(
+    id: string,
+    userId: string,
+    teamId: string,
+  ): Promise<SavedSearch> {
+    const search = await this.findOne(id, userId, teamId);
+
+    // Clear any existing default for this user
+    await this.savedSearchRepository.update(
+      { userId, teamId, isDefault: true },
+      { isDefault: false },
+    );
+
+    // Set this one as default
+    search.isDefault = true;
+    return this.savedSearchRepository.save(search);
+  }
+
   // ==================== Notification Scheduling ====================
   // 定时任务通过 setInterval 在 onModuleInit 中启动
 

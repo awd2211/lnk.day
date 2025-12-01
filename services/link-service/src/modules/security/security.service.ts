@@ -460,16 +460,41 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
     allowed: boolean;
     reason?: string;
     reputation?: ReputationScore;
+    riskLevel?: string;
+    score?: number;
   }> {
+    // Validate URL first
+    if (!url || typeof url !== 'string') {
+      return {
+        allowed: false,
+        reason: 'Invalid or empty URL',
+        riskLevel: 'unknown',
+        score: 0,
+      };
+    }
+
+    let domain: string;
+    try {
+      domain = new URL(url).hostname;
+    } catch {
+      return {
+        allowed: false,
+        reason: 'Invalid URL format',
+        riskLevel: 'unknown',
+        score: 0,
+      };
+    }
+
     // Blocked TLDs
     const blockedTLDs = ['.tk', '.ml', '.ga', '.cf', '.gq'];
-    const domain = new URL(url).hostname;
 
     for (const tld of blockedTLDs) {
       if (domain.endsWith(tld)) {
         return {
           allowed: false,
           reason: `Domain TLD ${tld} is blocked due to high abuse rate`,
+          riskLevel: 'high',
+          score: 20,
         };
       }
     }
@@ -477,11 +502,22 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
     // Quick reputation check
     const reputation = await this.calculateReputationScore(url);
 
+    // Map reputation category to risk level
+    const categoryToRiskLevel: Record<string, string> = {
+      trusted: 'low',
+      safe: 'low',
+      suspicious: 'medium',
+      malicious: 'high',
+      unknown: 'unknown',
+    };
+
     if (reputation.category === 'malicious') {
       return {
         allowed: false,
         reason: 'URL appears to be malicious',
         reputation,
+        riskLevel: 'high',
+        score: reputation.score,
       };
     }
 
@@ -490,10 +526,17 @@ export class SecurityService implements OnModuleInit, OnModuleDestroy {
         allowed: true,
         reason: 'URL flagged as suspicious but allowed',
         reputation,
+        riskLevel: 'medium',
+        score: reputation.score,
       };
     }
 
-    return { allowed: true, reputation };
+    return {
+      allowed: true,
+      reputation,
+      riskLevel: categoryToRiskLevel[reputation.category] || 'unknown',
+      score: reputation.score,
+    };
   }
 
   // Batch scan multiple URLs

@@ -73,6 +73,9 @@ export class CustomDomain {
   @Column({ default: false })
   isVerified: boolean;
 
+  @Column({ default: false })
+  isDefault: boolean;
+
   @Column({ nullable: true })
   verifiedAt: Date;
 

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUrl, IsOptional, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsUrl, IsOptional, IsArray, IsEnum, IsUUID } from 'class-validator';
 import { LinkStatus } from '../entities/link.entity';
 
 export class UpdateLinkDto {
@@ -23,6 +23,11 @@ export class UpdateLinkDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @ApiProperty({ required: false, description: '文件夹ID，设为 null 可移动到根目录' })
+  @IsOptional()
+  @IsString()
+  folderId?: string | null;
 
   @ApiProperty({ required: false, enum: LinkStatus })
   @IsOptional()

@@ -701,6 +701,12 @@ export class ProxyController {
   }
 
   // Domain Management
+  @Get('domains/stats')
+  @ApiOperation({ summary: '获取域名统计' })
+  getDomainStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getDomainStats(auth);
+  }
+
   @Get('domains')
   @ApiOperation({ summary: '获取域名列表' })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -858,6 +864,12 @@ export class ProxyController {
   }
 
   // ==================== Webhooks ====================
+  @Get('webhooks/stats')
+  @ApiOperation({ summary: '获取 Webhook 统计' })
+  getWebhookStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getWebhookStats(auth);
+  }
+
   @Get('webhooks')
   @ApiOperation({ summary: '获取 Webhook 列表' })
   @ApiQuery({ name: 'page', required: false, type: Number })

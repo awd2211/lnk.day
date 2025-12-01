@@ -7,7 +7,8 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsArray } from 'class-validator';
 import {
   JwtAuthGuard,
   CurrentUser,
@@ -20,15 +21,28 @@ import {
 import { SecurityService } from './security.service';
 
 class ScanUrlDto {
+  @ApiProperty({ description: 'URL to scan' })
+  @IsString()
+  @IsNotEmpty()
   url: string;
+
+  @ApiProperty({ required: false, description: 'Force rescan even if cached' })
+  @IsOptional()
+  @IsBoolean()
   force?: boolean;
 }
 
 class BatchScanDto {
+  @ApiProperty({ description: 'URLs to scan', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
   urls: string[];
 }
 
 class QuickCheckDto {
+  @ApiProperty({ description: 'URL to check' })
+  @IsString()
+  @IsNotEmpty()
   url: string;
 }
 

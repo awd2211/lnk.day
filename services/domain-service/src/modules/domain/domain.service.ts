@@ -79,19 +79,47 @@ export class DomainService {
 
   async findAll(
     teamId: string,
-    options?: { page?: number; limit?: number },
-  ): Promise<{ domains: CustomDomain[]; total: number }> {
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: DomainStatus;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      search?: string;
+    },
+  ): Promise<{ domains: CustomDomain[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
-    const [domains, total] = await this.domainRepository.findAndCount({
-      where: { teamId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const queryBuilder = this.domainRepository.createQueryBuilder('domain');
 
-    return { domains, total };
+    // Team filter
+    queryBuilder.where('domain.teamId = :teamId', { teamId });
+
+    // Status filter
+    if (options?.status) {
+      queryBuilder.andWhere('domain.status = :status', { status: options.status });
+    }
+
+    // Search
+    if (options?.search) {
+      queryBuilder.andWhere('domain.domain ILIKE :search', { search: `%${options.search}%` });
+    }
+
+    // Sorting (whitelist allowed fields)
+    const allowedSortFields = ['createdAt', 'updatedAt', 'domain', 'status', 'isDefault', 'verifiedAt'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`domain.${safeSortBy}`, safeSortOrder);
+
+    // Pagination
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [domains, total] = await queryBuilder.getManyAndCount();
+
+    return { domains, total, page, limit };
   }
 
   async findOne(id: string): Promise<CustomDomain> {
@@ -273,8 +301,56 @@ export class DomainService {
     return this.domainRepository.save(domain);
   }
 
+  async setDefault(id: string, teamId: string): Promise<CustomDomain> {
+    const domain = await this.findOne(id);
+
+    // 清除当前团队的其他默认域名
+    await this.domainRepository.update(
+      { teamId, isDefault: true },
+      { isDefault: false },
+    );
+
+    // 设置当前域名为默认
+    domain.isDefault = true;
+    return this.domainRepository.save(domain);
+  }
+
   async countByTeam(teamId: string): Promise<number> {
     return this.domainRepository.count({ where: { teamId } });
+  }
+
+  async getStats(): Promise<{
+    totalDomains: number;
+    verifiedDomains: number;
+    pendingDomains: number;
+    failedDomains: number;
+    activeDomains: number;
+    suspendedDomains: number;
+  }> {
+    const [
+      totalDomains,
+      verifiedDomains,
+      pendingDomains,
+      failedDomains,
+      activeDomains,
+      suspendedDomains,
+    ] = await Promise.all([
+      this.domainRepository.count(),
+      this.domainRepository.count({ where: { status: DomainStatus.VERIFIED } }),
+      this.domainRepository.count({ where: { status: DomainStatus.PENDING } }),
+      this.domainRepository.count({ where: { status: DomainStatus.FAILED } }),
+      this.domainRepository.count({ where: { status: DomainStatus.ACTIVE } }),
+      this.domainRepository.count({ where: { status: DomainStatus.SUSPENDED } }),
+    ]);
+
+    return {
+      totalDomains,
+      verifiedDomains,
+      pendingDomains,
+      failedDomains,
+      activeDomains,
+      suspendedDomains,
+    };
   }
 
   // ========== 私有方法 ==========

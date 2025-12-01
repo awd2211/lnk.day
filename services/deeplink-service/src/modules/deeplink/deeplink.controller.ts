@@ -25,9 +25,12 @@ export class DeepLinkController {
   @RequirePermissions(Permission.DEEPLINKS_VIEW)
   @ApiOperation({ summary: '获取深度链接列表' })
   @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的深度链接' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: '页码' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '每页数量' })
+  @ApiQuery({ name: 'status', required: false, description: '按状态筛选 (enabled, disabled)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, updatedAt, name, enabled, clicks, installs)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索关键词' })
   findAll(
     @ScopedTeamId() teamId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -35,10 +38,20 @@ export class DeepLinkController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('search') search?: string,
   ) {
     // 平台管理员可以查看所有深度链接
     const shouldQueryAll = all === 'true' && isPlatformAdmin(user);
-    return this.deepLinkService.findAll(shouldQueryAll ? undefined : teamId, { page, limit, status });
+    return this.deepLinkService.findAll(shouldQueryAll ? undefined : teamId, {
+      page,
+      limit,
+      status,
+      sortBy,
+      sortOrder,
+      search,
+    });
   }
 
   @Post()

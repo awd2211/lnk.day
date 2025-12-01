@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -7,6 +7,7 @@ import {
   ADMIN_PERMISSION_GROUPS,
   DEFAULT_ROLE_PERMISSIONS,
 } from './entities/admin-role.entity';
+import { Admin } from '../admin/entities/admin.entity';
 
 export interface CreateAdminRoleDto {
   name: string;
@@ -29,6 +30,8 @@ export class AdminRoleService {
   constructor(
     @InjectRepository(AdminRoleEntity)
     private readonly roleRepository: Repository<AdminRoleEntity>,
+    @InjectRepository(Admin)
+    private readonly adminRepository: Repository<Admin>,
   ) {}
 
   /**
@@ -157,7 +160,11 @@ export class AdminRoleService {
       throw new BadRequestException('系统内置角色不能删除');
     }
 
-    // TODO: 检查是否有管理员正在使用此角色
+    // 检查是否有管理员正在使用此角色
+    const adminsUsingRole = await this.adminRepository.count({ where: { roleId: id } });
+    if (adminsUsingRole > 0) {
+      throw new BadRequestException(`无法删除角色，当前有 ${adminsUsingRole} 位管理员正在使用此角色`);
+    }
 
     await this.roleRepository.remove(role);
   }

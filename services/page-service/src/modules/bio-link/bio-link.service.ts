@@ -63,32 +63,78 @@ export class BioLinkService {
 
   async findAll(
     teamId: string,
-    options?: { status?: BioLinkStatus; page?: number; limit?: number },
-  ): Promise<{ items: BioLink[]; total: number }> {
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    options?: {
+      status?: BioLinkStatus;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      search?: string;
+    },
+  ): Promise<{ items: Array<BioLink & { blocks: BioLinkItem[]; analytics?: { views: number; clicks: number } }>; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
-    const where: any = { teamId };
+    const queryBuilder = this.bioLinkRepository.createQueryBuilder('bioLink');
+
+    // Team filter
+    queryBuilder.where('bioLink.teamId = :teamId', { teamId });
+
+    // Status filter
     if (options?.status) {
-      where.status = options.status;
+      queryBuilder.andWhere('bioLink.status = :status', { status: options.status });
     }
 
-    const [items, total] = await this.bioLinkRepository.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // Search
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(bioLink.title ILIKE :search OR bioLink.username ILIKE :search)',
+        { search: `%${options.search}%` },
+      );
+    }
 
-    return { items, total };
+    // Sorting (whitelist allowed fields)
+    const allowedSortFields = ['createdAt', 'updatedAt', 'title', 'totalViews', 'totalClicks', 'username'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`bioLink.${safeSortBy}`, safeSortOrder);
+
+    // Pagination
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [bioLinks, total] = await queryBuilder.getManyAndCount();
+
+    // Attach blocks and analytics for each bio link
+    const items = await Promise.all(
+      bioLinks.map(async (bioLink) => {
+        const blocks = await this.getItems(bioLink.id);
+        return {
+          ...bioLink,
+          blocks,
+          analytics: {
+            views: bioLink.totalViews,
+            clicks: bioLink.totalClicks,
+          },
+        };
+      }),
+    );
+
+    return { items, total, page, limit };
   }
 
-  async findOne(id: string): Promise<BioLink> {
+  async findOne(id: string): Promise<BioLink & { blocks: BioLinkItem[] }> {
     const bioLink = await this.bioLinkRepository.findOne({ where: { id } });
     if (!bioLink) {
       throw new NotFoundException('Bio link not found');
     }
-    return bioLink;
+    // Fetch items and attach as blocks for frontend compatibility
+    const items = await this.getItems(id);
+    return {
+      ...bioLink,
+      blocks: items,
+    };
   }
 
   async findByUsername(username: string): Promise<BioLink> {

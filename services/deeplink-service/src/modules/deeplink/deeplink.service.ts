@@ -41,21 +41,54 @@ export class DeepLinkService {
     });
   }
 
-  async findAll(teamId?: string, options?: { page?: number; limit?: number; status?: string }): Promise<{ items: DeepLink[]; total: number; page: number; limit: number }> {
-    const where: any = {};
-    if (teamId) where.teamId = teamId;
-    if (options?.status === 'enabled') where.enabled = true;
-    if (options?.status === 'disabled') where.enabled = false;
+  async findAll(
+    teamId?: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      search?: string;
+    }
+  ): Promise<{ items: DeepLink[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
 
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    const queryBuilder = this.deepLinkRepository.createQueryBuilder('deeplink');
 
-    const [items, total] = await this.deepLinkRepository.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // Team filter
+    if (teamId) {
+      queryBuilder.where('deeplink.teamId = :teamId', { teamId });
+    }
+
+    // Status filter
+    if (options?.status === 'enabled') {
+      queryBuilder.andWhere('deeplink.enabled = :enabled', { enabled: true });
+    } else if (options?.status === 'disabled') {
+      queryBuilder.andWhere('deeplink.enabled = :enabled', { enabled: false });
+    }
+
+    // Search
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(deeplink.name ILIKE :search OR deeplink.fallbackUrl ILIKE :search)',
+        { search: `%${options.search}%` }
+      );
+    }
+
+    // Sorting (whitelist allowed fields)
+    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'enabled', 'clicks', 'installs'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`deeplink.${safeSortBy}`, safeSortOrder);
+
+    // Pagination
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
 
     return { items, total, page, limit };
   }

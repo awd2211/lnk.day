@@ -13,10 +13,11 @@ import { PresetRoleService } from './preset-role.service';
 import { IntegrationConfig } from './entities/integration-config.entity';
 import { IntegrationConfigService } from './integration-config.service';
 import { IntegrationConfigController } from './integration-config.controller';
+import { Admin } from '../admin/entities/admin.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([SystemConfig, AdminRoleEntity, IntegrationConfig]),
+    TypeOrmModule.forFeature([SystemConfig, AdminRoleEntity, IntegrationConfig, Admin]),
     HttpModule,
   ],
   controllers: [

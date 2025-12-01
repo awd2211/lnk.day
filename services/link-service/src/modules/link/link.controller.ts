@@ -54,14 +54,24 @@ export class LinkController {
   @Get()
   @RequirePermissions(Permission.LINKS_VIEW)
   @ApiOperation({ summary: '获取链接列表' })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'page', required: false, description: '页码' })
+  @ApiQuery({ name: 'limit', required: false, description: '每页数量' })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, clicks, title, shortCode, updatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'status', required: false, description: '状态筛选 (active, inactive, archived)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索关键词' })
+  @ApiQuery({ name: 'folderId', required: false, description: '文件夹ID' })
   findAll(
     @ScopedTeamId() teamId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('folderId') folderId?: string,
   ) {
-    return this.linkService.findAll(teamId, { page, limit });
+    return this.linkService.findAll(teamId, { page, limit, sortBy, sortOrder, status, search, folderId });
   }
 
   @Get(':id')

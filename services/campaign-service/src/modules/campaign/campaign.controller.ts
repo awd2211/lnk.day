@@ -39,6 +39,9 @@ export class CampaignController {
   @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的活动' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, name, startDate, endDate, status)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索关键词' })
   findAll(
     @ScopedTeamId() teamId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -46,10 +49,13 @@ export class CampaignController {
     @Query('all') all?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('search') search?: string,
   ) {
     // 平台管理员可以查看所有活动
     const shouldQueryAll = all === 'true' && isPlatformAdmin(user);
-    return this.campaignService.findAll(shouldQueryAll ? undefined : teamId, { status, page, limit });
+    return this.campaignService.findAll(shouldQueryAll ? undefined : teamId, { status, page, limit, sortBy, sortOrder, search });
   }
 
   @Get('active')

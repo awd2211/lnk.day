@@ -57,13 +57,13 @@ func (s *LinkService) GetByShortCode(ctx context.Context, code string) (*model.L
 	}
 
 	// Call link-service internal API
-	url := fmt.Sprintf("%s/links/internal/code/%s", s.cfg.LinkServiceURL, code)
+	url := fmt.Sprintf("%s/api/v1/links/internal/code/%s", s.cfg.LinkServiceURL, code)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("x-internal-key", s.cfg.InternalAPIKey)
+	req.Header.Set("x-internal-api-key", s.cfg.InternalAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := s.httpClient.Do(req)
@@ -96,13 +96,13 @@ func (s *LinkService) GetByShortCode(ctx context.Context, code string) (*model.L
 
 func (s *LinkService) IncrementClicks(ctx context.Context, linkID string) error {
 	// Call link-service internal API
-	url := fmt.Sprintf("%s/links/internal/clicks/%s", s.cfg.LinkServiceURL, linkID)
+	url := fmt.Sprintf("%s/api/v1/links/internal/clicks/%s", s.cfg.LinkServiceURL, linkID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("x-internal-key", s.cfg.InternalAPIKey)
+	req.Header.Set("x-internal-api-key", s.cfg.InternalAPIKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := s.httpClient.Do(req)

@@ -424,6 +424,47 @@ class StreamService:
             period_end=datetime.utcnow(),
         )
 
+    # ========== Logs ==========
+
+    async def get_logs(
+        self,
+        stream_id: str,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Get logs for a stream."""
+        logs_key = f"stream:{stream_id}:logs"
+        logs_data = await self.redis.lrange(logs_key, 0, limit - 1)
+
+        logs = []
+        for log_data in logs_data:
+            try:
+                log = json.loads(log_data)
+                logs.append(log)
+            except json.JSONDecodeError:
+                pass
+
+        return logs
+
+    async def add_log(
+        self,
+        stream_id: str,
+        level: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Add a log entry for a stream."""
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": level,
+            "message": message,
+            "details": details,
+        }
+
+        logs_key = f"stream:{stream_id}:logs"
+        await self.redis.lpush(logs_key, json.dumps(log_entry))
+        # Keep only the last 1000 logs
+        await self.redis.ltrim(logs_key, 0, 999)
+
     # ========== Backfill ==========
 
     async def create_backfill(

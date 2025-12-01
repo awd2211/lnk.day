@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { WebhookController } from './webhook.controller';
+import { WebhookController, WebhookInternalController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
 import { Webhook } from './entities/webhook.entity';
 
@@ -10,7 +10,7 @@ import { Webhook } from './entities/webhook.entity';
     TypeOrmModule.forFeature([Webhook]),
     ConfigModule,
   ],
-  controllers: [WebhookController],
+  controllers: [WebhookController, WebhookInternalController],
   providers: [WebhookService],
   exports: [WebhookService],
 })

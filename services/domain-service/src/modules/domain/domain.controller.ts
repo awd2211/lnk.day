@@ -57,14 +57,29 @@ export class DomainController {
   @Get()
   @RequirePermissions(Permission.DOMAINS_VIEW)
   @ApiOperation({ summary: '获取域名列表' })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'page', required: false, description: '页码' })
+  @ApiQuery({ name: 'limit', required: false, description: '每页数量' })
+  @ApiQuery({ name: 'status', required: false, description: '按状态筛选 (pending, verifying, active, failed, expired)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: '排序字段 (createdAt, updatedAt, domain, status, verifiedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: '排序方向 (ASC, DESC)' })
+  @ApiQuery({ name: 'search', required: false, description: '搜索域名' })
   async findAll(
     @ScopedTeamId() teamId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-  ): Promise<{ domains: CustomDomain[]; total: number }> {
-    return this.domainService.findAll(teamId, { page, limit });
+    @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+    @Query('search') search?: string,
+  ): Promise<{ domains: CustomDomain[]; total: number; page: number; limit: number }> {
+    return this.domainService.findAll(teamId, {
+      page,
+      limit,
+      status: status as any,
+      sortBy,
+      sortOrder,
+      search,
+    });
   }
 
   @Get('check/:domain')
@@ -177,6 +192,22 @@ export class DomainController {
     return this.domainService.update(id, dto);
   }
 
+  @Post(':id/set-default')
+  @RequirePermissions(Permission.DOMAINS_CONFIGURE)
+  @ApiOperation({ summary: '设置为默认域名' })
+  @ApiParam({ name: 'id', type: String })
+  async setDefault(
+    @Param('id', ParseUUIDPipe) id: string,
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<CustomDomain> {
+    const domain = await this.domainService.findOne(id);
+    if (!isPlatformAdmin(user) && domain.teamId !== teamId) {
+      throw new ForbiddenException('无权操作此域名');
+    }
+    return this.domainService.setDefault(id, teamId);
+  }
+
   @Delete(':id')
   @RequirePermissions(Permission.DOMAINS_REMOVE)
   @ApiOperation({ summary: '删除域名' })
@@ -192,5 +223,18 @@ export class DomainController {
     }
     await this.domainService.remove(id);
     return { message: 'Domain deleted successfully' };
+  }
+}
+
+// ========== Internal Controller (for console-service) ==========
+@ApiTags('domains-internal')
+@Controller('internal')
+export class DomainInternalController {
+  constructor(private readonly domainService: DomainService) {}
+
+  @Get('stats')
+  @ApiOperation({ summary: '获取域名统计数据（内部使用）' })
+  async getStats() {
+    return this.domainService.getStats();
   }
 }

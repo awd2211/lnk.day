@@ -13,6 +13,7 @@ import {
 
 import { Link, LinkStatus } from '../link/entities/link.entity';
 import { LinkService } from '../link/link.service';
+import { FolderService } from '../folder/folder.service';
 import {
   ImportLinksDto,
   ImportLinkItemDto,
@@ -42,6 +43,7 @@ export class BatchService {
     @InjectRepository(Link)
     private readonly linkRepository: Repository<Link>,
     private readonly linkService: LinkService,
+    private readonly folderService: FolderService,
   ) {}
 
   // ========== CSV 导入 ==========
@@ -590,7 +592,21 @@ export class BatchService {
 
         // 处理文件夹
         if (dto.folderId !== undefined) {
-          link.folderId = dto.folderId || undefined;
+          const oldFolderId = link.folderId;
+          const newFolderId = dto.folderId || undefined;
+
+          // 只有当文件夹发生变化时才更新计数
+          if (oldFolderId !== newFolderId) {
+            // 从旧文件夹减少计数
+            if (oldFolderId) {
+              await this.folderService.updateLinkCount(oldFolderId, -1);
+            }
+            // 向新文件夹增加计数
+            if (newFolderId) {
+              await this.folderService.updateLinkCount(newFolderId, 1);
+            }
+            link.folderId = newFolderId;
+          }
         }
 
         // 处理状态
