@@ -7,9 +7,47 @@ import { LdapService, LdapUser, LdapTestResult, LdapSyncResult } from './ldap.se
 import { LdapConfig } from './ldap-config.entity';
 
 // Mock ldapjs
+const mockBind = jest.fn();
+const mockUnbind = jest.fn();
+const mockSearch = jest.fn();
+const mockStarttls = jest.fn();
+
+const createMockLdapClient = () => {
+  const eventHandlers: Record<string, Function> = {};
+  return {
+    bind: mockBind,
+    unbind: mockUnbind,
+    search: mockSearch,
+    starttls: mockStarttls,
+    on: jest.fn((event: string, handler: Function) => {
+      eventHandlers[event] = handler;
+      return this;
+    }),
+    emit: (event: string, ...args: any[]) => {
+      if (eventHandlers[event]) {
+        eventHandlers[event](...args);
+      }
+    },
+    _eventHandlers: eventHandlers,
+  };
+};
+
+let mockLdapClient: ReturnType<typeof createMockLdapClient>;
+
 jest.mock('ldapjs', () => ({
-  createClient: jest.fn(),
+  createClient: jest.fn(() => {
+    mockLdapClient = createMockLdapClient();
+    // Auto-trigger connect event after a tick
+    setTimeout(() => {
+      if (mockLdapClient._eventHandlers['connect']) {
+        mockLdapClient._eventHandlers['connect']();
+      }
+    }, 0);
+    return mockLdapClient;
+  }),
 }));
+
+import * as ldap from 'ldapjs';
 
 describe('LdapService', () => {
   let service: LdapService;
@@ -255,6 +293,550 @@ describe('LdapService', () => {
       const result = service.getMappedRole(configNoDefault as LdapConfig, []);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('testConnection - success paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should test connection successfully with none security', async () => {
+      // Use none security to avoid STARTTLS complexity
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      // Mock successful bind
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      // Mock successful search with users
+      const mockSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('Connection successful');
+      expect(result.details?.connected).toBe(true);
+      expect(result.details?.boundSuccessfully).toBe(true);
+      expect(result.details?.userSearchSuccessful).toBe(true);
+      expect(ldapConfigRepo.save).toHaveBeenCalled();
+    });
+
+    it('should test connection with SSL security', async () => {
+      const sslConfig = { ...mockLdapConfig, securityProtocol: 'ssl' as const, port: 636 };
+      ldapConfigRepo.findOne.mockResolvedValue(sslConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(sslConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=user1,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['user1'] },
+                { type: 'mail', values: ['user1@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(true);
+      expect(ldap.createClient).toHaveBeenCalled();
+      const callArgs = (ldap.createClient as jest.Mock).mock.calls[0][0];
+      expect(callArgs.url).toContain('ldaps://');
+    });
+  });
+
+  describe('authenticate - success paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should authenticate user successfully with none security', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      // All binds succeed
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      // Mock user search
+      const mockUserSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+                { type: 'givenName', values: ['Test'] },
+                { type: 'sn', values: ['User'] },
+                { type: 'cn', values: ['Test User'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockUserSearchResult;
+        }),
+      };
+
+      // Mock group search (empty)
+      const mockGroupSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockGroupSearchResult;
+        }),
+      };
+
+      let searchCallCount = 0;
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        searchCallCount++;
+        if (searchCallCount === 1) {
+          callback(null, mockUserSearchResult);
+        } else {
+          callback(null, mockGroupSearchResult);
+        }
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'testuser', 'password123');
+
+      expect(result).not.toBeNull();
+      expect(result?.username).toBe('testuser');
+      expect(result?.email).toBe('test@example.com');
+      expect(result?.firstName).toBe('Test');
+      expect(result?.lastName).toBe('User');
+    });
+
+    it('should authenticate user with groups', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockUserSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=admin,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['admin'] },
+                { type: 'mail', values: ['admin@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockUserSearchResult;
+        }),
+      };
+
+      const mockGroupSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'cn=admins,ou=groups,dc=example,dc=com' },
+              attributes: [],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockGroupSearchResult;
+        }),
+      };
+
+      let searchCallCount = 0;
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        searchCallCount++;
+        if (searchCallCount === 1) {
+          callback(null, mockUserSearchResult);
+        } else {
+          callback(null, mockGroupSearchResult);
+        }
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'admin', 'adminpass');
+
+      expect(result).not.toBeNull();
+      expect(result?.groups).toContain('cn=admins,ou=groups,dc=example,dc=com');
+    });
+
+    it('should return null when user not found in LDAP', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      // Empty search result
+      const mockEmptySearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockEmptySearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockEmptySearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'nonexistent', 'password');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when user password is invalid', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      let bindCallCount = 0;
+      mockBind.mockImplementation((dn, password, callback) => {
+        bindCallCount++;
+        if (bindCallCount <= 1) {
+          callback(null); // Service account bind succeeds
+        } else {
+          callback(new Error('Invalid credentials')); // User bind fails
+        }
+      });
+
+      const mockUserSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockUserSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockUserSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'testuser', 'wrongpassword');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('syncUsers - success paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should sync users successfully', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=user1,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['user1'] },
+                { type: 'mail', values: ['user1@example.com'] },
+              ],
+            });
+            handler({
+              dn: { toString: () => 'uid=user2,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['user2'] },
+                { type: 'mail', values: ['user2@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.syncUsers('team-123');
+
+      expect(result.success).toBe(true);
+      expect(result.usersFound).toBe(2);
+      expect(result.usersUpdated).toBe(2);
+      expect(ldapConfigRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('testConnection - error paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should handle bind failure', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(new Error('Invalid credentials'));
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Bind failed');
+      expect(ldapConfigRepo.save).toHaveBeenCalled();
+    });
+
+    it('should handle search failure', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(new Error('Search timeout'));
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Search failed');
+    });
+
+    it('should handle STARTTLS failure', async () => {
+      const starttlsConfig = { ...mockLdapConfig, securityProtocol: 'starttls' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(starttlsConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(starttlsConfig as LdapConfig);
+
+      // Mock STARTTLS failure
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['connect']) {
+            client._eventHandlers['connect']();
+          }
+        }, 0);
+        mockStarttls.mockImplementation((opts, controls, callback) => {
+          callback(new Error('STARTTLS negotiation failed'));
+        });
+        return client;
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('STARTTLS failed');
+    });
+
+    it('should handle connection error', async () => {
+      ldapConfigRepo.findOne.mockResolvedValue(mockLdapConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(mockLdapConfig as LdapConfig);
+
+      // Mock connection error
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['error']) {
+            client._eventHandlers['error'](new Error('Connection refused'));
+          }
+        }, 0);
+        return client;
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Connection failed');
+    });
+
+    it('should handle connectError event', async () => {
+      ldapConfigRepo.findOne.mockResolvedValue(mockLdapConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(mockLdapConfig as LdapConfig);
+
+      // Mock connectError event
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['connectError']) {
+            client._eventHandlers['connectError'](new Error('Host unreachable'));
+          }
+        }, 0);
+        return client;
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Connect error');
+    });
+  });
+
+  describe('authenticate - error paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should handle authentication error gracefully', async () => {
+      ldapConfigRepo.findOne.mockResolvedValue(mockLdapConfig as LdapConfig);
+
+      // Mock connection error
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['error']) {
+            client._eventHandlers['error'](new Error('Network error'));
+          }
+        }, 0);
+        return client;
+      });
+
+      const result = await service.authenticate('team-123', 'testuser', 'password');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('syncUsers - error paths', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should handle sync with connection error', async () => {
+      ldapConfigRepo.findOne.mockResolvedValue(mockLdapConfig as LdapConfig);
+
+      // Mock connection error
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['error']) {
+            client._eventHandlers['error'](new Error('Connection refused'));
+          }
+        }, 0);
+        return client;
+      });
+
+      const result = await service.syncUsers('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('updateConfig - edge cases', () => {
+    it('should allow enabling when lastTestResult includes success', async () => {
+      const configWithSuccessTest = {
+        ...mockLdapConfig,
+        lastTestResult: 'success: Connected and found 5 users',
+        enabled: false,
+      };
+      ldapConfigRepo.findOne.mockResolvedValue(configWithSuccessTest as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue({ ...configWithSuccessTest, enabled: true } as LdapConfig);
+
+      const result = await service.updateConfig('team-123', { enabled: true });
+
+      expect(result.enabled).toBe(true);
+    });
+
+    it('should throw when enabling with failed test result', async () => {
+      const configWithFailedTest = {
+        ...mockLdapConfig,
+        lastTestResult: 'failed: Connection refused',
+        enabled: false,
+      };
+      ldapConfigRepo.findOne.mockResolvedValue(configWithFailedTest as LdapConfig);
+
+      await expect(
+        service.updateConfig('team-123', { enabled: true }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('deleteConfig - edge case', () => {
+    it('should handle undefined affected', async () => {
+      ldapConfigRepo.delete.mockResolvedValue({ affected: undefined, raw: {} } as any);
+
+      const result = await service.deleteConfig('team-123');
+
+      expect(result).toBe(false);
     });
   });
 });

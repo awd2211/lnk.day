@@ -658,4 +658,460 @@ describe('SSOService', () => {
       expect(result.isNew).toBe(mockSSOConfig.autoProvision);
     });
   });
+
+  describe('createSAMLConfigFromMetadata - edge cases', () => {
+    it('should throw ConflictException when SAML config already exists', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+
+      await expect(
+        service.createSAMLConfigFromMetadata('team-123', { metadataXml: '<xml/>' }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('updateSAMLConfig - edge cases', () => {
+    it('should throw BadRequestException for invalid certificate update', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.validateCertificate.mockReturnValue({ valid: false });
+
+      await expect(
+        service.updateSAMLConfig('team-123', 'config-123', { certificate: 'INVALID' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should update attribute mapping', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue({
+        ...mockSSOConfig,
+        attributeMapping: { email: 'mail' },
+      });
+      ssoConfigRepository.save.mockResolvedValue(mockSSOConfig);
+
+      await service.updateSAMLConfig('team-123', 'config-123', {
+        attributeMapping: { firstName: 'givenName' },
+      });
+
+      expect(ssoConfigRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributeMapping: { email: 'mail', firstName: 'givenName' },
+        }),
+      );
+    });
+  });
+
+  describe('initiateSAMLLogin - error handling', () => {
+    it('should throw BadRequestException when SAML service fails', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.createLoginRequest.mockRejectedValue(new Error('SAML error'));
+
+      await expect(service.initiateSAMLLogin('team-123')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when config is OIDC not SAML', async () => {
+      const oidcConfig = { ...mockSSOConfig, provider: SSOProvider.OIDC };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      await expect(service.initiateSAMLLogin('team-123')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('initiateSAMLLogout - error handling', () => {
+    it('should throw BadRequestException when SAML service fails', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.createLogoutRequest.mockRejectedValue(new Error('Logout error'));
+
+      await expect(
+        service.initiateSAMLLogout('team-123', 'user@example.com', 'session-idx'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when config is not SAML', async () => {
+      const oidcConfig = { ...mockSSOConfig, provider: SSOProvider.OIDC };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      await expect(
+        service.initiateSAMLLogout('team-123', 'user@example.com'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('testOIDCConnection', () => {
+    it('should test OIDC connection successfully', async () => {
+      const oidcConfig = {
+        ...mockSSOConfig,
+        provider: SSOProvider.OIDC,
+        oidcIssuer: 'https://oidc.example.com',
+      };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      // Mock global fetch
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            issuer: 'https://oidc.example.com',
+            authorization_endpoint: 'https://oidc.example.com/authorize',
+            token_endpoint: 'https://oidc.example.com/token',
+            userinfo_endpoint: 'https://oidc.example.com/userinfo',
+          }),
+      });
+      global.fetch = mockFetch as any;
+
+      const result = await service.testConnection('team-123', 'config-123');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('OIDC');
+    });
+
+    it('should handle OIDC discovery failure', async () => {
+      const oidcConfig = {
+        ...mockSSOConfig,
+        provider: SSOProvider.OIDC,
+        oidcIssuer: 'https://oidc.example.com',
+      };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+      global.fetch = mockFetch as any;
+
+      const result = await service.testConnection('team-123', 'config-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('404');
+    });
+
+    it('should handle OIDC fetch error', async () => {
+      const oidcConfig = {
+        ...mockSSOConfig,
+        provider: SSOProvider.OIDC,
+        oidcIssuer: 'https://oidc.example.com',
+      };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      const mockFetch = jest.fn().mockRejectedValue(new Error('Network error'));
+      global.fetch = mockFetch as any;
+
+      const result = await service.testConnection('team-123', 'config-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Network error');
+    });
+  });
+
+  describe('processSAMLResponse - error handling', () => {
+    it('should throw BadRequestException when SAML not configured', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.processSAMLResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when config is not SAML', async () => {
+      const oidcConfig = { ...mockSSOConfig, provider: SSOProvider.OIDC };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      await expect(
+        service.processSAMLResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should re-throw BadRequestException from SAML service', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.parseLoginResponse.mockRejectedValue(
+        new BadRequestException('Signature validation failed'),
+      );
+
+      await expect(
+        service.processSAMLResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should wrap generic errors in BadRequestException', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.parseLoginResponse.mockRejectedValue(new Error('Generic error'));
+
+      await expect(
+        service.processSAMLResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('processSAMLLogoutResponse', () => {
+    it('should process logout response successfully', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+      mockSAMLService.parseLogoutResponse.mockResolvedValue({
+        success: true,
+        issuer: 'https://idp.example.com',
+      });
+
+      const result = await service.processSAMLLogoutResponse('team-123', 'base64LogoutResponse');
+
+      expect(result.success).toBe(true);
+      expect(result.issuer).toBe('https://idp.example.com');
+    });
+
+    it('should throw when SAML not configured', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.processSAMLLogoutResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when config is not SAML', async () => {
+      const oidcConfig = { ...mockSSOConfig, provider: SSOProvider.OIDC };
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      await expect(
+        service.processSAMLLogoutResponse('team-123', 'base64Response'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('handleOIDCCallback', () => {
+    const mockOidcConfig = {
+      ...mockSSOConfig,
+      provider: SSOProvider.OIDC,
+      oidcIssuer: 'https://oidc.example.com',
+      oidcClientId: 'client-123',
+      oidcClientSecret: 'secret-123',
+      oidcTokenUrl: 'https://oidc.example.com/token',
+      oidcUserInfoUrl: 'https://oidc.example.com/userinfo',
+      oidcScopes: ['openid', 'email', 'profile'],
+      attributeMapping: {},
+    };
+
+    it('should exchange code for tokens and fetch user info', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockOidcConfig);
+
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'access-token-123',
+              refresh_token: 'refresh-token-123',
+              id_token: 'id-token-123',
+              expires_in: 3600,
+              token_type: 'Bearer',
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              sub: 'user-ext-123',
+              email: 'user@example.com',
+              given_name: 'Test',
+              family_name: 'User',
+              name: 'Test User',
+              picture: 'https://example.com/avatar.jpg',
+            }),
+        });
+      global.fetch = mockFetch as any;
+
+      const result = await service.handleOIDCCallback('team-123', 'auth-code', 'state-123');
+
+      expect(result.user.email).toBe('user@example.com');
+      expect(result.user.firstName).toBe('Test');
+      expect(result.user.lastName).toBe('User');
+      expect(result.user.externalId).toBe('user-ext-123');
+      expect(result.tokens.accessToken).toBe('access-token-123');
+    });
+
+    it('should throw when OIDC not configured', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.handleOIDCCallback('team-123', 'code', 'state'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when config is not OIDC', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig); // SAML config
+
+      await expect(
+        service.handleOIDCCallback('team-123', 'code', 'state'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when token exchange fails', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockOidcConfig);
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+      });
+      global.fetch = mockFetch as any;
+
+      await expect(
+        service.handleOIDCCallback('team-123', 'invalid-code', 'state'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw when user info fetch fails', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockOidcConfig);
+
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'access-token-123',
+              token_type: 'Bearer',
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+        });
+      global.fetch = mockFetch as any;
+
+      await expect(
+        service.handleOIDCCallback('team-123', 'code', 'state'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should use default issuer URLs when not specified', async () => {
+      const configWithoutUrls = {
+        ...mockOidcConfig,
+        oidcTokenUrl: undefined,
+        oidcUserInfoUrl: undefined,
+      };
+      ssoConfigRepository.findOne.mockResolvedValue(configWithoutUrls);
+
+      const mockFetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              access_token: 'token',
+              token_type: 'Bearer',
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              sub: 'user-123',
+              email: 'user@example.com',
+            }),
+        });
+      global.fetch = mockFetch as any;
+
+      await service.handleOIDCCallback('team-123', 'code', 'state');
+
+      // Verify default URLs were used
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://oidc.example.com/oauth/token',
+        expect.any(Object),
+      );
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://oidc.example.com/userinfo',
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('testLDAPConnection', () => {
+    it('should delegate to ldapService', async () => {
+      mockLdapService.testConnection.mockResolvedValue({
+        success: true,
+        message: 'LDAP connection successful',
+      });
+
+      const result = await service.testLDAPConnection('team-123');
+
+      expect(mockLdapService.testConnection).toHaveBeenCalledWith('team-123');
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('syncLDAPUsers', () => {
+    it('should delegate to ldapService', async () => {
+      mockLdapService.syncUsers.mockResolvedValue({
+        success: true,
+        usersFound: 10,
+        usersCreated: 5,
+        usersUpdated: 3,
+        errors: [],
+      });
+
+      const result = await service.syncLDAPUsers('team-123');
+
+      expect(mockLdapService.syncUsers).toHaveBeenCalledWith('team-123');
+      expect(result.usersFound).toBe(10);
+      expect(result.usersCreated).toBe(5);
+    });
+  });
+
+  describe('discoverSSO - OIDC and LDAP providers', () => {
+    it('should discover OIDC SSO', async () => {
+      const oidcConfig = {
+        ...mockSSOConfig,
+        provider: SSOProvider.OIDC,
+        oidcIssuer: 'https://oidc.example.com',
+        oidcClientId: 'client-123',
+        oidcAuthorizationUrl: 'https://oidc.example.com/authorize',
+        oidcScopes: ['openid', 'email'],
+      };
+      ssoConfigRepository.find.mockResolvedValue([oidcConfig]);
+      ssoConfigRepository.findOne.mockResolvedValue(oidcConfig);
+
+      const result = await service.discoverSSO('user@example.com');
+
+      expect(result.hasSSO).toBe(true);
+      expect(result.provider).toBe(SSOProvider.OIDC);
+      expect(result.loginUrl).toContain('authorize');
+    });
+
+    it('should discover LDAP SSO', async () => {
+      const ldapConfig = {
+        ...mockSSOConfig,
+        provider: SSOProvider.LDAP,
+      };
+      ssoConfigRepository.find.mockResolvedValue([ldapConfig]);
+
+      const result = await service.discoverSSO('user@example.com');
+
+      expect(result.hasSSO).toBe(true);
+      expect(result.provider).toBe(SSOProvider.LDAP);
+      expect(result.loginUrl).toContain('ldap');
+    });
+  });
+
+  describe('provisionUser', () => {
+    it('should provision new user', async () => {
+      ssoConfigRepository.findOne.mockResolvedValue(mockSSOConfig);
+
+      const result = await service.provisionUser('team-123', 'config-123', {
+        email: 'new@example.com',
+        firstName: 'New',
+        lastName: 'User',
+      });
+
+      expect(result.userId).toBeDefined();
+      expect(result.isNew).toBe(true);
+      expect(result.action).toBe('created');
+    });
+
+    it('should link existing user when autoProvision is false', async () => {
+      const configNoProvision = { ...mockSSOConfig, autoProvision: false };
+      ssoConfigRepository.findOne.mockResolvedValue(configNoProvision);
+
+      const result = await service.provisionUser('team-123', 'config-123', {
+        email: 'existing@example.com',
+        externalId: 'ext-123',
+      });
+
+      expect(result.isNew).toBe(false);
+      expect(result.action).toBe('linked');
+    });
+  });
 });

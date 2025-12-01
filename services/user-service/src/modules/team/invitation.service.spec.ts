@@ -204,6 +204,22 @@ describe('InvitationService', () => {
         new BadRequestException('该邮箱已有待处理的邀请'),
       );
     });
+
+    it('should still create invitation even if email sending fails', async () => {
+      teamRepository.findOne.mockResolvedValue(mockTeam);
+      memberRepository.findOne.mockResolvedValue(mockOwnerMember);
+      userRepository.findOne.mockResolvedValue(null);
+      invitationRepository.findOne.mockResolvedValue(null);
+      invitationRepository.create.mockReturnValue({ ...mockInvitation, email: createDto.email });
+      invitationRepository.save.mockResolvedValue({ ...mockInvitation, email: createDto.email });
+      emailService.sendTeamInvitationEmail.mockRejectedValue(new Error('Email service unavailable'));
+
+      const result = await service.createInvitation('team-123', createDto, 'owner-123');
+
+      expect(result).toBeDefined();
+      expect(result.email).toBe(createDto.email);
+      expect(invitationRepository.save).toHaveBeenCalled();
+    });
   });
 
   describe('bulkInvite', () => {
@@ -334,6 +350,15 @@ describe('InvitationService', () => {
       );
     });
 
+    it('should throw ForbiddenException if operator not found', async () => {
+      invitationRepository.findOne.mockResolvedValue(mockInvitation);
+      memberRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.revokeInvitation('invitation-123', 'non-member')).rejects.toThrow(
+        new ForbiddenException('您没有权限撤销邀请'),
+      );
+    });
+
     it('should throw BadRequestException if invitation not pending', async () => {
       invitationRepository.findOne.mockResolvedValue({
         ...mockInvitation,
@@ -445,6 +470,43 @@ describe('InvitationService', () => {
         new BadRequestException('您已是该团队成员'),
       );
     });
+
+    it('should throw BadRequestException if invitation already accepted', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        status: InvitationStatus.ACCEPTED,
+      });
+      userRepository.findOne.mockResolvedValue(user);
+
+      await expect(service.acceptInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new BadRequestException('邀请已被接受'),
+      );
+    });
+
+    it('should send notification when accepting invitation and handle notification error', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com', name: 'Invited User' };
+      const inviter = { id: 'inviter-123', email: 'inviter@example.com', name: 'Inviter' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        invitedById: inviter.id,
+        team: mockTeam,
+      });
+      userRepository.findOne
+        .mockResolvedValueOnce(user) // First call for user
+        .mockResolvedValueOnce(inviter); // Second call for inviter in notifyInviterOfAcceptance
+      memberRepository.findOne.mockResolvedValue(null); // Not already a member
+      memberRepository.create.mockReturnValue({ teamId: 'team-123', userId: user.id });
+      memberRepository.save.mockResolvedValue({ id: 'new-member', teamId: 'team-123', userId: user.id });
+      invitationRepository.save.mockResolvedValue({});
+      emailService.sendInvitationAcceptedEmail.mockRejectedValue(new Error('Email service down'));
+
+      // Should not throw even if notification fails
+      const result = await service.acceptInvitation('valid-token', 'user-123');
+      expect(result).toBeDefined();
+    });
   });
 
   describe('declineInvitation', () => {
@@ -464,6 +526,23 @@ describe('InvitationService', () => {
       );
     });
 
+    it('should throw NotFoundException if invitation not found', async () => {
+      invitationRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.declineInvitation('invalid-token', 'user-123')).rejects.toThrow(
+        new NotFoundException('邀请不存在'),
+      );
+    });
+
+    it('should throw NotFoundException if user not found', async () => {
+      invitationRepository.findOne.mockResolvedValue(mockInvitation);
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new NotFoundException('用户不存在'),
+      );
+    });
+
     it('should throw ForbiddenException if email mismatch', async () => {
       const user = { id: 'user-123', email: 'other@example.com' };
       invitationRepository.findOne.mockResolvedValue({
@@ -474,6 +553,62 @@ describe('InvitationService', () => {
 
       await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
         new ForbiddenException('此邀请不是发给您的'),
+      );
+    });
+
+    it('should throw BadRequestException if invitation not pending (accepted)', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        status: InvitationStatus.ACCEPTED,
+      });
+      userRepository.findOne.mockResolvedValue(user);
+
+      await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new BadRequestException('邀请已被接受'),
+      );
+    });
+
+    it('should throw BadRequestException if invitation not pending (declined)', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        status: InvitationStatus.DECLINED,
+      });
+      userRepository.findOne.mockResolvedValue(user);
+
+      await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new BadRequestException('邀请已被拒绝'),
+      );
+    });
+
+    it('should throw BadRequestException if invitation revoked', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        status: InvitationStatus.REVOKED,
+      });
+      userRepository.findOne.mockResolvedValue(user);
+
+      await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new BadRequestException('邀请已被撤销'),
+      );
+    });
+
+    it('should throw BadRequestException if invitation expired', async () => {
+      const user = { id: 'user-123', email: 'invited@example.com' };
+      invitationRepository.findOne.mockResolvedValue({
+        ...mockInvitation,
+        email: 'invited@example.com',
+        status: InvitationStatus.EXPIRED,
+      });
+      userRepository.findOne.mockResolvedValue(user);
+
+      await expect(service.declineInvitation('valid-token', 'user-123')).rejects.toThrow(
+        new BadRequestException('邀请已过期'),
       );
     });
   });
@@ -487,6 +622,19 @@ describe('InvitationService', () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
+    });
+
+    it('should filter by status when provided', async () => {
+      memberRepository.findOne.mockResolvedValue(mockOwnerMember);
+      invitationRepository.findAndCount.mockResolvedValue([[mockInvitation], 1]);
+
+      await service.getTeamInvitations('team-123', 'owner-123', { status: InvitationStatus.PENDING });
+
+      expect(invitationRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: InvitationStatus.PENDING }),
+        }),
+      );
     });
 
     it('should throw ForbiddenException if no permission', async () => {
@@ -507,6 +655,19 @@ describe('InvitationService', () => {
 
       expect(result.data).toHaveLength(1);
       expect(result.total).toBe(1);
+    });
+
+    it('should filter by status when provided', async () => {
+      userRepository.findOne.mockResolvedValue(mockUser);
+      invitationRepository.findAndCount.mockResolvedValue([[mockInvitation], 1]);
+
+      await service.getUserInvitations('user-123', { status: InvitationStatus.ACCEPTED });
+
+      expect(invitationRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: InvitationStatus.ACCEPTED }),
+        }),
+      );
     });
 
     it('should throw NotFoundException if user not found', async () => {

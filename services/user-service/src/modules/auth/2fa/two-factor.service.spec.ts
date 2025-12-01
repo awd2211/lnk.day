@@ -676,5 +676,36 @@ describe('TwoFactorService', () => {
         ).rejects.toThrow('TWO_FACTOR_SECRET environment variable is required for 2FA');
       });
     });
+
+    describe('verifyTOTP with invalid code', () => {
+      it('should return false when TOTP code is invalid', async () => {
+        // Access the private method directly
+        const verifyTOTP = (service as any).verifyTOTP.bind(service);
+        const result = verifyTOTP('JBSWY3DPEHPK3PXP', '000000');
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('encryption/decryption round-trip', () => {
+      it('should encrypt and decrypt secret correctly', async () => {
+        // Enable 2FA to create encrypted secret
+        twoFactorRepository.findOne.mockResolvedValue(null);
+        let savedRecord: any = null;
+        twoFactorRepository.create.mockImplementation((data) => data);
+        twoFactorRepository.save.mockImplementation(async (data) => {
+          savedRecord = data;
+          return data;
+        });
+
+        const enableResult = await service.enable2FA('user-123', 'test@example.com');
+        const originalSecret = enableResult.secret;
+
+        // Now decrypt using the saved encrypted secret
+        const decryptSecret = (service as any).decryptSecret.bind(service);
+        const decryptedSecret = decryptSecret(savedRecord.secret);
+
+        expect(decryptedSecret).toBe(originalSecret);
+      });
+    });
   });
 });

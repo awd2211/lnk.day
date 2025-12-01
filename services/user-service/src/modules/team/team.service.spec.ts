@@ -122,6 +122,16 @@ describe('TeamService', () => {
 
       await expect(service.findOne('non-existent')).rejects.toThrow(NotFoundException);
     });
+
+    it('should set owner to null if owner lookup fails', async () => {
+      teamRepository.findOne.mockResolvedValue(mockTeam);
+      userService.findOne.mockRejectedValue(new Error('User not found'));
+
+      const result = await service.findOne('team-123');
+
+      expect(result.id).toBe('team-123');
+      expect((result as any).owner).toBeNull();
+    });
   });
 
   describe('remove', () => {
@@ -215,6 +225,30 @@ describe('TeamService', () => {
         service.inviteMember('team-123', inviteMemberDto, 'owner-123'),
       ).rejects.toThrow(new BadRequestException('该用户已是团队成员'));
     });
+
+    it('should throw if trying to invite role higher than own', async () => {
+      teamRepository.findOne.mockResolvedValue(mockTeam);
+      userService.findOne.mockResolvedValue(mockUser);
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ role: TeamMemberRole.ADMIN, userId: 'admin-123' })
+        .mockResolvedValueOnce(null); // Not already member
+      userService.findByEmail.mockResolvedValue({ id: 'new-user-id' });
+
+      // ADMIN trying to invite OWNER
+      await expect(
+        service.inviteMember('team-123', { email: 'newuser@example.com', role: TeamMemberRole.OWNER }, 'admin-123'),
+      ).rejects.toThrow(new BadRequestException('不能邀请比自己权限更高或相同的角色'));
+    });
+
+    it('should throw if inviter not found', async () => {
+      teamRepository.findOne.mockResolvedValue(mockTeam);
+      userService.findOne.mockResolvedValue(mockUser);
+      teamMemberRepository.findOne.mockResolvedValue(null); // Inviter not a member
+
+      await expect(
+        service.inviteMember('team-123', inviteMemberDto, 'non-member'),
+      ).rejects.toThrow(new BadRequestException('您没有权限邀请成员'));
+    });
   });
 
   describe('updateMemberRole', () => {
@@ -256,6 +290,37 @@ describe('TeamService', () => {
         service.updateMemberRole('team-123', 'member-123', updateMemberDto, 'owner-123'),
       ).rejects.toThrow(new BadRequestException('不能修改团队所有者的角色'));
     });
+
+    it('should throw if operator has no permission', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'member-123', role: TeamMemberRole.MEMBER })
+        .mockResolvedValueOnce({ role: TeamMemberRole.MEMBER }); // Operator is MEMBER, not ADMIN/OWNER
+
+      await expect(
+        service.updateMemberRole('team-123', 'member-123', updateMemberDto, 'user-456'),
+      ).rejects.toThrow(new BadRequestException('您没有权限修改成员角色'));
+    });
+
+    it('should throw if operator not found', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'member-123', role: TeamMemberRole.MEMBER })
+        .mockResolvedValueOnce(null); // Operator not a member
+
+      await expect(
+        service.updateMemberRole('team-123', 'member-123', updateMemberDto, 'non-member'),
+      ).rejects.toThrow(new BadRequestException('您没有权限修改成员角色'));
+    });
+
+    it('should throw if trying to set role higher than own', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'member-123', role: TeamMemberRole.MEMBER })
+        .mockResolvedValueOnce({ role: TeamMemberRole.ADMIN }); // Operator is ADMIN
+
+      // ADMIN trying to set OWNER role
+      await expect(
+        service.updateMemberRole('team-123', 'member-123', { role: TeamMemberRole.OWNER }, 'admin-123'),
+      ).rejects.toThrow(new BadRequestException('不能设置比自己更高或相同的权限'));
+    });
   });
 
   describe('removeMember', () => {
@@ -289,6 +354,54 @@ describe('TeamService', () => {
       await expect(
         service.removeMember('team-123', 'owner-member', 'admin-123'),
       ).rejects.toThrow(new BadRequestException('不能移除团队所有者'));
+    });
+
+    it('should throw if member not found', async () => {
+      teamMemberRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.removeMember('team-123', 'non-existent', 'owner-123'),
+      ).rejects.toThrow(new NotFoundException('成员不存在'));
+    });
+
+    it('should throw if operator has no permission', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'member-123', userId: 'user-456', role: TeamMemberRole.MEMBER })
+        .mockResolvedValueOnce({ role: TeamMemberRole.MEMBER }); // Operator is MEMBER, not ADMIN/OWNER
+
+      await expect(
+        service.removeMember('team-123', 'member-123', 'other-member'),
+      ).rejects.toThrow(new BadRequestException('您没有权限移除成员'));
+    });
+
+    it('should throw if operator not found', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'member-123', userId: 'user-456', role: TeamMemberRole.MEMBER })
+        .mockResolvedValueOnce(null); // Operator not a member
+
+      await expect(
+        service.removeMember('team-123', 'member-123', 'non-member'),
+      ).rejects.toThrow(new BadRequestException('您没有权限移除成员'));
+    });
+
+    it('should throw if trying to remove member with higher role', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'admin-member', userId: 'admin-456', role: TeamMemberRole.ADMIN })
+        .mockResolvedValueOnce({ role: TeamMemberRole.MEMBER }); // Operator is MEMBER
+
+      await expect(
+        service.removeMember('team-123', 'admin-member', 'member-123'),
+      ).rejects.toThrow(new BadRequestException('您没有权限移除成员'));
+    });
+
+    it('should throw if trying to remove member with same role', async () => {
+      teamMemberRepository.findOne
+        .mockResolvedValueOnce({ id: 'admin-member', userId: 'admin-456', role: TeamMemberRole.ADMIN })
+        .mockResolvedValueOnce({ role: TeamMemberRole.ADMIN }); // Operator is also ADMIN
+
+      await expect(
+        service.removeMember('team-123', 'admin-member', 'other-admin'),
+      ).rejects.toThrow(new BadRequestException('不能移除权限更高或相同的成员'));
     });
   });
 
@@ -375,6 +488,25 @@ describe('TeamService', () => {
       const result = await service.getUserTeamMembership('user-456', 'team-123');
 
       expect(result).toBeNull();
+    });
+
+    it('should return custom role permissions if customRole exists', async () => {
+      userService.findOne.mockResolvedValue(mockUser);
+      teamMemberRepository.findOne.mockResolvedValue({
+        ...mockMember,
+        role: TeamMemberRole.MEMBER,
+        customRole: {
+          id: 'custom-role-123',
+          name: 'Custom Role',
+          permissions: ['links:view', 'links:create', 'custom:permission'],
+        },
+      });
+
+      const result = await service.getUserTeamMembership('user-456', 'team-123');
+
+      expect(result).toBeDefined();
+      expect(result?.permissions).toContain('links:view');
+      expect(result?.permissions).toContain('custom:permission');
     });
   });
 });

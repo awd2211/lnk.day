@@ -212,6 +212,110 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('refreshToken');
     });
 
+    it('should parse expiresIn in seconds', async () => {
+      const secondsConfigService = createMockConfigService({ JWT_ACCESS_EXPIRES_IN: '300s' });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: UserService, useValue: userService },
+          { provide: TeamService, useValue: teamService },
+          { provide: JwtService, useValue: jwtService },
+          { provide: ConfigService, useValue: secondsConfigService },
+          { provide: EmailService, useValue: emailService },
+          { provide: TokenBlacklistService, useValue: tokenBlacklistService },
+          { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        ],
+      }).compile();
+
+      const authWithSeconds = module.get<AuthService>(AuthService);
+      tokenBlacklistService.isBlacklisted.mockResolvedValue(false);
+      jwtService.verify.mockReturnValue({ sub: mockUser.id, email: mockUser.email });
+      userService.findOne.mockResolvedValue(mockUser);
+
+      const result = await authWithSeconds.refreshTokens(refreshToken);
+
+      expect(result.expiresIn).toBe(300);
+    });
+
+    it('should parse expiresIn in hours', async () => {
+      const hoursConfigService = createMockConfigService({ JWT_ACCESS_EXPIRES_IN: '2h' });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: UserService, useValue: userService },
+          { provide: TeamService, useValue: teamService },
+          { provide: JwtService, useValue: jwtService },
+          { provide: ConfigService, useValue: hoursConfigService },
+          { provide: EmailService, useValue: emailService },
+          { provide: TokenBlacklistService, useValue: tokenBlacklistService },
+          { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        ],
+      }).compile();
+
+      const authWithHours = module.get<AuthService>(AuthService);
+      tokenBlacklistService.isBlacklisted.mockResolvedValue(false);
+      jwtService.verify.mockReturnValue({ sub: mockUser.id, email: mockUser.email });
+      userService.findOne.mockResolvedValue(mockUser);
+
+      const result = await authWithHours.refreshTokens(refreshToken);
+
+      expect(result.expiresIn).toBe(7200);
+    });
+
+    it('should parse expiresIn in days', async () => {
+      const daysConfigService = createMockConfigService({ JWT_ACCESS_EXPIRES_IN: '1d' });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: UserService, useValue: userService },
+          { provide: TeamService, useValue: teamService },
+          { provide: JwtService, useValue: jwtService },
+          { provide: ConfigService, useValue: daysConfigService },
+          { provide: EmailService, useValue: emailService },
+          { provide: TokenBlacklistService, useValue: tokenBlacklistService },
+          { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        ],
+      }).compile();
+
+      const authWithDays = module.get<AuthService>(AuthService);
+      tokenBlacklistService.isBlacklisted.mockResolvedValue(false);
+      jwtService.verify.mockReturnValue({ sub: mockUser.id, email: mockUser.email });
+      userService.findOne.mockResolvedValue(mockUser);
+
+      const result = await authWithDays.refreshTokens(refreshToken);
+
+      expect(result.expiresIn).toBe(86400);
+    });
+
+    it('should default expiresIn to 900 for invalid format', async () => {
+      const invalidConfigService = createMockConfigService({ JWT_ACCESS_EXPIRES_IN: 'invalid' });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: UserService, useValue: userService },
+          { provide: TeamService, useValue: teamService },
+          { provide: JwtService, useValue: jwtService },
+          { provide: ConfigService, useValue: invalidConfigService },
+          { provide: EmailService, useValue: emailService },
+          { provide: TokenBlacklistService, useValue: tokenBlacklistService },
+          { provide: getRepositoryToken(PasswordResetToken), useValue: passwordResetTokenRepository },
+        ],
+      }).compile();
+
+      const authWithInvalid = module.get<AuthService>(AuthService);
+      tokenBlacklistService.isBlacklisted.mockResolvedValue(false);
+      jwtService.verify.mockReturnValue({ sub: mockUser.id, email: mockUser.email });
+      userService.findOne.mockResolvedValue(mockUser);
+
+      const result = await authWithInvalid.refreshTokens(refreshToken);
+
+      expect(result.expiresIn).toBe(900);
+    });
+
     it('should throw UnauthorizedException if token is blacklisted', async () => {
       tokenBlacklistService.isBlacklisted.mockResolvedValue(true);
 

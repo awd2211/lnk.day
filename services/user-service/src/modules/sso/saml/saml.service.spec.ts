@@ -169,6 +169,13 @@ describe('SAMLService', () => {
 
       expect(idp1).toBe(idp2);
     });
+
+    it('should create identity provider without SLO URL', () => {
+      const configWithoutSlo = { ...mockIdpConfig, sloUrl: undefined };
+      const idp = service.createIdentityProvider('config-no-slo', configWithoutSlo);
+
+      expect(idp).toBeDefined();
+    });
   });
 
   describe('clearCache', () => {
@@ -233,6 +240,63 @@ describe('SAMLService', () => {
 
       expect(result.user).toBeDefined();
     });
+
+    it('should throw when extract is missing', async () => {
+      const samlify = require('samlify');
+      samlify.ServiceProvider.mockReturnValueOnce({
+        createLoginRequest: jest.fn(),
+        parseLoginResponse: jest.fn().mockResolvedValue({ extract: null }),
+        getMetadata: jest.fn(),
+      });
+
+      // Clear cache to use new mock
+      service.clearCache();
+
+      await expect(
+        service.parseLoginResponse('team-fail', mockIdpConfig, 'base64SAMLResponse'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw on parse error', async () => {
+      const samlify = require('samlify');
+      samlify.ServiceProvider.mockReturnValueOnce({
+        createLoginRequest: jest.fn(),
+        parseLoginResponse: jest.fn().mockRejectedValue(new Error('Parse failed')),
+        getMetadata: jest.fn(),
+      });
+
+      service.clearCache();
+
+      await expect(
+        service.parseLoginResponse('team-error', mockIdpConfig, 'invalidResponse'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should use default issuer from idpConfig when not in response', async () => {
+      const samlify = require('samlify');
+      samlify.ServiceProvider.mockReturnValueOnce({
+        createLoginRequest: jest.fn(),
+        parseLoginResponse: jest.fn().mockResolvedValue({
+          extract: {
+            nameID: 'user@example.com',
+            sessionIndex: 'session-123',
+            issuer: undefined,
+            attributes: { email: 'user@example.com' },
+          },
+        }),
+        getMetadata: jest.fn(),
+      });
+
+      service.clearCache();
+
+      const result = await service.parseLoginResponse(
+        'team-no-issuer',
+        mockIdpConfig,
+        'base64SAMLResponse',
+      );
+
+      expect(result.issuer).toBe(mockIdpConfig.entityId);
+    });
   });
 
   describe('createLogoutRequest', () => {
@@ -260,6 +324,48 @@ describe('SAMLService', () => {
       expect(result.success).toBe(true);
       expect(result.issuer).toBeDefined();
     });
+
+    it('should return success false on parse error', async () => {
+      const samlify = require('samlify');
+      samlify.ServiceProvider.mockReturnValueOnce({
+        createLogoutRequest: jest.fn(),
+        parseLogoutResponse: jest.fn().mockRejectedValue(new Error('Logout parse failed')),
+        getMetadata: jest.fn(),
+      });
+
+      service.clearCache();
+
+      const result = await service.parseLogoutResponse(
+        'team-logout-fail',
+        mockIdpConfig,
+        'invalidLogoutResponse',
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.issuer).toBe(mockIdpConfig.entityId);
+    });
+
+    it('should use default issuer when not in response', async () => {
+      const samlify = require('samlify');
+      samlify.ServiceProvider.mockReturnValueOnce({
+        createLogoutRequest: jest.fn(),
+        parseLogoutResponse: jest.fn().mockResolvedValue({
+          extract: { issuer: undefined },
+        }),
+        getMetadata: jest.fn(),
+      });
+
+      service.clearCache();
+
+      const result = await service.parseLogoutResponse(
+        'team-logout-no-issuer',
+        mockIdpConfig,
+        'base64SAMLResponse',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.issuer).toBe(mockIdpConfig.entityId);
+    });
   });
 
   describe('generateSPMetadata', () => {
@@ -286,6 +392,130 @@ describe('SAMLService', () => {
       expect(result.ssoUrl).toBe('https://idp.example.com/sso');
       expect(result.sloUrl).toBe('https://idp.example.com/slo');
       expect(result.certificate).toBeDefined();
+    });
+
+    it('should throw on missing EntityDescriptor', async () => {
+      const xml2js = require('xml2js');
+      xml2js.Parser.mockImplementationOnce(() => ({
+        parseStringPromise: jest.fn().mockResolvedValue({}),
+      }));
+
+      await expect(
+        service.parseIdPMetadata('<Invalid>...</Invalid>'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw on missing IDPSSODescriptor', async () => {
+      const xml2js = require('xml2js');
+      xml2js.Parser.mockImplementationOnce(() => ({
+        parseStringPromise: jest.fn().mockResolvedValue({
+          EntityDescriptor: {
+            $: { entityID: 'https://idp.example.com' },
+          },
+        }),
+      }));
+
+      await expect(
+        service.parseIdPMetadata('<EntityDescriptor>no idp</EntityDescriptor>'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should handle certificate as object with underscore property', async () => {
+      const xml2js = require('xml2js');
+      xml2js.Parser.mockImplementationOnce(() => ({
+        parseStringPromise: jest.fn().mockResolvedValue({
+          EntityDescriptor: {
+            $: { entityID: 'https://idp.example.com' },
+            IDPSSODescriptor: [{
+              $: { WantAuthnRequestsSigned: 'true', WantAssertionsSigned: 'false' },
+              SingleSignOnService: [{
+                $: {
+                  Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
+                  Location: 'https://idp.example.com/sso',
+                },
+              }],
+              SingleLogoutService: [],
+              KeyDescriptor: [{
+                $: { use: 'signing' },
+                KeyInfo: [{
+                  X509Data: [{
+                    X509Certificate: [{ _: 'MIIC...cert-content...' }],
+                  }],
+                }],
+              }],
+              NameIDFormat: [{ _: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress' }],
+            }],
+          },
+        }),
+      }));
+
+      const result = await service.parseIdPMetadata('<EntityDescriptor>...</EntityDescriptor>');
+
+      expect(result.certificate).toBe('MIIC...cert-content...');
+      expect(result.signedRequests).toBe(true);
+      expect(result.signedAssertions).toBe(false);
+    });
+
+    it('should handle missing KeyDescriptor use attribute', async () => {
+      const xml2js = require('xml2js');
+      xml2js.Parser.mockImplementationOnce(() => ({
+        parseStringPromise: jest.fn().mockResolvedValue({
+          EntityDescriptor: {
+            $: { entityID: 'https://idp.example.com' },
+            IDPSSODescriptor: [{
+              $: {},
+              SingleSignOnService: [{
+                $: {
+                  Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+                  Location: 'https://idp.example.com/sso',
+                },
+              }],
+              SingleLogoutService: [],
+              KeyDescriptor: [{
+                $: {},  // No use attribute
+                KeyInfo: [{
+                  X509Data: [{
+                    X509Certificate: ['MIIC...default-cert...'],
+                  }],
+                }],
+              }],
+              NameIDFormat: [],
+            }],
+          },
+        }),
+      }));
+
+      const result = await service.parseIdPMetadata('<EntityDescriptor>...</EntityDescriptor>');
+
+      expect(result.certificate).toBe('MIIC...default-cert...');
+    });
+
+    it('should handle empty services array for SLO', async () => {
+      const xml2js = require('xml2js');
+      xml2js.Parser.mockImplementationOnce(() => ({
+        parseStringPromise: jest.fn().mockResolvedValue({
+          EntityDescriptor: {
+            $: { entityID: 'https://idp.example.com' },
+            IDPSSODescriptor: [{
+              $: {},
+              SingleSignOnService: [{
+                $: {
+                  Binding: 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
+                  Location: 'https://idp.example.com/sso',
+                },
+              }],
+              SingleLogoutService: [],
+              KeyDescriptor: [],
+              NameIDFormat: [],
+            }],
+          },
+        }),
+      }));
+
+      const result = await service.parseIdPMetadata('<EntityDescriptor>...</EntityDescriptor>');
+
+      expect(result.sloUrl).toBe('');
+      expect(result.certificate).toBe('');
     });
   });
 

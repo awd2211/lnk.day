@@ -242,6 +242,138 @@ describe('RegisterUserSaga', () => {
         expect(call[1]).toBeInstanceOf(Function); // compensator
       }
     });
+
+    describe('create-user-account handler', () => {
+      it('should execute handler and return userId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[0];
+        const handler = handlerCall[0];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        const result = await handler(payload, ctx);
+
+        expect(result).toHaveProperty('userId');
+        expect(result.userId).toMatch(/^user_\d+$/);
+      });
+
+      it('should execute compensator when userId exists', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[0];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: { 'create-user-account': { userId: 'user-123' } } };
+
+        // Should not throw
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+
+      it('should handle compensator when no userId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[0];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        // Should not throw
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+    });
+
+    describe('init-quota handler', () => {
+      it('should execute handler and return quotaId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[1];
+        const handler = handlerCall[0];
+
+        const payload = { email: 'test@example.com', password: 'pass123', plan: 'pro' };
+        const ctx = { previousResults: { 'create-user-account': { userId: 'user-123' } } };
+
+        const result = await handler(payload, ctx);
+
+        expect(result).toHaveProperty('quotaId');
+        expect(result.quotaId).toBe('quota_user-123');
+      });
+
+      it('should execute compensator when quotaId exists', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[1];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: { 'init-quota': { quotaId: 'quota-123' } } };
+
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+
+      it('should handle compensator when no quotaId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[1];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+    });
+
+    describe('create-default-team handler', () => {
+      it('should execute handler and return teamId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[2];
+        const handler = handlerCall[0];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: { 'create-user-account': { userId: 'user-456' } } };
+
+        const result = await handler(payload, ctx);
+
+        expect(result).toHaveProperty('teamId');
+        expect(result.teamId).toBe('team_user-456');
+      });
+
+      it('should execute compensator when teamId exists', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[2];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: { 'create-default-team': { teamId: 'team-123' } } };
+
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+
+      it('should handle compensator when no teamId', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[2];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+    });
+
+    describe('send-welcome-email handler', () => {
+      it('should execute handler and return sent status', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[3];
+        const handler = handlerCall[0];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        const result = await handler(payload, ctx);
+
+        expect(result).toEqual({ sent: true });
+      });
+
+      it('should execute compensator (no-op)', async () => {
+        const handlerCall = (createStepHandler as jest.Mock).mock.calls[3];
+        const compensator = handlerCall[1];
+
+        const payload = { email: 'test@example.com', password: 'pass123' };
+        const ctx = { previousResults: {} };
+
+        // Compensator is no-op for email
+        await expect(compensator(payload, ctx)).resolves.not.toThrow();
+      });
+    });
   });
 
   describe('saga type', () => {

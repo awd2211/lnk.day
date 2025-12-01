@@ -887,4 +887,442 @@ describe('StripeService', () => {
       expect(result).toHaveLength(1);
     });
   });
+
+  describe('getCustomer - error handling', () => {
+    it('should return null on retrieval error', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockRejectedValue(new Error('Not found'));
+
+      const result = await service.getCustomer('cus_invalid');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('handleWebhookEvent - edge cases', () => {
+    it('should handle customer.subscription.trial_will_end', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        email: 'test@example.com',
+      });
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(notificationService.sendTrialEndingEmail).toHaveBeenCalled();
+    });
+
+    it('should handle unrecognized webhook event type', async () => {
+      const event = {
+        type: 'unknown.event.type',
+        data: { object: {} },
+      };
+
+      // Should not throw
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+
+    it('should handle checkout.session.completed with missing metadata', async () => {
+      const event = {
+        type: 'checkout.session.completed',
+        data: {
+          object: { id: 'cs_123', metadata: {} },
+        },
+      };
+
+      // Should not throw - logs error but continues
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+
+    it('should handle customer.subscription.created with missing teamId', async () => {
+      const event = {
+        type: 'customer.subscription.created',
+        data: {
+          object: {
+            id: 'sub_123',
+            metadata: {},
+            customer: 'cus_123',
+            status: 'active',
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            items: { data: [{ price: { unit_amount: 4900 } }] },
+            currency: 'usd',
+          },
+        },
+      };
+
+      // Should not throw - logs error and returns early
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+
+    it('should handle customer.subscription.updated when subscription not found', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const event = {
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_unknown',
+            status: 'active',
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+          },
+        },
+      };
+
+      // Should not throw - logs warning and returns
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+      expect(subscriptionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle customer.subscription.updated with canceled_at', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      subscriptionRepository.save.mockResolvedValue(mockSubscription);
+
+      const event = {
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            status: 'canceled',
+            cancel_at_period_end: true,
+            canceled_at: Math.floor(Date.now() / 1000),
+            current_period_start: Math.floor(Date.now() / 1000),
+            current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(subscriptionRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ canceledAt: expect.any(Date) }),
+      );
+    });
+
+    it('should handle customer.subscription.deleted when subscription not found', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const event = {
+        type: 'customer.subscription.deleted',
+        data: {
+          object: { id: 'sub_unknown' },
+        },
+      };
+
+      // Should return early without error
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+      expect(subscriptionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should handle invoice.paid with existing invoice', async () => {
+      const existingInvoice = { id: 'inv-123', status: 'open' } as Invoice;
+      invoiceRepository.findOne.mockResolvedValue(existingInvoice);
+      invoiceRepository.save.mockResolvedValue(existingInvoice);
+
+      const event = {
+        type: 'invoice.paid',
+        data: {
+          object: {
+            id: 'in_123',
+            subscription: 'sub_stripe_123',
+            invoice_pdf: 'https://stripe.com/invoice.pdf',
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(invoiceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'paid', paidAt: expect.any(Date) }),
+      );
+    });
+
+    it('should handle invoice.paid when subscription not found', async () => {
+      invoiceRepository.findOne.mockResolvedValue(null);
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const event = {
+        type: 'invoice.paid',
+        data: {
+          object: {
+            id: 'in_123',
+            subscription: 'sub_unknown',
+          },
+        },
+      };
+
+      // Should return early without error
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+
+    it('should handle invoice.payment_failed with existing invoice', async () => {
+      const existingInvoice = { id: 'inv-123', status: 'open' } as Invoice;
+      invoiceRepository.findOne.mockResolvedValue(existingInvoice);
+      invoiceRepository.save.mockResolvedValue(existingInvoice);
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      subscriptionRepository.save.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        email: 'test@example.com',
+      });
+
+      const event = {
+        type: 'invoice.payment_failed',
+        data: {
+          object: {
+            id: 'in_123',
+            customer: 'cus_123',
+            subscription: 'sub_stripe_123',
+            amount_due: 4900,
+            currency: 'usd',
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(invoiceRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed' }),
+      );
+    });
+
+    it('should handle invoice.payment_failed when customer is deleted', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      subscriptionRepository.save.mockResolvedValue(mockSubscription);
+      invoiceRepository.findOne.mockResolvedValue(null);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({ deleted: true });
+
+      const event = {
+        type: 'invoice.payment_failed',
+        data: {
+          object: {
+            id: 'in_123',
+            customer: 'cus_deleted',
+            subscription: 'sub_stripe_123',
+            amount_due: 4900,
+            currency: 'usd',
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      // Should not send notification for deleted customer
+      expect(notificationService.sendPaymentFailedEmail).not.toHaveBeenCalled();
+    });
+
+    it('should handle invoice.payment_failed notification error', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      subscriptionRepository.save.mockResolvedValue(mockSubscription);
+      invoiceRepository.findOne.mockResolvedValue(null);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockRejectedValue(new Error('API error'));
+
+      const event = {
+        type: 'invoice.payment_failed',
+        data: {
+          object: {
+            id: 'in_123',
+            customer: 'cus_123',
+            subscription: 'sub_stripe_123',
+            amount_due: 4900,
+            currency: 'usd',
+          },
+        },
+      };
+
+      // Should not throw - catches error internally
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+
+    it('should handle trial_will_end when subscription not found', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_unknown',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+          },
+        },
+      };
+
+      // Should not throw
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+      expect(notificationService.sendTrialEndingEmail).not.toHaveBeenCalled();
+    });
+
+    it('should handle trial_will_end notification error', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockRejectedValue(new Error('API error'));
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          },
+        },
+      };
+
+      // Should not throw - catches error internally
+      await expect(service.handleWebhookEvent(event as any)).resolves.not.toThrow();
+    });
+  });
+
+  describe('getCurrentPeriodUsage', () => {
+    it('should return usage for current period', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        items: {
+          data: [
+            { id: 'si_1', price: { lookup_key: 'api_calls_metered' } },
+            { id: 'si_2', price: { lookup_key: 'clicks_metered' } },
+            { id: 'si_3', price: { lookup_key: 'links_metered' } },
+          ],
+        },
+      });
+      stripeInstance.subscriptionItems.listUsageRecordSummaries
+        .mockResolvedValueOnce({ data: [{ total_usage: 100 }] })
+        .mockResolvedValueOnce({ data: [{ total_usage: 500 }] })
+        .mockResolvedValueOnce({ data: [{ total_usage: 50 }] });
+
+      const result = await service.getCurrentPeriodUsage('team-123');
+
+      expect(result.apiCalls).toBe(100);
+      expect(result.clicks).toBe(500);
+      expect(result.linksCreated).toBe(50);
+    });
+
+    it('should return zeros when no subscription', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.getCurrentPeriodUsage('team-123');
+
+      expect(result.apiCalls).toBe(0);
+      expect(result.clicks).toBe(0);
+      expect(result.linksCreated).toBe(0);
+    });
+
+    it('should return zeros when no external subscription ID', async () => {
+      subscriptionRepository.findOne.mockResolvedValue({
+        ...mockSubscription,
+        externalSubscriptionId: undefined,
+      });
+
+      const result = await service.getCurrentPeriodUsage('team-123');
+
+      expect(result.apiCalls).toBe(0);
+    });
+  });
+
+  describe('pauseSubscription - edge cases', () => {
+    it('should pause with resume date', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.update.mockResolvedValue({
+        id: 'sub_123',
+        pause_collection: { behavior: 'void' },
+      });
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+      subscriptionRepository.save.mockResolvedValue(mockSubscription);
+
+      const resumeAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await service.pauseSubscription('sub_123', resumeAt);
+
+      expect(stripeInstance.subscriptions.update).toHaveBeenCalledWith('sub_123', {
+        pause_collection: {
+          behavior: 'void',
+          resumes_at: expect.any(Number),
+        },
+      });
+    });
+
+    it('should handle pause when local subscription not found', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.update.mockResolvedValue({
+        id: 'sub_123',
+        pause_collection: { behavior: 'void' },
+      });
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.pauseSubscription('sub_123');
+
+      expect(result).toBeDefined();
+      expect(subscriptionRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resumeSubscription - edge cases', () => {
+    it('should handle resume when local subscription not found', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.update.mockResolvedValue({
+        id: 'sub_123',
+        status: 'active',
+      });
+      subscriptionRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.resumeSubscription('sub_123');
+
+      expect(result).toBeDefined();
+      expect(subscriptionRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reportUsage - with timestamp', () => {
+    it('should report usage with custom timestamp', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptionItems.createUsageRecord.mockResolvedValue({
+        id: 'usage_123',
+        quantity: 100,
+      });
+
+      const customDate = new Date('2024-01-15');
+      await service.reportUsage('si_123', 100, customDate, 'set');
+
+      expect(stripeInstance.subscriptionItems.createUsageRecord).toHaveBeenCalledWith('si_123', {
+        quantity: 100,
+        timestamp: Math.floor(customDate.getTime() / 1000),
+        action: 'set',
+      });
+    });
+  });
+
+  describe('getUsageSummary', () => {
+    it('should get usage summary', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptionItems.listUsageRecordSummaries.mockResolvedValue({
+        data: [{ total_usage: 1000 }],
+      });
+
+      const result = await service.getUsageSummary('si_123');
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].total_usage).toBe(1000);
+    });
+  });
 });

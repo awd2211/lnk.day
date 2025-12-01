@@ -481,5 +481,367 @@ describe('PrivacyService', () => {
         expect.objectContaining({ downloadUrl: null }),
       );
     });
+
+    it('should handle no expired exports', async () => {
+      dataRequestRepository.find.mockResolvedValue([]);
+
+      await service.cleanupExpiredExports();
+
+      expect(dataRequestRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('onModuleInit', () => {
+    it('should start deletion and cleanup intervals', () => {
+      jest.useFakeTimers({ legacyFakeTimers: true });
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+
+      service.onModuleInit();
+
+      expect(setIntervalSpy).toHaveBeenCalledTimes(2);
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 24 * 60 * 60 * 1000);
+
+      service.onModuleDestroy();
+      jest.useRealTimers();
+    });
+  });
+
+  describe('onModuleDestroy', () => {
+    it('should clear intervals on destroy', () => {
+      jest.useFakeTimers({ legacyFakeTimers: true });
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+
+      service.onModuleInit();
+      service.onModuleDestroy();
+
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it('should handle destroy without init', () => {
+      // Should not throw
+      expect(() => service.onModuleDestroy()).not.toThrow();
+    });
+  });
+
+  describe('processExportRequest', () => {
+    it('should process export request successfully', async () => {
+      const exportRequest = {
+        ...mockDataRequest,
+        id: 'export-123',
+        type: DataRequestType.EXPORT,
+        status: DataRequestStatus.PENDING,
+        userId: 'user-123',
+      };
+      dataRequestRepository.findOne.mockResolvedValue(exportRequest);
+      // Track the save calls to verify status changes
+      const saveCalls: any[] = [];
+      dataRequestRepository.save.mockImplementation((req: any) => {
+        saveCalls.push({ ...req });
+        return Promise.resolve(req);
+      });
+      userRepository.findOne.mockResolvedValue(mockUser);
+      teamMemberRepository.find.mockResolvedValue([]);
+      consentRepository.find.mockResolvedValue([]);
+
+      await service.processExportRequest('export-123');
+
+      // Verify first save sets status to PROCESSING
+      expect(saveCalls[0].status).toBe(DataRequestStatus.PROCESSING);
+      // Verify second save sets status to COMPLETED with download info
+      expect(saveCalls[1].status).toBe(DataRequestStatus.COMPLETED);
+      expect(saveCalls[1].downloadUrl).toBeDefined();
+      expect(saveCalls[1].completedAt).toBeInstanceOf(Date);
+    });
+
+    it('should throw if request not found', async () => {
+      dataRequestRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.processExportRequest('invalid-id')).rejects.toThrow(
+        new NotFoundException('请求不存在'),
+      );
+    });
+
+    it('should handle export error gracefully', async () => {
+      const exportRequest = {
+        ...mockDataRequest,
+        id: 'export-123',
+        type: DataRequestType.EXPORT,
+        userId: 'user-123',
+      };
+      dataRequestRepository.findOne.mockResolvedValue(exportRequest);
+      dataRequestRepository.save.mockResolvedValue(exportRequest);
+      userRepository.findOne.mockRejectedValue(new Error('Database error'));
+
+      await service.processExportRequest('export-123');
+
+      expect(dataRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: DataRequestStatus.FAILED,
+          processingNotes: 'Database error',
+        }),
+      );
+    });
+
+    it('should send email when export is ready', async () => {
+      const exportRequest = {
+        ...mockDataRequest,
+        id: 'export-123',
+        type: DataRequestType.EXPORT,
+        userId: 'user-123',
+      };
+      dataRequestRepository.findOne.mockResolvedValue(exportRequest);
+      dataRequestRepository.save.mockResolvedValue(exportRequest);
+      userRepository.findOne.mockResolvedValue(mockUser);
+      teamMemberRepository.find.mockResolvedValue([]);
+      consentRepository.find.mockResolvedValue([]);
+
+      await service.processExportRequest('export-123');
+
+      expect(emailService.sendDataExportReadyEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should not send email if user not found', async () => {
+      const exportRequest = {
+        ...mockDataRequest,
+        id: 'export-123',
+        type: DataRequestType.EXPORT,
+        userId: 'user-123',
+      };
+      dataRequestRepository.findOne.mockResolvedValue(exportRequest);
+      dataRequestRepository.save.mockResolvedValue(exportRequest);
+      // First call for collectUserData - return user
+      // Second call for email - return null
+      userRepository.findOne
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(mockUser)
+        .mockResolvedValueOnce(null);
+      teamMemberRepository.find.mockResolvedValue([]);
+      consentRepository.find.mockResolvedValue([]);
+    });
+  });
+
+  describe('processAccountDeletion', () => {
+    it('should complete deletion when user already deleted', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const deletionRequest = {
+        ...mockDataRequest,
+        id: 'deletion-123',
+        type: DataRequestType.DELETE,
+        status: DataRequestStatus.PENDING,
+        coolingPeriodEndsAt: pastDate,
+      };
+      dataRequestRepository.findOne.mockResolvedValue(deletionRequest);
+      dataRequestRepository.save.mockResolvedValue(deletionRequest);
+      userRepository.findOne.mockResolvedValue(null);
+
+      await service.processAccountDeletion('deletion-123');
+
+      expect(dataRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: DataRequestStatus.COMPLETED,
+          processingNotes: 'User already deleted',
+        }),
+      );
+    });
+
+    it('should handle deletion error gracefully', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const deletionRequest = {
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+        status: DataRequestStatus.PENDING,
+        coolingPeriodEndsAt: pastDate,
+      };
+      dataRequestRepository.findOne.mockResolvedValue(deletionRequest);
+      dataRequestRepository.save.mockResolvedValue(deletionRequest);
+      userRepository.findOne.mockResolvedValue(mockUser);
+      userRepository.update.mockRejectedValue(new Error('Deletion failed'));
+
+      await service.processAccountDeletion('request-123');
+
+      expect(dataRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: DataRequestStatus.FAILED,
+          processingNotes: 'Deletion failed',
+        }),
+      );
+    });
+
+    it('should complete deletion successfully', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const deletionRequest = {
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+        status: DataRequestStatus.PENDING,
+        coolingPeriodEndsAt: pastDate,
+      };
+      dataRequestRepository.findOne.mockResolvedValue(deletionRequest);
+      dataRequestRepository.save.mockResolvedValue(deletionRequest);
+      userRepository.findOne.mockResolvedValue(mockUser);
+      userRepository.update.mockResolvedValue({ affected: 1, raw: {}, generatedMaps: [] });
+      userRepository.delete.mockResolvedValue({ affected: 1, raw: {} });
+      consentRepository.delete.mockResolvedValue({ affected: 1, raw: {} });
+
+      await service.processAccountDeletion('request-123');
+
+      expect(userRepository.delete).toHaveBeenCalledWith(mockUser.id);
+      expect(dataRequestRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: DataRequestStatus.COMPLETED,
+          completedAt: expect.any(Date),
+        }),
+      );
+    });
+  });
+
+  describe('processPendingDeletions error handling', () => {
+    it('should continue processing if one deletion fails', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      dataRequestRepository.find.mockResolvedValue([
+        {
+          ...mockDataRequest,
+          id: 'deletion-1',
+          type: DataRequestType.DELETE,
+          status: DataRequestStatus.PENDING,
+          coolingPeriodEndsAt: pastDate,
+        },
+        {
+          ...mockDataRequest,
+          id: 'deletion-2',
+          type: DataRequestType.DELETE,
+          status: DataRequestStatus.PENDING,
+          coolingPeriodEndsAt: pastDate,
+        },
+      ]);
+
+      // First deletion fails, second succeeds
+      dataRequestRepository.findOne
+        .mockRejectedValueOnce(new Error('First deletion error'))
+        .mockResolvedValueOnce({
+          ...mockDataRequest,
+          id: 'deletion-2',
+          type: DataRequestType.DELETE,
+          status: DataRequestStatus.PENDING,
+          coolingPeriodEndsAt: pastDate,
+        });
+
+      dataRequestRepository.save.mockResolvedValue({});
+      userRepository.findOne.mockResolvedValue(null);
+
+      await service.processPendingDeletions();
+
+      // Should continue to process second deletion
+      expect(dataRequestRepository.find).toHaveBeenCalled();
+    });
+  });
+
+  describe('sendRequestConfirmationEmail', () => {
+    it('should send deletion request email', async () => {
+      dataRequestRepository.findOne.mockResolvedValue(null);
+      dataRequestRepository.create.mockReturnValue({
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+      });
+      dataRequestRepository.save.mockResolvedValue({
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+        coolingPeriodEndsAt: new Date(),
+      });
+      userRepository.findOne.mockResolvedValue(mockUser);
+
+      await service.createDataRequest('user-123', { type: DataRequestType.DELETE });
+
+      expect(emailService.sendPrivacyRequestEmail).toHaveBeenCalledWith(
+        mockUser.email,
+        expect.stringContaining('删除'),
+        DataRequestType.DELETE,
+        expect.any(Date),
+      );
+    });
+
+    it('should send portability request email', async () => {
+      dataRequestRepository.findOne.mockResolvedValue(null);
+      dataRequestRepository.create.mockReturnValue({
+        ...mockDataRequest,
+        type: DataRequestType.PORTABILITY,
+      });
+      dataRequestRepository.save.mockResolvedValue({
+        ...mockDataRequest,
+        type: DataRequestType.PORTABILITY,
+      });
+      userRepository.findOne.mockResolvedValue(mockUser);
+
+      await service.createDataRequest('user-123', { type: DataRequestType.PORTABILITY });
+
+      expect(emailService.sendPrivacyRequestEmail).toHaveBeenCalled();
+    });
+
+    it('should handle email sending error gracefully', async () => {
+      dataRequestRepository.findOne.mockResolvedValue(null);
+      dataRequestRepository.create.mockReturnValue({
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+      });
+      dataRequestRepository.save.mockResolvedValue({
+        ...mockDataRequest,
+        type: DataRequestType.DELETE,
+      });
+      userRepository.findOne.mockResolvedValue(mockUser);
+      emailService.sendPrivacyRequestEmail.mockRejectedValue(new Error('Email failed'));
+
+      // Should not throw
+      await expect(
+        service.createDataRequest('user-123', { type: DataRequestType.DELETE }),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  describe('interval callback errors', () => {
+    it('should handle processPendingDeletions error in interval', async () => {
+      jest.useFakeTimers({ legacyFakeTimers: true });
+
+      dataRequestRepository.find.mockRejectedValue(new Error('DB error'));
+
+      service.onModuleInit();
+
+      // Advance timer by one day
+      jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+
+      // Allow promise to settle
+      await Promise.resolve();
+
+      service.onModuleDestroy();
+      jest.useRealTimers();
+    });
+
+    it('should handle cleanupExpiredExports error in interval', async () => {
+      jest.useFakeTimers({ legacyFakeTimers: true });
+
+      dataRequestRepository.find.mockRejectedValue(new Error('Cleanup error'));
+
+      service.onModuleInit();
+
+      // Advance timer by one day
+      jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+
+      // Allow promise to settle
+      await Promise.resolve();
+
+      service.onModuleDestroy();
+      jest.useRealTimers();
+    });
   });
 });

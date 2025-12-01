@@ -191,6 +191,14 @@ describe('EmailService', () => {
         }),
       );
     });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendTeamInvitationEmail('test@example.com', 'Team', 'http://link'),
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('sendInvitationAcceptedEmail', () => {
@@ -209,6 +217,14 @@ describe('EmailService', () => {
           template: 'invitation-accepted',
         }),
       );
+    });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendInvitationAcceptedEmail('admin@example.com', 'Member', 'Team'),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -233,6 +249,28 @@ describe('EmailService', () => {
         }),
       );
     });
+
+    it('should send without reason', async () => {
+      await service.sendRemovedFromTeamEmail('user@example.com', 'Team');
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'http://localhost:60007/email/send',
+        expect.objectContaining({
+          data: expect.objectContaining({
+            teamName: 'Team',
+            reason: undefined,
+          }),
+        }),
+      );
+    });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendRemovedFromTeamEmail('user@example.com', 'Team'),
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('sendRoleChangedEmail', () => {
@@ -251,6 +289,14 @@ describe('EmailService', () => {
           },
         }),
       );
+    });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendRoleChangedEmail('user@example.com', 'Team', 'MEMBER'),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -274,6 +320,14 @@ describe('EmailService', () => {
           },
         }),
       );
+    });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendDataExportReadyEmail('user@example.com', 'http://download', '1小时'),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -313,6 +367,14 @@ describe('EmailService', () => {
         }),
       );
     });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendPrivacyRequestEmail('user@example.com', '请求', 'delete'),
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('sendAccountDeletionWarningEmail', () => {
@@ -329,6 +391,14 @@ describe('EmailService', () => {
         }),
       );
     });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendAccountDeletionWarningEmail('user@example.com', 3),
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('sendAccountDeletedEmail', () => {
@@ -344,6 +414,14 @@ describe('EmailService', () => {
           data: {},
         }),
       );
+    });
+
+    it('should not throw on failure', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(
+        service.sendAccountDeletedEmail('user@example.com'),
+      ).resolves.not.toThrow();
     });
   });
 });
