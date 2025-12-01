@@ -17,7 +17,12 @@ export type TriggerEvent =
   | 'page.published'
   | 'user.invited'
   | 'campaign.started'
-  | 'campaign.ended';
+  | 'campaign.ended'
+  // Extended integration types
+  | 'slack.notification'
+  | 'teams.notification'
+  | 'google_analytics.track'
+  | 'facebook_pixel.track';
 
 @Entity('zapier_subscriptions')
 @Index(['teamId', 'event'])

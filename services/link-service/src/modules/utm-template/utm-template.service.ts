@@ -22,7 +22,7 @@ interface CreateUTMTemplateDto {
 
 interface UpdateUTMTemplateDto extends Partial<CreateUTMTemplateDto> {}
 
-interface UTMParams {
+export interface UTMParams {
   source?: string;
   medium?: string;
   campaign?: string;

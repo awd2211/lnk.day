@@ -48,7 +48,7 @@ interface GenerateOptions {
   maxRetries?: number;    // 最大重试次数
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   valid: boolean;
   reason?: string;
   suggestions?: string[];
@@ -185,7 +185,7 @@ export class ShortCodeGeneratorService {
     }
 
     // 唯一性检查 (先检查缓存，再检查数据库)
-    const cached = await this.redisService.getLink(shortCode, 'lnk.day');
+    const cached = await this.redisService.getLink(shortCode);
     if (cached) {
       return {
         valid: false,
@@ -372,7 +372,7 @@ export class ShortCodeGeneratorService {
    * 易记忆生成 (单词+数字)
    */
   private generateMemorable(options: GenerateOptions): string {
-    const word = MEMORABLE_WORDS[Math.floor(Math.random() * MEMORABLE_WORDS.length)];
+    const word = MEMORABLE_WORDS[Math.floor(Math.random() * MEMORABLE_WORDS.length)] || 'link';
     const numLength = (options.length || 6) - word.length;
     const num = numLength > 0
       ? customAlphabet(CHARSET_NUMERIC, Math.max(2, numLength))()

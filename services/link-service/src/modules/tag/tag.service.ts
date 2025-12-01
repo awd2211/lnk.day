@@ -63,12 +63,15 @@ export class TagService {
     }
 
     // 自动分配颜色
-    const color = dto.color || this.getNextColor(teamId);
+    const color = dto.color || await this.getNextColor(teamId);
 
     const tag = this.tagRepository.create({
-      ...dto,
+      name: dto.name,
+      description: dto.description,
       teamId,
       color,
+      icon: dto.icon,
+      parentId: dto.parentId,
       metadata: {
         autoApplyRules: dto.autoApplyRules || [],
       },
@@ -432,7 +435,7 @@ export class TagService {
 
   private async getNextColor(teamId: string): Promise<string> {
     const count = await this.tagRepository.count({ where: { teamId } });
-    return TAG_COLORS[count % TAG_COLORS.length] || TAG_COLORS[0];
+    return TAG_COLORS[count % TAG_COLORS.length] ?? TAG_COLORS[0] ?? '#3B82F6';
   }
 
   getAvailableColors(): string[] {

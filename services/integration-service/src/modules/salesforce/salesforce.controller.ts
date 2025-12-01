@@ -21,6 +21,7 @@ import {
   Permission,
   RequirePermissions,
   ScopedTeamId,
+  Public,
 } from '@lnk/nestjs-common';
 import { SalesforceService } from './salesforce.service';
 
@@ -77,8 +78,7 @@ export class SalesforceController {
   // ========== OAuth Endpoints ==========
 
   @Get('oauth/install')
-  @ApiHeader({ name: 'x-team-id', required: true })
-  
+  @Public()
   @ApiOperation({ summary: 'Initiate Salesforce OAuth flow' })
   @ApiQuery({ name: 'sandbox', required: false, type: Boolean })
   initiateOAuth(
@@ -96,6 +96,7 @@ export class SalesforceController {
   }
 
   @Get('oauth/callback')
+  @Public()
   @ApiOperation({ summary: 'Handle Salesforce OAuth callback' })
   async handleOAuthCallback(
     @Query('code') code: string,

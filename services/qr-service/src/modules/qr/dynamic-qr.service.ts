@@ -170,6 +170,59 @@ export class DynamicQrService {
     return { data, total, page, limit };
   }
 
+  /**
+   * 管理后台使用：查询所有二维码（不限 teamId）
+   */
+  async findAllAdmin(
+    options: DynamicQrListOptions & { teamId?: string } = {},
+  ): Promise<{ data: DynamicQrCode[]; total: number; page: number; limit: number }> {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      isActive,
+      tags,
+      folderId,
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      teamId,
+    } = options;
+
+    const query = this.dynamicQrRepository.createQueryBuilder('qr');
+
+    // 可选团队筛选
+    if (teamId) {
+      query.where('qr.teamId = :teamId', { teamId });
+    }
+
+    if (search) {
+      query.andWhere(
+        '(qr.name ILIKE :search OR qr.description ILIKE :search OR qr.shortCode ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (isActive !== undefined) {
+      query.andWhere('qr.isActive = :isActive', { isActive });
+    }
+
+    if (tags && tags.length > 0) {
+      query.andWhere('qr.tags && :tags', { tags });
+    }
+
+    if (folderId) {
+      query.andWhere('qr.folderId = :folderId', { folderId });
+    }
+
+    const [data, total] = await query
+      .orderBy(`qr.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
+  }
+
   async findOne(id: string, teamId: string): Promise<DynamicQrCode> {
     const qr = await this.dynamicQrRepository.findOne({
       where: { id, teamId },

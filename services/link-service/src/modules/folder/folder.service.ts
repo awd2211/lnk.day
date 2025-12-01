@@ -147,12 +147,14 @@ export class FolderService {
    */
   async recalculateLinkCounts(teamId: string): Promise<void> {
     // 使用原生 SQL 来更新所有文件夹的 linkCount
+    // 注意：folderId 是 varchar 类型，需要将 folder.id (uuid) 转换为 text
     await this.folderRepository.query(`
       UPDATE folders f
       SET "linkCount" = (
         SELECT COUNT(*)
         FROM links l
-        WHERE l."folderId"::text = f.id::text
+        WHERE l."folderId" = f.id::text
+          AND l."teamId" = f."teamId"
       )
       WHERE f."teamId" = $1
     `, [teamId]);

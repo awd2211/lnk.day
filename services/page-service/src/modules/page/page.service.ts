@@ -130,6 +130,26 @@ export class PageService {
     await this.pageRepository.increment({ id }, 'uniqueViews', 1);
   }
 
+  async getAnalytics(
+    id: string,
+    params?: { startDate?: string; endDate?: string },
+  ): Promise<{
+    views: number;
+    uniqueViews: number;
+    period: { startDate: string; endDate: string };
+  }> {
+    const page = await this.findOne(id);
+    // 基础分析数据，未来可以从 analytics-service 获取更详细的数据
+    const endDate: string = params?.endDate || new Date().toISOString().split('T')[0] as string;
+    const startDate: string = params?.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] as string;
+
+    return {
+      views: page.views || 0,
+      uniqueViews: page.uniqueViews || 0,
+      period: { startDate, endDate },
+    };
+  }
+
   async renderPage(slug: string, variantId?: string): Promise<{ html: string; variantId?: string }> {
     const page = await this.findBySlug(slug);
 

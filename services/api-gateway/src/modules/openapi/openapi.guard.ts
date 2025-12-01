@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 
 import { OpenApiService } from './openapi.service';
@@ -141,7 +142,7 @@ export const RequireScopes = (...scopes: string[]) => SetMetadata(REQUIRED_SCOPE
 // 权限 Guard
 @Injectable()
 export class OpenApiScopesGuard implements CanActivate {
-  constructor(private reflector: any) {}
+  constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredScopes = this.reflector.getAllAndOverride<string[]>(REQUIRED_SCOPES_KEY, [

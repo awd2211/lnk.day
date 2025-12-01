@@ -83,6 +83,13 @@ export class ProxyService {
         url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
         requireAuth: true,
       },
+      // User Security Module (sessions, events) - 注意: 不同于 link-service 的 link-security
+      {
+        name: 'user-service-security',
+        prefix: '/api/security',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
       // Link Service (60003)
       {
         name: 'link-service-links',
@@ -115,9 +122,23 @@ export class ProxyService {
         requireAuth: true,
       },
       {
-        name: 'link-service-security',
-        prefix: '/api/security',
+        name: 'link-service-utm-templates',
+        prefix: '/api/utm-templates',
         url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
+      {
+        name: 'link-service-tags',
+        prefix: '/api/tags',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
+      // link-service 链接安全扫描功能 - 使用独立前缀避免与 user-service /api/security 冲突
+      {
+        name: 'link-service-security',
+        prefix: '/api/link-security',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        targetPrefix: '/api/v1/security', // 映射到 link-service 的 /api/v1/security
         requireAuth: true,
       },
       {
@@ -217,6 +238,12 @@ export class ProxyService {
       {
         name: 'page-service-seo',
         prefix: '/api/seo',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: true,
+      },
+      {
+        name: 'page-service-comments',
+        prefix: '/api/comments',
         url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
         requireAuth: true,
       },
@@ -328,7 +355,38 @@ export class ProxyService {
         targetPrefix: '/api/v1/webhooks', // 映射到 webhooks controller
         requireAuth: true,
       },
-      // Integration Service (60016)
+      // Integration Service (60016) - OAuth endpoints (public, must be before auth-required routes)
+      {
+        name: 'integration-service-hubspot-oauth',
+        prefix: '/api/hubspot/oauth',
+        url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+        requireAuth: false,
+      },
+      {
+        name: 'integration-service-hubspot-webhook',
+        prefix: '/api/hubspot/webhook',
+        url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+        requireAuth: false,
+      },
+      {
+        name: 'integration-service-salesforce-oauth',
+        prefix: '/api/salesforce/oauth',
+        url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+        requireAuth: false,
+      },
+      {
+        name: 'integration-service-shopify-oauth',
+        prefix: '/api/shopify/oauth',
+        url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+        requireAuth: false,
+      },
+      {
+        name: 'integration-service-shopify-webhooks',
+        prefix: '/api/shopify/webhooks',
+        url: this.configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+        requireAuth: false,
+      },
+      // Integration Service (60016) - Auth-required routes
       {
         name: 'integration-service-zapier',
         prefix: '/api/zapier',
@@ -424,7 +482,16 @@ export class ProxyService {
   }
 
   findRoute(path: string): ServiceRoute | undefined {
-    return this.routes.find((route) => path.startsWith(route.prefix));
+    // Find all matching routes and return the one with the longest prefix
+    // This ensures more specific routes like /api/teams-notifications
+    // take precedence over /api/teams
+    const matchingRoutes = this.routes.filter((route) => path.startsWith(route.prefix));
+    if (matchingRoutes.length === 0) {
+      return undefined;
+    }
+    return matchingRoutes.reduce((longest, current) =>
+      current.prefix.length > longest.prefix.length ? current : longest
+    );
   }
 
   async proxyRequest(
@@ -442,9 +509,18 @@ export class ProxyService {
 
     // Transform path - 保留资源路径部分，加上目标服务的前缀
     const resourcePath = path.replace(route.prefix, '');
-    const targetPrefix = route.targetPrefix || '/api/v1';
-    const routeSuffix = route.prefix.replace('/api', ''); // /api/links -> /links
-    const targetUrl = `${route.url}${targetPrefix}${routeSuffix}${resourcePath}`;
+
+    let targetUrl: string;
+    if (route.targetPrefix) {
+      // 如果指定了 targetPrefix，直接使用它替换整个前缀
+      // 例如: /api/link-security/stats -> /api/v1/security/stats
+      targetUrl = `${route.url}${route.targetPrefix}${resourcePath}`;
+    } else {
+      // 默认行为：保留路由后缀
+      // 例如: /api/links/123 -> /api/v1/links/123
+      const routeSuffix = route.prefix.replace('/api', ''); // /api/links -> /links
+      targetUrl = `${route.url}/api/v1${routeSuffix}${resourcePath}`;
+    }
 
     this.logger.debug(`Proxying ${method} ${path} -> ${targetUrl}`);
 

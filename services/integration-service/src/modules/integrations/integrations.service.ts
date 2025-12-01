@@ -8,7 +8,7 @@ import { ZapierSubscription } from '../zapier/entities/zapier-subscription.entit
 
 export interface UnifiedIntegration {
   id: string;
-  type: 'zapier' | 'hubspot' | 'salesforce' | 'shopify';
+  type: 'zapier' | 'hubspot' | 'salesforce' | 'shopify' | 'slack' | 'teams' | 'google_analytics' | 'facebook_pixel';
   name: string;
   teamId: string;
   teamName?: string;
@@ -245,10 +245,26 @@ export class IntegrationsService {
 
     const zapier = await this.zapierRepo.findOne({ where: { id } });
     if (zapier) {
+      // 根据 event 字段判断真正的集成类型
+      const eventToType: Record<string, UnifiedIntegration['type']> = {
+        'slack.notification': 'slack' as any,
+        'teams.notification': 'teams' as any,
+        'google_analytics.track': 'google_analytics' as any,
+        'facebook_pixel.track': 'facebook_pixel' as any,
+      };
+      const actualType = eventToType[zapier.event] || 'zapier';
+      const typeNames: Record<string, string> = {
+        zapier: 'Zapier',
+        slack: 'Slack',
+        teams: 'Microsoft Teams',
+        google_analytics: 'Google Analytics',
+        facebook_pixel: 'Facebook Pixel',
+      };
+
       return {
         id: zapier.id,
-        type: 'zapier',
-        name: `Zapier - ${zapier.event}`,
+        type: actualType,
+        name: `${typeNames[actualType] || actualType} - ${zapier.event}`,
         teamId: zapier.teamId,
         status: zapier.failureCount > 3 ? 'error' : 'connected',
         config: { event: zapier.event, webhookUrl: zapier.webhookUrl },
@@ -365,29 +381,143 @@ export class IntegrationsService {
     };
   }
 
-  async connect(platform: string, data: Record<string, any>): Promise<{ success: boolean; message: string; oauthUrl?: string }> {
+  async connect(platform: string, teamId: string, data: Record<string, any>): Promise<{ success: boolean; message: string; integration?: UnifiedIntegration }> {
     const platformLower = platform.toLowerCase();
+    this.logger.log(`Connecting ${platform} for team ${teamId} with config: ${JSON.stringify(data)}`);
 
-    // 各平台的 OAuth 授权 URL
-    const oauthUrls: Record<string, string> = {
-      hubspot: '/api/v1/hubspot/oauth/install',
-      salesforce: '/api/v1/salesforce/oauth/install',
-      shopify: '/api/v1/shopify/oauth/install',
-      zapier: '/api/v1/zapier/hooks/subscribe',
-    };
+    try {
+      switch (platformLower) {
+        case 'zapier': {
+          if (!data.webhookUrl) {
+            return { success: false, message: '请提供 Zapier Webhook URL' };
+          }
+          const zapier = this.zapierRepo.create({
+            teamId,
+            event: 'link.clicked',  // Default event
+            webhookUrl: data.webhookUrl,
+            enabled: true,
+            failureCount: 0,
+          });
+          const saved = await this.zapierRepo.save(zapier);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'Zapier 集成已连接', integration: integration || undefined };
+        }
 
-    if (oauthUrls[platformLower]) {
-      return {
-        success: true,
-        message: `Please redirect to OAuth flow`,
-        oauthUrl: oauthUrls[platformLower],
-      };
+        case 'hubspot': {
+          if (!data.apiKey) {
+            return { success: false, message: '请提供 HubSpot API Key' };
+          }
+          const hubspot = this.hubspotRepo.create({
+            teamId,
+            accessToken: data.apiKey,
+            refreshToken: '',  // API Key 模式不需要 refresh token
+            hubspotPortalId: data.portalId || 'api-key-auth',
+            scopes: ['contacts', 'deals'],
+            isActive: true,
+            connectedAt: new Date(),
+            settings: { syncContacts: true, syncDeals: true },
+          });
+          const saved = await this.hubspotRepo.save(hubspot);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'HubSpot 集成已连接', integration: integration || undefined };
+        }
+
+        case 'salesforce': {
+          if (!data.clientId || !data.clientSecret) {
+            return { success: false, message: '请提供 Salesforce Client ID 和 Client Secret' };
+          }
+          const salesforce = this.salesforceRepo.create({
+            teamId,
+            accessToken: `pending_${data.clientId}`,  // 标记为待 OAuth 授权
+            refreshToken: data.clientSecret,  // 临时存储 client secret
+            instanceUrl: data.instanceUrl || 'https://login.salesforce.com',
+            orgId: data.clientId.substring(0, 15),
+            isActive: true,
+            connectedAt: new Date(),
+            settings: { syncContacts: true, syncLeads: true },
+          });
+          const saved = await this.salesforceRepo.save(salesforce);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'Salesforce 集成已保存，请完成 OAuth 授权', integration: integration || undefined };
+        }
+
+        case 'shopify': {
+          if (!data.shopDomain || !data.accessToken) {
+            return { success: false, message: '请提供 Shopify 店铺域名和 Access Token' };
+          }
+          const shopify = this.shopifyRepo.create({
+            teamId,
+            shopDomain: data.shopDomain.replace(/^https?:\/\//, '').replace(/\/$/, ''),
+            accessToken: data.accessToken,
+            scopes: ['read_products', 'read_orders'],
+            isActive: true,
+            installedAt: new Date(),
+            settings: { autoCreateProductLinks: true },
+          });
+          const saved = await this.shopifyRepo.save(shopify);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'Shopify 集成已连接', integration: integration || undefined };
+        }
+
+        case 'slack':
+        case 'teams': {
+          if (!data.webhookUrl) {
+            return { success: false, message: `请提供 ${platform} Webhook URL` };
+          }
+          // 使用 Zapier 表存储 Slack/Teams webhook (重用 webhook 功能)
+          const webhook = this.zapierRepo.create({
+            teamId,
+            event: `${platformLower}.notification`,
+            webhookUrl: data.webhookUrl,
+            enabled: true,
+            failureCount: 0,
+          });
+          const saved = await this.zapierRepo.save(webhook);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: `${platform} 集成已连接`, integration: integration || undefined };
+        }
+
+        case 'google_analytics': {
+          if (!data.measurementId) {
+            return { success: false, message: '请提供 Google Analytics Measurement ID' };
+          }
+          // 使用 Zapier 表存储 GA 配置
+          const ga = this.zapierRepo.create({
+            teamId,
+            event: 'google_analytics.track',
+            webhookUrl: `ga4://${data.measurementId}${data.apiSecret ? '?secret=' + data.apiSecret : ''}`,
+            enabled: true,
+            failureCount: 0,
+          });
+          const saved = await this.zapierRepo.save(ga);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'Google Analytics 集成已连接', integration: integration || undefined };
+        }
+
+        case 'facebook_pixel': {
+          if (!data.pixelId) {
+            return { success: false, message: '请提供 Facebook Pixel ID' };
+          }
+          // 使用 Zapier 表存储 FB Pixel 配置
+          const fb = this.zapierRepo.create({
+            teamId,
+            event: 'facebook_pixel.track',
+            webhookUrl: `fbpixel://${data.pixelId}${data.accessToken ? '?token=' + data.accessToken : ''}`,
+            enabled: true,
+            failureCount: 0,
+          });
+          const saved = await this.zapierRepo.save(fb);
+          const integration = await this.findOne(saved.id);
+          return { success: true, message: 'Facebook Pixel 集成已连接', integration: integration || undefined };
+        }
+
+        default:
+          return { success: false, message: `不支持的平台: ${platform}` };
+      }
+    } catch (error: any) {
+      this.logger.error(`Failed to connect ${platform}:`, error);
+      return { success: false, message: error.message || '连接失败，请检查配置信息' };
     }
-
-    return {
-      success: false,
-      message: `Unknown platform: ${platform}`,
-    };
   }
 
   getAvailableIntegrations() {

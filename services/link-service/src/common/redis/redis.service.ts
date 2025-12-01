@@ -79,4 +79,43 @@ export class RedisService {
   async invalidateByShortCode(shortCode: string): Promise<void> {
     await this.deleteLink(shortCode);
   }
+
+  /**
+   * Increment a counter key and return the new value
+   */
+  async incr(key: string): Promise<number> {
+    try {
+      return await this.redis.incr(key);
+    } catch (error: any) {
+      this.logger.error(`Redis incr error for ${key}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Generic get method
+   */
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch (error: any) {
+      this.logger.error(`Redis get error for ${key}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Generic set method
+   */
+  async set(key: string, value: string, ttl?: number): Promise<void> {
+    try {
+      if (ttl) {
+        await this.redis.set(key, value, 'EX', ttl);
+      } else {
+        await this.redis.set(key, value);
+      }
+    } catch (error: any) {
+      this.logger.error(`Redis set error for ${key}: ${error.message}`);
+    }
+  }
 }

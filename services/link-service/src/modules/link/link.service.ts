@@ -221,6 +221,63 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     return { links, total, page, limit };
   }
 
+  /**
+   * 管理后台使用：查询所有链接（不限 teamId）
+   */
+  async findAllAdmin(
+    options?: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'ASC' | 'DESC';
+      status?: string;
+      search?: string;
+      teamId?: string; // 可选：按团队筛选
+    },
+  ): Promise<{ links: Link[]; total: number; page: number; limit: number }> {
+    const page = Number(options?.page) || 1;
+    const limit = Math.min(Number(options?.limit) || 20, 100);
+    const sortBy = options?.sortBy || 'createdAt';
+    const sortOrder = options?.sortOrder || 'DESC';
+
+    this.logger.debug(`findAllAdmin called with page=${page}, limit=${limit}, teamId=${options?.teamId || 'all'}`);
+
+    const queryBuilder = this.linkRepository.createQueryBuilder('link');
+
+    // 可选：按团队筛选
+    if (options?.teamId) {
+      queryBuilder.where('link.teamId = :teamId', { teamId: options.teamId });
+    }
+
+    // 状态筛选
+    if (options?.status) {
+      queryBuilder.andWhere('link.status = :status', { status: options.status.toUpperCase() });
+    }
+
+    // 搜索
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(link.title ILIKE :search OR link.shortCode ILIKE :search OR link.originalUrl ILIKE :search)',
+        { search: `%${options.search}%` },
+      );
+    }
+
+    // 排序
+    const allowedSortFields = ['createdAt', 'updatedAt', 'clicks', 'title', 'shortCode', 'totalClicks'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    queryBuilder.orderBy(`link.${safeSortBy}`, safeSortOrder);
+
+    // 分页
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [links, total] = await queryBuilder.getManyAndCount();
+
+    this.logger.debug(`findAllAdmin result: found ${total} links`);
+
+    return { links, total, page, limit };
+  }
+
   async findOne(id: string): Promise<Link> {
     const link = await this.linkRepository.findOne({ where: { id } });
     if (!link) {

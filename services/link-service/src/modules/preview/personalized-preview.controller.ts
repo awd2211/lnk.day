@@ -15,7 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs
 import { Request } from 'express';
 
 import { PersonalizedPreviewService } from './personalized-preview.service';
-import { JwtAuthGuard, CurrentUser, ScopeGuard, RequireScope } from '@lnk/nestjs-common';
+import { JwtAuthGuard, CurrentUser, ScopeGuard, PermissionGuard, RequirePermissions, Permission } from '@lnk/nestjs-common';
 import {
   PreviewTargetType,
   DeviceType,
@@ -31,8 +31,8 @@ export class PersonalizedPreviewController {
   // ==================== Config Endpoints ====================
 
   @Post('configs/:linkId')
-  @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建个性化预览配置' })
   @ApiBody({
@@ -66,8 +66,8 @@ export class PersonalizedPreviewController {
   }
 
   @Get('configs/link/:linkId')
-  @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:view')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取链接的所有个性化预览配置' })
   getConfigsByLink(
@@ -81,8 +81,8 @@ export class PersonalizedPreviewController {
   }
 
   @Get('configs/:id')
-  @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:view')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取单个预览配置' })
   getConfig(
@@ -97,7 +97,7 @@ export class PersonalizedPreviewController {
 
   @Put('configs/:id')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '更新预览配置' })
   updateConfig(
@@ -114,7 +114,7 @@ export class PersonalizedPreviewController {
 
   @Delete('configs/:id')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '删除预览配置' })
   async deleteConfig(
@@ -132,7 +132,7 @@ export class PersonalizedPreviewController {
 
   @Post('templates')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '创建预览模板' })
   createTemplate(
@@ -147,7 +147,7 @@ export class PersonalizedPreviewController {
 
   @Get('templates')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:view')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取所有预览模板' })
   getTemplates(@CurrentUser() user: any) {
@@ -158,7 +158,7 @@ export class PersonalizedPreviewController {
 
   @Put('templates/:id')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '更新预览模板' })
   updateTemplate(
@@ -175,7 +175,7 @@ export class PersonalizedPreviewController {
 
   @Delete('templates/:id')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '删除预览模板' })
   async deleteTemplate(
@@ -239,7 +239,7 @@ export class PersonalizedPreviewController {
 
   @Post('simulate/:linkId')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:view')
+  @RequirePermissions(Permission.LINKS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '模拟预览（测试不同条件下的预览效果）' })
   @ApiBody({
@@ -273,17 +273,17 @@ export class PersonalizedPreviewController {
   // ==================== Analytics Endpoints ====================
 
   @Get('analytics/:linkId')
-  @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('analytics:view')
+  @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+  @RequirePermissions(Permission.ANALYTICS_VIEW)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取预览分析数据' })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   getAnalytics(
     @Param('linkId') linkId: string,
+    @CurrentUser() user: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @CurrentUser() user: any,
   ) {
     return this.personalizedPreviewService.getPreviewAnalytics(
       linkId,
@@ -297,7 +297,7 @@ export class PersonalizedPreviewController {
 
   @Post('bulk/apply-template')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '批量应用模板到多个链接' })
   @ApiBody({
@@ -322,7 +322,7 @@ export class PersonalizedPreviewController {
 
   @Post('configs/:id/duplicate')
   @UseGuards(JwtAuthGuard, ScopeGuard)
-  @RequireScope('links:edit')
+  @RequirePermissions(Permission.LINKS_EDIT)
   @ApiBearerAuth()
   @ApiOperation({ summary: '复制配置到另一个链接' })
   @ApiBody({

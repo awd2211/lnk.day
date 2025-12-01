@@ -353,6 +353,20 @@ export class LinkInternalController {
     await this.linkService.incrementClicks(id);
     return { success: true };
   }
+
+  @Get('admin/all')
+  @UseGuards(InternalAuthGuard)
+  @ApiOperation({ summary: '内部 API - 管理后台获取所有链接' })
+  @ApiHeader({ name: 'x-internal-api-key', description: '内部 API 密钥', required: true })
+  async adminFindAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.linkService.findAllAdmin({ page, limit, status, search, teamId });
+  }
 }
 
 // ========== 控制台统计内部 API（无需认证） ==========

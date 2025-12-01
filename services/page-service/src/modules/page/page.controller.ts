@@ -38,8 +38,20 @@ export class PageController {
   @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取落地页列表' })
   @ApiQuery({ name: 'status', required: false, enum: PageStatus })
-  findAll(@ScopedTeamId() teamId: string, @Query('status') status?: PageStatus) {
-    return this.pageService.findAll(teamId, { status });
+  @ApiQuery({ name: 'all', required: false, type: Boolean, description: '管理员模式，返回所有团队的落地页' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  findAll(
+    @ScopedTeamId() teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: PageStatus,
+    @Query('all') all?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    // 平台管理员可以查看所有落地页
+    const shouldQueryAll = all === 'true' && isPlatformAdmin(user);
+    return this.pageService.findAll(shouldQueryAll ? undefined : teamId, { status, page, limit });
   }
 
   @Get('render/:slug')
@@ -164,6 +176,25 @@ export class PageController {
       throw new ForbiddenException('无权复制此落地页');
     }
     return this.pageService.duplicate(id, user.id, teamId);
+  }
+
+  @Get(':id/analytics')
+  @RequirePermissions(Permission.PAGES_VIEW)
+  @ApiOperation({ summary: '获取落地页分析数据' })
+  @ApiQuery({ name: 'startDate', required: false, description: '开始日期 (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: '结束日期 (YYYY-MM-DD)' })
+  async getAnalytics(
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @ScopedTeamId() teamId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
+  ) {
+    const page = await this.pageService.findOne(id);
+    if (user && !isPlatformAdmin(user) && page.teamId !== teamId) {
+      throw new ForbiddenException('无权查看此落地页分析数据');
+    }
+    return this.pageService.getAnalytics(id, { startDate, endDate });
   }
 
   @Delete(':id')

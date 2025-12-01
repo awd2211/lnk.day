@@ -24,6 +24,7 @@ import {
   Permission,
   RequirePermissions,
   ScopedTeamId,
+  Public,
 } from '@lnk/nestjs-common';
 import { ShopifyService } from './shopify.service';
 
@@ -58,6 +59,7 @@ export class ShopifyController {
   // ========== OAuth Endpoints ==========
 
   @Get('oauth/install')
+  @Public()
   @ApiOperation({ summary: 'Initiate Shopify OAuth flow' })
   initiateOAuth(
     @Query('teamId') teamId: string,
@@ -73,6 +75,7 @@ export class ShopifyController {
   }
 
   @Get('oauth/callback')
+  @Public()
   @ApiOperation({ summary: 'Handle Shopify OAuth callback' })
   async handleOAuthCallback(
     @Query('shop') shop: string,
@@ -282,6 +285,7 @@ export class ShopifyController {
   // ========== Webhooks ==========
 
   @Post('webhooks/products/create')
+  @Public()
   @ApiExcludeEndpoint()
   async handleProductCreate(
     @Req() req: RawBodyRequest<Request>,
@@ -299,6 +303,7 @@ export class ShopifyController {
   }
 
   @Post('webhooks/products/update')
+  @Public()
   @ApiExcludeEndpoint()
   async handleProductUpdate(
     @Headers('x-shopify-shop-domain') shopDomain: string,
@@ -310,6 +315,7 @@ export class ShopifyController {
   }
 
   @Post('webhooks/products/delete')
+  @Public()
   @ApiExcludeEndpoint()
   async handleProductDelete(
     @Headers('x-shopify-shop-domain') shopDomain: string,
@@ -321,6 +327,7 @@ export class ShopifyController {
   }
 
   @Post('webhooks/orders/create')
+  @Public()
   @ApiExcludeEndpoint()
   async handleOrderCreate(
     @Req() req: RawBodyRequest<Request>,
@@ -338,6 +345,7 @@ export class ShopifyController {
   }
 
   @Post('webhooks/orders/paid')
+  @Public()
   @ApiExcludeEndpoint()
   async handleOrderPaid(
     @Headers('x-shopify-shop-domain') shopDomain: string,
@@ -349,6 +357,7 @@ export class ShopifyController {
   }
 
   @Post('webhooks/app/uninstalled')
+  @Public()
   @ApiExcludeEndpoint()
   async handleAppUninstalled(
     @Req() req: RawBodyRequest<Request>,

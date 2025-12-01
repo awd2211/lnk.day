@@ -25,6 +25,7 @@ import {
   Permission,
   RequirePermissions,
   ScopedTeamId,
+  Public,
 } from '@lnk/nestjs-common';
 import { HubSpotService } from './hubspot.service';
 import {
@@ -51,8 +52,7 @@ export class HubSpotController {
   // ========== OAuth Endpoints ==========
 
   @Get('oauth/install')
-  @ApiHeader({ name: 'x-team-id', required: true })
-  
+  @Public()
   @ApiOperation({ summary: 'Initiate HubSpot OAuth flow' })
   initiateOAuth(@Query() dto: InitiateHubSpotOAuthDto, @Res() res: Response) {
     const authUrl = this.hubspotService.generateAuthUrl(dto.teamId, dto.redirectUrl);
@@ -60,6 +60,7 @@ export class HubSpotController {
   }
 
   @Get('oauth/callback')
+  @Public()
   @ApiOperation({ summary: 'Handle HubSpot OAuth callback' })
   async handleOAuthCallback(
     @Query() query: HubSpotOAuthCallbackDto,
@@ -245,6 +246,7 @@ export class HubSpotController {
   // ========== Webhook Endpoint ==========
 
   @Post('webhook')
+  @Public()
   @ApiOperation({ summary: 'Receive HubSpot webhook events' })
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,

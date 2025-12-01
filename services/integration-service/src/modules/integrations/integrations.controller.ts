@@ -9,13 +9,21 @@ import {
   Body,
   ParseUUIDPipe,
   NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import {
+  JwtAuthGuard,
+  ScopeGuard,
+  PermissionGuard,
+  ScopedTeamId,
+} from '@lnk/nestjs-common';
 import { IntegrationsService } from './integrations.service';
 
 @ApiTags('integrations')
 @Controller('integrations')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 export class IntegrationsController {
   constructor(private readonly service: IntegrationsService) {}
 
@@ -32,12 +40,14 @@ export class IntegrationsController {
   }
 
   @Post(':platform/connect')
+  @ApiHeader({ name: 'x-team-id', required: true })
   @ApiOperation({ summary: '连接集成平台' })
   async connect(
     @Param('platform') platform: string,
+    @ScopedTeamId() teamId: string,
     @Body() data: Record<string, any>,
   ) {
-    return this.service.connect(platform, data);
+    return this.service.connect(platform, teamId, data);
   }
 
   @Get()

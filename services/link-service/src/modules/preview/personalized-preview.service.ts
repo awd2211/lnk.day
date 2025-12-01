@@ -21,7 +21,7 @@ interface VisitorContext {
   timestamp?: Date;
 }
 
-interface PersonalizedPreviewMeta {
+export interface PersonalizedPreviewMeta {
   // Open Graph
   ogTitle: string;
   ogDescription: string;
@@ -327,7 +327,7 @@ export class PersonalizedPreviewService {
   private matchTime(targetValue: string, timestamp: Date): boolean {
     const [start, end] = targetValue.split('-').map(Number);
     const hour = timestamp.getHours();
-    return hour >= start && hour < end;
+    return hour >= (start ?? 0) && hour < (end ?? 24);
   }
 
   private matchCustomConditions(
@@ -373,13 +373,13 @@ export class PersonalizedPreviewService {
     const baseMeta: PersonalizedPreviewMeta = {
       ogTitle: link.title || link.originalUrl,
       ogDescription: link.description || '',
-      ogImage: link.ogImage || '',
+      ogImage: (link as any).ogImage || '',
       ogType: 'website',
       ogUrl: `${process.env.SHORT_URL_BASE || 'https://lnk.day'}/${link.shortCode}`,
       twitterCard: 'summary_large_image',
       twitterTitle: link.title || link.originalUrl,
       twitterDescription: link.description || '',
-      twitterImage: link.ogImage || '',
+      twitterImage: (link as any).ogImage || '',
     };
 
     if (!config) {

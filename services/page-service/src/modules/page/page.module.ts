@@ -7,10 +7,11 @@ import { Page } from './entities/page.entity';
 import { PageComment } from './entities/comment.entity';
 import { CommentController } from './comment.controller';
 import { CommentService } from './comment.service';
+import { CommentManagementController } from './comment-management.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Page, PageComment])],
-  controllers: [PageController, CommentController, PageInternalController],
+  controllers: [PageController, CommentController, CommentManagementController, PageInternalController],
   providers: [PageService, CommentService],
   exports: [PageService, CommentService],
 })
