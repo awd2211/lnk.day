@@ -31,6 +31,9 @@ import AdminRolesPage from '@/pages/AdminRolesPage';
 import AdminProfilePage from '@/pages/AdminProfilePage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
 import NotificationsPage from '@/pages/NotificationsPage';
+import QuotasPage from '@/pages/QuotasPage';
+import AlertRulesPage from '@/pages/AlertRulesPage';
+import AutomationWorkflowPage from '@/pages/AutomationWorkflowPage';
 
 function App() {
   return (
@@ -67,6 +70,9 @@ function App() {
         <Route path="profile" element={<AdminProfilePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="quotas" element={<QuotasPage />} />
+        <Route path="alert-rules" element={<AlertRulesPage />} />
+        <Route path="automation" element={<AutomationWorkflowPage />} />
       </Route>
     </Routes>
   );

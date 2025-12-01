@@ -33,6 +33,9 @@ import {
   Mail,
   Gauge,
   Building,
+  Database,
+  AlertTriangle,
+  Workflow,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -94,6 +97,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: '订阅管理', href: '/subscriptions', icon: CreditCard },
       { name: '计费发票', href: '/billing', icon: Receipt },
+      { name: '配额管理', href: '/quotas', icon: Database },
     ],
   },
   {
@@ -112,6 +116,7 @@ const navigationGroups: NavGroup[] = [
       { name: '内容审核', href: '/moderation', icon: ShieldAlert },
       { name: '审计日志', href: '/audit-logs', icon: FileText },
       { name: '告警管理', href: '/alerts', icon: Bell },
+      { name: '告警规则', href: '/alert-rules', icon: AlertTriangle },
     ],
   },
   {
@@ -120,6 +125,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { name: '系统监控', href: '/system', icon: Server },
       { name: '性能指标', href: '/metrics', icon: Gauge },
+      { name: '自动化规则', href: '/automation', icon: Workflow },
       { name: '管理员角色', href: '/admin-roles', icon: ShieldCheck },
       { name: '通知管理', href: '/notifications', icon: Mail },
       { name: '系统设置', href: '/settings', icon: Settings },
