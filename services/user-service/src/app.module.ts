@@ -32,6 +32,7 @@ import { NotificationModule } from './common/notification/notification.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { UserSagaModule } from './saga/saga.module';
+import { TenantModule } from './modules/tenant/tenant.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { UserSagaModule } from './saga/saga.module';
     HealthModule,
     RabbitMQModule,
     UserSagaModule,
+    TenantModule,
   ],
   providers: [
     {
