@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHORT_LINK_DOMAIN } from '@/lib/config';
 import {
   Search,
   Building2,
@@ -210,7 +211,7 @@ export default function TenantsPage() {
       clicksCount: 89000,
       customDomain: 'links.acme.com',
       branding: {
-        logo: 'https://acme.com/logo.png',
+        logo: '/placeholder-logo.png',
         primaryColor: '#1a56db',
         accentColor: '#7e3af2',
       },
@@ -658,7 +659,7 @@ export default function TenantsPage() {
                         <div>
                           <p className="font-medium">{tenant.name}</p>
                           <p className="text-xs text-gray-500">
-                            {tenant.customDomain || `${tenant.slug}.lnk.day`}
+                            {tenant.customDomain || `${tenant.slug}.${SHORT_LINK_DOMAIN}`}
                           </p>
                         </div>
                       </button>
@@ -804,7 +805,7 @@ export default function TenantsPage() {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold">{viewingTenant.name}</h3>
                   <p className="text-sm text-gray-500">
-                    {viewingTenant.customDomain || `${viewingTenant.slug}.lnk.day`}
+                    {viewingTenant.customDomain || `${viewingTenant.slug}.${SHORT_LINK_DOMAIN}`}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
                     {getStatusBadge(viewingTenant.status)}
@@ -1151,7 +1152,7 @@ export default function TenantsPage() {
                 onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                 placeholder="acme-corp"
               />
-              <p className="text-xs text-gray-500">将用于子域名: {formData.slug || 'xxx'}.lnk.day</p>
+              <p className="text-xs text-gray-500">将用于子域名: {formData.slug || 'xxx'}.{SHORT_LINK_DOMAIN}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="ownerEmail">所有者邮箱</Label>

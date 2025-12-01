@@ -36,9 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = async (email: string, password: string, rememberMe = false) => {
-    console.log('Attempting login to:', import.meta.env.VITE_CONSOLE_SERVICE_URL || 'http://localhost:60009/api/v1');
     const { data } = await adminAuthService.login(email, password, rememberMe);
-    console.log('Login response:', data);
     localStorage.setItem('console_token', data.accessToken);
     localStorage.setItem('console_admin', JSON.stringify(data.admin));
     if (rememberMe) {

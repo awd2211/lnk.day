@@ -56,6 +56,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { qrCodesService, proxyService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
+import { formatShortUrl } from '@/lib/config';
 
 // Admin oversight types
 type QRStatus = 'active' | 'disabled' | 'blocked' | 'flagged';
@@ -234,7 +235,7 @@ export default function QRCodesPage() {
 
     return {
       ...item,
-      shortUrl: item.shortUrl || (item.shortCode ? `lnk.day/${item.shortCode}` : item.content),
+      shortUrl: item.shortUrl || (item.shortCode ? formatShortUrl(item.shortCode) : item.content),
       teamName: item.teamName || teamNameMap[item.teamId] || `团队 ${item.teamId?.slice(0, 8) || '-'}`,
       ownerName: item.ownerName || item.userName || (item.userId ? `用户 ${item.userId.slice(0, 8)}` : '-'),
       style: styleType,

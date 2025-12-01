@@ -34,6 +34,19 @@ import NotificationsPage from '@/pages/NotificationsPage';
 import QuotasPage from '@/pages/QuotasPage';
 import AlertRulesPage from '@/pages/AlertRulesPage';
 import AutomationWorkflowPage from '@/pages/AutomationWorkflowPage';
+import LinkTemplatesPage from '@/pages/LinkTemplatesPage';
+import UtmTemplatesPage from '@/pages/UtmTemplatesPage';
+import CampaignTemplatesPage from '@/pages/CampaignTemplatesPage';
+import BioLinkTemplatesPage from '@/pages/BioLinkTemplatesPage';
+import QrStylesPage from '@/pages/QrStylesPage';
+import SsoConfigPage from '@/pages/SsoConfigPage';
+import SecurityScanPage from '@/pages/SecurityScanPage';
+import AbTestsPage from '@/pages/AbTestsPage';
+import GoalsPage from '@/pages/GoalsPage';
+import RedirectRulesPage from '@/pages/RedirectRulesPage';
+import TagsPage from '@/pages/TagsPage';
+import FoldersPage from '@/pages/FoldersPage';
+import RealtimePage from '@/pages/RealtimePage';
 
 function App() {
   return (
@@ -73,6 +86,19 @@ function App() {
         <Route path="quotas" element={<QuotasPage />} />
         <Route path="alert-rules" element={<AlertRulesPage />} />
         <Route path="automation" element={<AutomationWorkflowPage />} />
+        <Route path="templates/links" element={<LinkTemplatesPage />} />
+        <Route path="templates/utm" element={<UtmTemplatesPage />} />
+        <Route path="templates/campaigns" element={<CampaignTemplatesPage />} />
+        <Route path="templates/bio-links" element={<BioLinkTemplatesPage />} />
+        <Route path="templates/qr-styles" element={<QrStylesPage />} />
+        <Route path="sso-config" element={<SsoConfigPage />} />
+        <Route path="security-scan" element={<SecurityScanPage />} />
+        <Route path="ab-tests" element={<AbTestsPage />} />
+        <Route path="goals" element={<GoalsPage />} />
+        <Route path="redirect-rules" element={<RedirectRulesPage />} />
+        <Route path="tags" element={<TagsPage />} />
+        <Route path="folders" element={<FoldersPage />} />
+        <Route path="realtime" element={<RealtimePage />} />
       </Route>
     </Routes>
   );

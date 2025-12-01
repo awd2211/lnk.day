@@ -59,6 +59,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { landingPagesService, proxyService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
+import { buildPageUrl } from '@/lib/config';
 
 // Admin oversight types
 type PageStatus = 'published' | 'draft' | 'archived' | 'blocked' | 'flagged';
@@ -647,7 +648,7 @@ export default function PagesPage() {
                                 title="访问页面"
                               >
                                 <a
-                                  href={`https://lnk.day/${landingPage.slug}`}
+                                  href={buildPageUrl(landingPage.slug)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
@@ -849,7 +850,7 @@ export default function PagesPage() {
                 {selectedPage.status === 'published' && (
                   <Button className="w-full" asChild>
                     <a
-                      href={`https://lnk.day/${selectedPage.slug}`}
+                      href={buildPageUrl(selectedPage.slug)}
                       target="_blank"
                       rel="noopener noreferrer"
                     >

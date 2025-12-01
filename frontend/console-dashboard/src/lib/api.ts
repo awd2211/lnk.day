@@ -450,3 +450,76 @@ export const linksService = {
   unblockLink: (id: string) => api.post(`/proxy/links/${id}/unblock`),
   flagLink: (id: string, reason: string) => api.post(`/proxy/links/${id}/flag`, { reason }),
 };
+
+// Automation
+export const automationService = {
+  getAutomations: (params?: { page?: number; limit?: number; status?: string; search?: string }) =>
+    api.get('/system/automation', { params }),
+  getAutomation: (id: string) => api.get(`/system/automation/${id}`),
+  createAutomation: (data: any) => api.post('/system/automation', data),
+  updateAutomation: (id: string, data: any) => api.put(`/system/automation/${id}`, data),
+  deleteAutomation: (id: string) => api.delete(`/system/automation/${id}`),
+  toggleAutomation: (id: string) => api.patch(`/system/automation/${id}/toggle`),
+  executeAutomation: (id: string) => api.post(`/system/automation/${id}/execute`),
+  getHistory: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/system/automation/${id}/history`, { params }),
+};
+
+// Templates (Platform Presets)
+export const templatesService = {
+  // Global stats
+  getStats: () => api.get('/templates/stats'),
+
+  // Link Templates
+  getLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) =>
+    api.get('/templates/links', { params }),
+  getLinkTemplateStats: () => api.get('/templates/links/stats'),
+  getLinkTemplate: (id: string) => api.get(`/templates/links/${id}`),
+  createLinkTemplate: (data: any) => api.post('/templates/links', data),
+  updateLinkTemplate: (id: string, data: any) => api.put(`/templates/links/${id}`, data),
+  deleteLinkTemplate: (id: string) => api.delete(`/templates/links/${id}`),
+  toggleLinkTemplate: (id: string) => api.patch(`/templates/links/${id}/toggle`),
+  reorderLinkTemplates: (items: { id: string; sortOrder: number }[]) =>
+    api.patch('/templates/links/reorder', { items }),
+
+  // UTM Templates
+  getUtmTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; platform?: string; status?: string }) =>
+    api.get('/templates/utm', { params }),
+  getUtmPlatforms: () => api.get('/templates/utm/platforms'),
+  getUtmTemplate: (id: string) => api.get(`/templates/utm/${id}`),
+  createUtmTemplate: (data: any) => api.post('/templates/utm', data),
+  updateUtmTemplate: (id: string, data: any) => api.put(`/templates/utm/${id}`, data),
+  deleteUtmTemplate: (id: string) => api.delete(`/templates/utm/${id}`),
+  seedUtmPlatforms: () => api.post('/templates/utm/seed-platforms'),
+
+  // Campaign Templates
+  getCampaignTemplates: (params?: { page?: number; limit?: number; search?: string; scenario?: string; status?: string }) =>
+    api.get('/templates/campaigns', { params }),
+  getCampaignScenarios: () => api.get('/templates/campaigns/scenarios'),
+  getCampaignTemplate: (id: string) => api.get(`/templates/campaigns/${id}`),
+  createCampaignTemplate: (data: any) => api.post('/templates/campaigns', data),
+  updateCampaignTemplate: (id: string, data: any) => api.put(`/templates/campaigns/${id}`, data),
+  deleteCampaignTemplate: (id: string) => api.delete(`/templates/campaigns/${id}`),
+
+  // Bio Link Templates
+  getBioLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; industry?: string; status?: string }) =>
+    api.get('/templates/bio-links', { params }),
+  getBioLinkIndustries: () => api.get('/templates/bio-links/industries'),
+  getBioLinkTemplate: (id: string) => api.get(`/templates/bio-links/${id}`),
+  getBioLinkTemplatePreview: (id: string) => api.get(`/templates/bio-links/${id}/preview`),
+  createBioLinkTemplate: (data: any) => api.post('/templates/bio-links', data),
+  updateBioLinkTemplate: (id: string, data: any) => api.put(`/templates/bio-links/${id}`, data),
+  deleteBioLinkTemplate: (id: string) => api.delete(`/templates/bio-links/${id}`),
+  toggleBioLinkTemplate: (id: string) => api.patch(`/templates/bio-links/${id}/toggle`),
+
+  // QR Styles
+  getQrStyles: (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) =>
+    api.get('/templates/qr-styles', { params }),
+  getQrStyle: (id: string) => api.get(`/templates/qr-styles/${id}`),
+  getQrStylePreview: (id: string) => api.get(`/templates/qr-styles/${id}/preview`),
+  createQrStyle: (data: any) => api.post('/templates/qr-styles', data),
+  updateQrStyle: (id: string, data: any) => api.put(`/templates/qr-styles/${id}`, data),
+  deleteQrStyle: (id: string) => api.delete(`/templates/qr-styles/${id}`),
+  toggleQrStyle: (id: string) => api.patch(`/templates/qr-styles/${id}/toggle`),
+  seedQrStyles: () => api.post('/templates/qr-styles/seed'),
+};

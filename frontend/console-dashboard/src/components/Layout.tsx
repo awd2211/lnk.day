@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { SHORT_LINK_DOMAIN } from '@/lib/config';
 import {
   LayoutDashboard,
   Users,
@@ -36,6 +37,17 @@ import {
   Database,
   AlertTriangle,
   Workflow,
+  Palette,
+  FileType,
+  Tag,
+  Layers,
+  UserSquare,
+  KeyRound,
+  ScanLine,
+  FlaskConical,
+  Target,
+  GitBranch,
+  Activity,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -81,6 +93,9 @@ const navigationGroups: NavGroup[] = [
       { name: '深度链接', href: '/deep-links', icon: Smartphone },
       { name: '落地页', href: '/pages', icon: LayoutIcon },
       { name: '域名管理', href: '/domains', icon: Globe },
+      { name: '重定向规则', href: '/redirect-rules', icon: GitBranch },
+      { name: '标签管理', href: '/tags', icon: Tag },
+      { name: '文件夹', href: '/folders', icon: Layers },
     ],
   },
   {
@@ -88,6 +103,9 @@ const navigationGroups: NavGroup[] = [
     icon: BarChart3,
     items: [
       { name: '数据分析', href: '/analytics', icon: BarChart3 },
+      { name: '实时数据', href: '/realtime', icon: Activity },
+      { name: 'A/B 测试', href: '/ab-tests', icon: FlaskConical },
+      { name: '目标转化', href: '/goals', icon: Target },
       { name: '数据导出', href: '/export', icon: Download },
     ],
   },
@@ -117,6 +135,19 @@ const navigationGroups: NavGroup[] = [
       { name: '审计日志', href: '/audit-logs', icon: FileText },
       { name: '告警管理', href: '/alerts', icon: Bell },
       { name: '告警规则', href: '/alert-rules', icon: AlertTriangle },
+      { name: 'SSO 配置', href: '/sso-config', icon: KeyRound },
+      { name: '安全扫描', href: '/security-scan', icon: ScanLine },
+    ],
+  },
+  {
+    name: '模板预设',
+    icon: FileType,
+    items: [
+      { name: '链接模板', href: '/templates/links', icon: Link2 },
+      { name: 'UTM 模板', href: '/templates/utm', icon: Tag },
+      { name: '活动模板', href: '/templates/campaigns', icon: Megaphone },
+      { name: 'Bio Link 模板', href: '/templates/bio-links', icon: UserSquare },
+      { name: 'QR 码样式', href: '/templates/qr-styles', icon: Palette },
     ],
   },
   {
@@ -258,7 +289,7 @@ export default function Layout() {
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 w-64 border-r bg-white flex flex-col">
         <div className="flex h-16 items-center border-b px-6 shrink-0">
-          <span className="text-xl font-bold text-primary">lnk.day Console</span>
+          <span className="text-xl font-bold text-primary">{SHORT_LINK_DOMAIN} Console</span>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-2">

@@ -37,6 +37,7 @@ import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
+import { formatShortUrl } from '@/lib/config';
 import { Badge } from '@/components/ui/badge';
 import { dashboardService, subscriptionsService } from '@/lib/api';
 
@@ -425,7 +426,7 @@ export default function DashboardPage() {
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-primary">lnk.day/{link.shortCode}</p>
+                    <p className="truncate font-medium text-primary">{formatShortUrl(link.shortCode)}</p>
                     <p className="truncate text-xs text-gray-500">{link.originalUrl}</p>
                   </div>
                   <div className="text-right">

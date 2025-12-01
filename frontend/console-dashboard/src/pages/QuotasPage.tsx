@@ -138,7 +138,7 @@ export default function QuotasPage() {
   const { data: quotasData, isLoading } = useQuery({
     queryKey: ['admin-quotas', searchQuery, filterPlan],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/quotas', {
+      const response = await api.get('/system/quotas', {
         params: {
           search: searchQuery || undefined,
           plan: filterPlan !== 'all' ? filterPlan : undefined,
@@ -152,7 +152,7 @@ export default function QuotasPage() {
   const { data: plansData } = useQuery({
     queryKey: ['plan-templates'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/plans');
+      const response = await api.get('/system/plans');
       return response.data;
     },
   });
@@ -161,7 +161,7 @@ export default function QuotasPage() {
   const { data: statsData } = useQuery({
     queryKey: ['quota-stats'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/quotas/stats');
+      const response = await api.get('/system/quotas/stats');
       return response.data;
     },
   });
@@ -179,7 +179,7 @@ export default function QuotasPage() {
   // Update quota mutation
   const updateQuotaMutation = useMutation({
     mutationFn: async ({ teamId, quotas }: { teamId: string; quotas: Record<string, number> }) => {
-      const response = await api.put(`/api/v1/system/quotas/${teamId}`, { quotas });
+      const response = await api.put(`/system/quotas/${teamId}`, { quotas });
       return response.data;
     },
     onSuccess: () => {
@@ -196,7 +196,7 @@ export default function QuotasPage() {
   // Reset quota mutation
   const resetQuotaMutation = useMutation({
     mutationFn: async (teamId: string) => {
-      const response = await api.post(`/api/v1/system/quotas/${teamId}/reset`);
+      const response = await api.post(`/system/quotas/${teamId}/reset`);
       return response.data;
     },
     onSuccess: () => {

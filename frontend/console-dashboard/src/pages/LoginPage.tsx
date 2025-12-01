@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
+import { SHORT_LINK_DOMAIN } from '@/lib/config';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">lnk.day Console</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{SHORT_LINK_DOMAIN} Console</h1>
           <p className="mt-2 text-sm text-gray-600">管理后台登录</p>
         </div>
 

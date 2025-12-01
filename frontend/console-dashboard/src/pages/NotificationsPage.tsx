@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHORT_LINK_DOMAIN } from '@/lib/config';
 import {
   Search,
   RefreshCw,
@@ -753,7 +754,7 @@ export default function NotificationsPage() {
                   </div>
                   <div>
                     <Label>发件人名称</Label>
-                    <Input defaultValue={selectedChannel.config?.fromName} placeholder="lnk.day" />
+                    <Input defaultValue={selectedChannel.config?.fromName} placeholder={SHORT_LINK_DOMAIN} />
                   </div>
                 </>
               )}
@@ -777,7 +778,7 @@ export default function NotificationsPage() {
                   </div>
                   <div>
                     <Label>签名</Label>
-                    <Input defaultValue={selectedChannel.config?.signName} placeholder="lnk.day" />
+                    <Input defaultValue={selectedChannel.config?.signName} placeholder={SHORT_LINK_DOMAIN} />
                   </div>
                 </>
               )}

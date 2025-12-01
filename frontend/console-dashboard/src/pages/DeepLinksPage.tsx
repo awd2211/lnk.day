@@ -58,6 +58,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { deepLinksService, proxyService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
+import { formatShortUrl } from '@/lib/config';
 
 // Admin oversight types
 type DeepLinkStatus = 'active' | 'disabled' | 'blocked' | 'flagged';
@@ -230,7 +231,7 @@ export default function DeepLinksPage() {
     return {
       ...item,
       status,
-      shortUrl: item.shortUrl || (item.shortCode ? `lnk.day/${item.shortCode}` : item.linkId),
+      shortUrl: item.shortUrl || (item.shortCode ? formatShortUrl(item.shortCode) : item.linkId),
       teamName: item.teamName || teamNameMap[item.teamId] || (item.teamId ? `团队 ${item.teamId.slice(0, 8)}` : '-'),
       ownerName: item.ownerName || item.userName || (item.userId ? `用户 ${item.userId.slice(0, 8)}` : '-'),
       ownerEmail: item.ownerEmail || item.userEmail,

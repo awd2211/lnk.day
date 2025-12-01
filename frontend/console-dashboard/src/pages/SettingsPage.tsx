@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { systemService } from '@/lib/api';
+import { SHORT_LINK_DOMAIN } from '@/lib/config';
 
 interface SystemConfig {
   general: {
@@ -105,9 +106,9 @@ interface SystemConfig {
 
 const defaultConfig: SystemConfig = {
   general: {
-    siteName: 'lnk.day',
-    defaultDomain: 'lnk.day',
-    supportEmail: 'support@lnk.day',
+    siteName: SHORT_LINK_DOMAIN,
+    defaultDomain: SHORT_LINK_DOMAIN,
+    supportEmail: `support@${SHORT_LINK_DOMAIN}`,
     timezone: 'Asia/Shanghai',
     language: 'zh-CN',
   },
@@ -120,8 +121,8 @@ const defaultConfig: SystemConfig = {
   },
   email: {
     provider: 'smtp',
-    fromName: 'lnk.day',
-    fromEmail: 'noreply@lnk.day',
+    fromName: SHORT_LINK_DOMAIN,
+    fromEmail: `noreply@${SHORT_LINK_DOMAIN}`,
     smtp: {
       host: '',
       port: 587,
@@ -225,8 +226,8 @@ export default function SettingsPage() {
           ...configData,
           email: emailData ? {
             provider: emailData.provider || 'smtp',
-            fromName: emailData.fromName || 'lnk.day',
-            fromEmail: emailData.fromEmail || 'noreply@lnk.day',
+            fromName: emailData.fromName || SHORT_LINK_DOMAIN,
+            fromEmail: emailData.fromEmail || `noreply@${SHORT_LINK_DOMAIN}`,
             smtp: emailData.smtp || defaultConfig.email.smtp,
             mailgun: emailData.mailgun || defaultConfig.email.mailgun,
           } : defaultConfig.email,

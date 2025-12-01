@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { buildShortUrl, formatShortUrl } from '@/lib/config';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -289,7 +290,7 @@ export default function LinksPage() {
   const teams = teamsData?.data?.items || teamsData?.data || [];
 
   const handleCopy = (shortCode: string, id: string) => {
-    navigator.clipboard.writeText(`https://lnk.day/${shortCode}`);
+    navigator.clipboard.writeText(buildShortUrl(shortCode));
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -328,7 +329,7 @@ export default function LinksPage() {
 
   const prepareExportData = () => {
     return links.map((link) => ({
-      shortCode: `lnk.day/${link.shortCode}`,
+      shortCode: formatShortUrl(link.shortCode),
       originalUrl: link.originalUrl,
       title: link.title || '',
       clicks: link.clicks,
@@ -851,7 +852,7 @@ export default function LinksPage() {
           <SheetHeader>
             <SheetTitle>链接详情</SheetTitle>
             <SheetDescription>
-              lnk.day/{selectedLink?.shortCode}
+              {selectedLink?.shortCode ? formatShortUrl(selectedLink.shortCode) : ''}
             </SheetDescription>
           </SheetHeader>
           {selectedLink && (
@@ -866,7 +867,7 @@ export default function LinksPage() {
                   <label className="text-sm text-gray-500">短链接</label>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="flex-1 rounded bg-gray-100 px-3 py-2 text-sm">
-                      https://lnk.day/{selectedLink.shortCode}
+                      {buildShortUrl(selectedLink.shortCode)}
                     </code>
                     <Button
                       variant="outline"

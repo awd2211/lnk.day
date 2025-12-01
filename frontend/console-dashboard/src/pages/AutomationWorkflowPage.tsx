@@ -182,7 +182,7 @@ export default function AutomationWorkflowPage() {
   const { data: workflowsData, isLoading } = useQuery({
     queryKey: ['automation-workflows', searchQuery, filterTrigger, filterStatus],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/automation', {
+      const response = await api.get('/system/automation', {
         params: {
           search: searchQuery || undefined,
           trigger: filterTrigger !== 'all' ? filterTrigger : undefined,
@@ -198,7 +198,7 @@ export default function AutomationWorkflowPage() {
     queryKey: ['automation-logs', selectedWorkflowLogs?.id],
     queryFn: async () => {
       if (!selectedWorkflowLogs) return { data: [] };
-      const response = await api.get(`/api/v1/system/automation/${selectedWorkflowLogs.id}/logs`);
+      const response = await api.get(`/system/automation/${selectedWorkflowLogs.id}/logs`);
       return response.data;
     },
     enabled: !!selectedWorkflowLogs,
@@ -208,18 +208,18 @@ export default function AutomationWorkflowPage() {
   const { data: statsData } = useQuery({
     queryKey: ['automation-stats'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/automation/stats');
+      const response = await api.get('/system/automation/stats');
       return response.data;
     },
   });
 
-  const workflows: AutomationWorkflow[] = workflowsData?.data || [];
-  const logs: ExecutionLog[] = logsData?.data || [];
-  const stats = statsData || {
-    totalWorkflows: 18,
-    activeWorkflows: 15,
-    executionsToday: 234,
-    failedToday: 3,
+  const workflows: AutomationWorkflow[] = workflowsData?.items || [];
+  const logs: ExecutionLog[] = logsData?.items || [];
+  const stats = {
+    totalWorkflows: statsData?.total || 0,
+    activeWorkflows: statsData?.enabled || 0,
+    executionsToday: statsData?.last24h?.success || 0,
+    failedToday: statsData?.last24h?.failed || 0,
   };
 
   // Create workflow mutation
@@ -239,7 +239,7 @@ export default function AutomationWorkflowPage() {
         actions: data.actions.filter((a) => a.type),
         enabled: data.enabled,
       };
-      const response = await api.post('/api/v1/system/automation', payload);
+      const response = await api.post('/system/automation', payload);
       return response.data;
     },
     onSuccess: () => {
@@ -271,7 +271,7 @@ export default function AutomationWorkflowPage() {
         actions: data.actions.filter((a) => a.type),
         enabled: data.enabled,
       };
-      const response = await api.put(`/api/v1/system/automation/${id}`, payload);
+      const response = await api.put(`/system/automation/${id}`, payload);
       return response.data;
     },
     onSuccess: () => {
@@ -287,8 +287,8 @@ export default function AutomationWorkflowPage() {
 
   // Toggle workflow mutation
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const response = await api.patch(`/api/v1/system/automation/${id}/toggle`, { enabled });
+    mutationFn: async ({ id }: { id: string; enabled: boolean }) => {
+      const response = await api.post(`/system/automation/${id}/toggle`);
       return response.data;
     },
     onSuccess: () => {
@@ -303,7 +303,7 @@ export default function AutomationWorkflowPage() {
   // Run workflow mutation
   const runMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/api/v1/system/automation/${id}/run`);
+      const response = await api.post(`/system/automation/${id}/execute`);
       return response.data;
     },
     onSuccess: () => {
@@ -318,7 +318,7 @@ export default function AutomationWorkflowPage() {
   // Delete workflow mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/system/automation/${id}`);
+      await api.delete(`/system/automation/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['automation-workflows'] });

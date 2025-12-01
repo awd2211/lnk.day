@@ -81,32 +81,45 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 
+interface AlertRuleCondition {
+  metric: string;
+  operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte' | 'ne' | 'contains';
+  value: number | string;
+  duration?: number;
+}
+
 interface AlertRule {
   id: string;
   name: string;
   description?: string;
-  type: 'threshold' | 'anomaly' | 'pattern' | 'health';
-  metric: string;
-  condition: {
-    operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte';
-    value: number;
-    duration?: number;
-  };
-  severity: 'info' | 'warning' | 'critical';
+  type: 'threshold' | 'anomaly' | 'schedule' | 'event';
+  source?: string;
+  category?: string;
+  conditions: AlertRuleCondition[];
+  severity: 'low' | 'medium' | 'high' | 'critical';
   enabled: boolean;
-  channels: ('email' | 'slack' | 'webhook')[];
-  recipients?: string[];
-  cooldownMinutes: number;
-  lastTriggered?: string;
+  cooldownSeconds: number;
+  notificationChannels?: string[];
+  notificationConfig?: Record<string, any>;
+  createdBy?: string;
+  lastTriggeredAt?: string;
   triggerCount: number;
   createdAt: string;
+  updatedAt?: string;
+  // 兼容旧字段
+  condition?: AlertRuleCondition;
+  metric?: string;
+  channels?: string[];
+  recipients?: string[];
+  cooldownMinutes?: number;
+  lastTriggered?: string;
 }
 
 const ALERT_TYPES = [
   { value: 'threshold', label: '阈值告警', icon: TrendingUp, description: '当指标超过设定阈值时触发' },
   { value: 'anomaly', label: '异常检测', icon: Activity, description: '基于历史数据检测异常波动' },
-  { value: 'pattern', label: '模式匹配', icon: Zap, description: '当检测到特定模式时触发' },
-  { value: 'health', label: '健康检查', icon: Server, description: '服务健康状态监控' },
+  { value: 'schedule', label: '定时检查', icon: Zap, description: '按计划定期检查触发' },
+  { value: 'event', label: '事件触发', icon: Server, description: '基于特定事件触发告警' },
 ];
 
 const METRICS = [
@@ -132,8 +145,9 @@ const OPERATORS = [
 ];
 
 const SEVERITIES = [
-  { value: 'info', label: '信息', color: 'bg-blue-500' },
-  { value: 'warning', label: '警告', color: 'bg-orange-500' },
+  { value: 'low', label: '低', color: 'bg-blue-500' },
+  { value: 'medium', label: '中', color: 'bg-yellow-500' },
+  { value: 'high', label: '高', color: 'bg-orange-500' },
   { value: 'critical', label: '严重', color: 'bg-destructive' },
 ];
 
@@ -152,14 +166,14 @@ export default function AlertRulesPage() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    type: 'threshold' as AlertRule['type'],
+    type: 'threshold' as string,
     metric: '',
-    operator: 'gt' as AlertRule['condition']['operator'],
+    operator: 'gt' as string,
     value: 0,
     duration: 5,
-    severity: 'warning' as AlertRule['severity'],
+    severity: 'medium' as string,
     enabled: true,
-    channels: ['email'] as AlertRule['channels'],
+    channels: ['email'] as string[],
     recipients: '',
     cooldownMinutes: 15,
   });
@@ -168,7 +182,7 @@ export default function AlertRulesPage() {
   const { data: rulesData, isLoading } = useQuery({
     queryKey: ['alert-rules', searchQuery, filterType, filterSeverity],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/alert-rules', {
+      const response = await api.get('/alerts/rules', {
         params: {
           search: searchQuery || undefined,
           type: filterType !== 'all' ? filterType : undefined,
@@ -183,12 +197,12 @@ export default function AlertRulesPage() {
   const { data: statsData } = useQuery({
     queryKey: ['alert-rules-stats'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/system/alert-rules/stats');
+      const response = await api.get('/alerts/rules/stats');
       return response.data;
     },
   });
 
-  const rules: AlertRule[] = rulesData?.data || [];
+  const rules: AlertRule[] = rulesData?.rules || [];
   const stats = statsData || {
     totalRules: 24,
     activeRules: 18,
@@ -199,14 +213,23 @@ export default function AlertRulesPage() {
   // Create rule mutation
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await api.post('/api/v1/system/alert-rules', {
-        ...data,
-        condition: {
+      const response = await api.post('/alerts/rules', {
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        severity: data.severity,
+        enabled: data.enabled,
+        cooldownSeconds: data.cooldownMinutes * 60,
+        conditions: [{
+          metric: data.metric,
           operator: data.operator,
           value: data.value,
-          duration: data.duration,
+          duration: data.duration * 60, // 转换为秒
+        }],
+        notificationChannels: data.channels,
+        notificationConfig: {
+          recipients: data.recipients.split(',').map((r) => r.trim()).filter(Boolean),
         },
-        recipients: data.recipients.split(',').map((r) => r.trim()).filter(Boolean),
       });
       return response.data;
     },
@@ -225,14 +248,23 @@ export default function AlertRulesPage() {
   // Update rule mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const response = await api.put(`/api/v1/system/alert-rules/${id}`, {
-        ...data,
-        condition: {
+      const response = await api.put(`/alerts/rules/${id}`, {
+        name: data.name,
+        description: data.description,
+        type: data.type,
+        severity: data.severity,
+        enabled: data.enabled,
+        cooldownSeconds: data.cooldownMinutes * 60,
+        conditions: [{
+          metric: data.metric,
           operator: data.operator,
           value: data.value,
-          duration: data.duration,
+          duration: data.duration * 60,
+        }],
+        notificationChannels: data.channels,
+        notificationConfig: {
+          recipients: data.recipients.split(',').map((r) => r.trim()).filter(Boolean),
         },
-        recipients: data.recipients.split(',').map((r) => r.trim()).filter(Boolean),
       });
       return response.data;
     },
@@ -250,7 +282,7 @@ export default function AlertRulesPage() {
   // Toggle rule mutation
   const toggleMutation = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const response = await api.patch(`/api/v1/system/alert-rules/${id}/toggle`, { enabled });
+      const response = await api.patch(`/alerts/rules/${id}/toggle`, { enabled });
       return response.data;
     },
     onSuccess: () => {
@@ -265,7 +297,7 @@ export default function AlertRulesPage() {
   // Delete rule mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/system/alert-rules/${id}`);
+      await api.delete(`/alerts/rules/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
@@ -288,7 +320,7 @@ export default function AlertRulesPage() {
       operator: 'gt',
       value: 0,
       duration: 5,
-      severity: 'warning',
+      severity: 'medium',
       enabled: true,
       channels: ['email'],
       recipients: '',
@@ -301,20 +333,26 @@ export default function AlertRulesPage() {
     setCreateDialogOpen(true);
   };
 
-  const handleOpenEdit = (rule: AlertRule) => {
+  const handleOpenEdit = (rule: any) => {
+    // 适配后端数据格式
+    const condition = rule.conditions?.[0] || rule.condition || {};
+    const channels = rule.notificationChannels || rule.channels || [];
+    const recipients = rule.notificationConfig?.recipients || rule.recipients || [];
+    const cooldownMinutes = rule.cooldownSeconds ? Math.round(rule.cooldownSeconds / 60) : (rule.cooldownMinutes || 15);
+
     setFormData({
       name: rule.name,
       description: rule.description || '',
       type: rule.type,
-      metric: rule.metric,
-      operator: rule.condition.operator,
-      value: rule.condition.value,
-      duration: rule.condition.duration || 5,
-      severity: rule.severity,
+      metric: condition.metric || '',
+      operator: condition.operator || 'gt',
+      value: condition.value || 0,
+      duration: condition.duration ? Math.round(condition.duration / 60) : 5,
+      severity: rule.severity || 'medium',
       enabled: rule.enabled,
-      channels: rule.channels,
-      recipients: rule.recipients?.join(', ') || '',
-      cooldownMinutes: rule.cooldownMinutes,
+      channels: channels,
+      recipients: recipients.join(', '),
+      cooldownMinutes: cooldownMinutes,
     });
     setEditingRule(rule);
   };
@@ -351,8 +389,13 @@ export default function AlertRulesPage() {
     switch (severity) {
       case 'critical':
         return <Badge variant="destructive">严重</Badge>;
+      case 'high':
+        return <Badge className="bg-red-400">高</Badge>;
       case 'warning':
+      case 'medium':
         return <Badge className="bg-orange-500">警告</Badge>;
+      case 'low':
+      case 'info':
       default:
         return <Badge variant="secondary">信息</Badge>;
     }
@@ -528,12 +571,12 @@ export default function AlertRulesPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {METRICS.find((m) => m.value === rule.metric)?.label || rule.metric}
+                        {METRICS.find((m) => m.value === (rule.conditions?.[0]?.metric || rule.metric))?.label || rule.conditions?.[0]?.metric || rule.metric || '-'}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <code className="text-xs bg-muted px-2 py-1 rounded">
-                        {OPERATORS.find((o) => o.value === rule.condition.operator)?.label} {rule.condition.value}
+                        {OPERATORS.find((o) => o.value === (rule.conditions?.[0]?.operator || rule.condition?.operator))?.label} {rule.conditions?.[0]?.value || rule.condition?.value}
                       </code>
                     </TableCell>
                     <TableCell>{getSeverityBadge(rule.severity)}</TableCell>
@@ -547,10 +590,10 @@ export default function AlertRulesPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <span className="font-medium">{rule.triggerCount}</span>
-                        {rule.lastTriggered && (
+                        <span className="font-medium">{rule.triggerCount || 0}</span>
+                        {(rule.lastTriggeredAt || rule.lastTriggered) && (
                           <p className="text-xs text-muted-foreground">
-                            上次: {new Date(rule.lastTriggered).toLocaleString()}
+                            上次: {new Date(rule.lastTriggeredAt ?? rule.lastTriggered ?? '').toLocaleString()}
                           </p>
                         )}
                       </div>
@@ -704,7 +747,7 @@ export default function AlertRulesPage() {
                   <Label>比较运算符</Label>
                   <Select
                     value={formData.operator}
-                    onValueChange={(v) => setFormData({ ...formData, operator: v as AlertRule['condition']['operator'] })}
+                    onValueChange={(v) => setFormData({ ...formData, operator: v as AlertRuleCondition['operator'] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
