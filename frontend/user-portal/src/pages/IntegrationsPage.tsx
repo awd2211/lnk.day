@@ -257,11 +257,11 @@ function NotificationChannelCard({
         </div>
 
         <div className="flex flex-wrap gap-1 mt-3">
-          {channel.events.slice(0, 3).map((event, index) => (
+          {(channel.events || []).slice(0, 3).map((event, index) => (
             <Badge key={index} variant="secondary" className="text-xs">{event}</Badge>
           ))}
-          {channel.events.length > 3 && (
-            <Badge variant="secondary" className="text-xs">+{channel.events.length - 3}</Badge>
+          {(channel.events?.length || 0) > 3 && (
+            <Badge variant="secondary" className="text-xs">+{channel.events!.length - 3}</Badge>
           )}
         </div>
 

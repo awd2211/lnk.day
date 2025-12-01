@@ -66,7 +66,7 @@ export function useAuditLogs(filters: AuditLogFilters = {}, page: number = 1, li
         total: number;
         page: number;
         totalPages: number;
-      }>(`/audit/logs?${params.toString()}`);
+      }>(`/api/v1/audit/logs?${params.toString()}`);
       return response.data;
     },
   });
@@ -76,7 +76,7 @@ export function useAuditLogStats(days: number = 7) {
   return useQuery({
     queryKey: ['audit-logs', 'stats', days],
     queryFn: async () => {
-      const response = await api.get<AuditLogStats>(`/audit/stats?days=${days}`);
+      const response = await api.get<AuditLogStats>(`/api/v1/audit/stats?days=${days}`);
       return response.data;
     },
   });
@@ -87,7 +87,7 @@ export function useLoginHistory(userId?: string) {
     queryKey: ['audit-logs', 'logins', userId],
     queryFn: async () => {
       const params = userId ? `?userId=${userId}` : '';
-      const response = await api.get<AuditLog[]>(`/audit/logins${params}`);
+      const response = await api.get<AuditLog[]>(`/api/v1/audit/logins${params}`);
       return response.data;
     },
   });
@@ -97,7 +97,7 @@ export function useAuditLogActions() {
   return useQuery({
     queryKey: ['audit-logs', 'actions'],
     queryFn: async () => {
-      const response = await api.get<{ action: string; label: string; category: string }[]>('/audit/actions');
+      const response = await api.get<{ action: string; label: string; category: string }[]>('/api/v1/audit/actions');
       return response.data;
     },
   });

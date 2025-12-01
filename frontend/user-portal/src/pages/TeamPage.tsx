@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Users, UserPlus, Settings, CreditCard, Building } from 'lucide-react';
 
 import Layout from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
+import { userService } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -46,8 +47,14 @@ export default function TeamPage() {
 
   // Queries
   const { data: team, isLoading: isLoadingTeam } = useCurrentTeam();
-  const { data: members, isLoading: isLoadingMembers } = useTeamMembers(team?.id);
-  const { data: invitations, isLoading: isLoadingInvitations } = useTeamInvitations(team?.id);
+  // 个人工作区不需要获取成员和邀请列表
+  const isPersonalWorkspace = team?.isPersonal === true;
+  const { data: members, isLoading: isLoadingMembers } = useTeamMembers(
+    isPersonalWorkspace ? undefined : team?.id
+  );
+  const { data: invitations, isLoading: isLoadingInvitations } = useTeamInvitations(
+    isPersonalWorkspace ? undefined : team?.id
+  );
 
   // Mutations
   const inviteMember = useInviteMember();
@@ -62,13 +69,35 @@ export default function TeamPage() {
   const currentUserId = user?.id || '';
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
+  // 同步团队名称到本地状态
+  useEffect(() => {
+    if (team?.name && !teamName) {
+      setTeamName(team.name);
+    }
+  }, [team?.name]);
+
   // Handlers
   const handleInvite = async (email: string, role: string) => {
     if (!team) return;
     try {
-      await inviteMember.mutateAsync({ teamId: team.id, email, role });
+      // 如果是个人工作区，需要先创建团队
+      let teamId = team.id;
+      if (isPersonalWorkspace) {
+        // 创建团队（使用用户名作为团队名）
+        const teamName = `${user?.name || '我'}的团队`;
+        const { data: newTeam } = await userService.createTeam({ name: teamName });
+        teamId = newTeam.id;
+        toast({ title: '团队已创建', description: `已创建团队 "${teamName}"` });
+      }
+
+      await inviteMember.mutateAsync({ teamId, email, role });
       setShowInviteDialog(false);
       toast({ title: '邀请已发送', description: `已向 ${email} 发送邀请` });
+
+      // 如果是新创建的团队，刷新页面数据
+      if (isPersonalWorkspace) {
+        window.location.reload();
+      }
     } catch (error: any) {
       toast({
         title: '邀请失败',
@@ -139,7 +168,7 @@ export default function TeamPage() {
           <h1 className="text-2xl font-bold">团队管理</h1>
           <p className="text-muted-foreground">管理您的团队成员和设置</p>
         </div>
-        {isAdmin && (
+        {isAdmin && !isPersonalWorkspace && (
           <Button onClick={() => setShowInviteDialog(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
             邀请成员
@@ -197,73 +226,149 @@ export default function TeamPage() {
         </TabsList>
 
         <TabsContent value="members" className="space-y-6">
-          {/* Pending Invitations */}
-          <PendingInvitations
-            invitations={invitations || []}
-            isLoading={isLoadingInvitations}
-            onResend={handleResendInvitation}
-            onCancel={handleCancelInvitation}
-            isResending={resendInvitation.isPending}
-            isCancelling={cancelInvitation.isPending}
-          />
+          {isPersonalWorkspace ? (
+            <>
+              {/* 个人工作区也可以邀请成员 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">邀请成员</CardTitle>
+                  <CardDescription>通过邮箱邀请成员加入您的工作区</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="py-6 text-center">
+                    <Users className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <h3 className="mt-4 text-lg font-medium">邀请团队成员</h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      邀请成员一起管理链接、查看分析数据，并为他们分配合适的权限
+                    </p>
+                    <Button className="mt-4" onClick={() => setShowInviteDialog(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      邀请成员
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Team Members */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">团队成员</CardTitle>
-              <CardDescription>管理您团队中的成员及其权限</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TeamMemberList
-                members={members || []}
-                isLoading={isLoadingMembers}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-                onUpdateRole={handleUpdateRole}
-                onRemove={handleRemoveMember}
+              {/* 当前成员（只有自己） */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">工作区成员</CardTitle>
+                  <CardDescription>当前工作区的成员列表</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <span className="text-sm font-medium text-primary">
+                          {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{user?.name || '我'}</p>
+                        <p className="text-sm text-muted-foreground">{user?.email}</p>
+                      </div>
+                    </div>
+                    <Badge>所有者</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Pending Invitations */}
+              <PendingInvitations
+                invitations={invitations || []}
+                isLoading={isLoadingInvitations}
+                onResend={handleResendInvitation}
+                onCancel={handleCancelInvitation}
+                isResending={resendInvitation.isPending}
+                isCancelling={cancelInvitation.isPending}
               />
-            </CardContent>
-          </Card>
+
+              {/* Team Members */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">团队成员</CardTitle>
+                  <CardDescription>管理您团队中的成员及其权限</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TeamMemberList
+                    members={members || []}
+                    isLoading={isLoadingMembers}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
+                    onUpdateRole={handleUpdateRole}
+                    onRemove={handleRemoveMember}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">团队设置</CardTitle>
-              <CardDescription>更新您的团队信息</CardDescription>
+              <CardTitle className="text-lg">
+                {isPersonalWorkspace ? '工作区设置' : '团队设置'}
+              </CardTitle>
+              <CardDescription>
+                {isPersonalWorkspace ? '管理您的个人工作区' : '更新您的团队信息'}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="max-w-md space-y-4">
-                <div>
-                  <Label htmlFor="teamName">团队名称</Label>
-                  <Input
-                    id="teamName"
-                    value={teamName || team?.name || ''}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="输入团队名称"
-                    className="mt-1"
-                  />
+              {isPersonalWorkspace ? (
+                <div className="max-w-md space-y-4">
+                  <div>
+                    <Label>工作区类型</Label>
+                    <p className="mt-1 text-sm text-muted-foreground">个人工作区</p>
+                  </div>
+                  <div>
+                    <Label>所有者</Label>
+                    <p className="mt-1 text-sm text-muted-foreground">{team?.owner?.email || user?.email}</p>
+                  </div>
+                  <div>
+                    <Label>创建时间</Label>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {team?.createdAt ? new Date(team.createdAt).toLocaleDateString('zh-CN') : '-'}
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="max-w-md space-y-4">
+                    <div>
+                      <Label htmlFor="teamName">团队名称</Label>
+                      <Input
+                        id="teamName"
+                        value={teamName || team?.name || ''}
+                        onChange={(e) => setTeamName(e.target.value)}
+                        placeholder="输入团队名称"
+                        className="mt-1"
+                      />
+                    </div>
 
-                <Button
-                  onClick={handleSaveSettings}
-                  disabled={isSavingSettings || !teamName.trim()}
-                >
-                  {isSavingSettings ? '保存中...' : '保存更改'}
-                </Button>
-              </div>
+                    <Button
+                      onClick={handleSaveSettings}
+                      disabled={isSavingSettings || !teamName.trim()}
+                    >
+                      {isSavingSettings ? '保存中...' : '保存更改'}
+                    </Button>
+                  </div>
 
-              <Separator />
+                  <Separator />
 
-              <div className="space-y-4">
-                <h3 className="font-medium text-destructive">危险区域</h3>
-                <p className="text-sm text-muted-foreground">
-                  删除团队后，所有团队数据将被永久删除且无法恢复。
-                </p>
-                <Button variant="destructive" disabled>
-                  删除团队
-                </Button>
-              </div>
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-destructive">危险区域</h3>
+                    <p className="text-sm text-muted-foreground">
+                      删除团队后，所有团队数据将被永久删除且无法恢复。
+                    </p>
+                    <Button variant="destructive" disabled>
+                      删除团队
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

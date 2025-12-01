@@ -181,7 +181,7 @@ export function useGoals(campaignId?: string) {
     queryKey: ['goals', { campaignId }],
     queryFn: async () => {
       const params = campaignId ? `?campaignId=${campaignId}` : '';
-      const response = await api.get<Goal[]>(`/goals${params}`);
+      const response = await api.get<Goal[]>(`/api/v1/goals${params}`);
       return response.data;
     },
   });
@@ -191,7 +191,7 @@ export function useGoal(id: string) {
   return useQuery({
     queryKey: ['goals', id],
     queryFn: async () => {
-      const response = await api.get<Goal>(`/goals/${id}`);
+      const response = await api.get<Goal>(`/api/v1/goals/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -202,7 +202,7 @@ export function useGoalStats() {
   return useQuery({
     queryKey: ['goals', 'stats'],
     queryFn: async () => {
-      const response = await api.get<GoalStats>('/goals/stats');
+      const response = await api.get<GoalStats>('/api/v1/goals/stats');
       return response.data;
     },
   });
@@ -213,7 +213,7 @@ export function useCreateGoal() {
 
   return useMutation({
     mutationFn: async (data: CreateGoalDto) => {
-      const response = await api.post<Goal>('/goals', data);
+      const response = await api.post<Goal>('/api/v1/goals', data);
       return response.data;
     },
     onSuccess: () => {
@@ -227,7 +227,7 @@ export function useUpdateGoal() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateGoalDto }) => {
-      const response = await api.patch<Goal>(`/goals/${id}`, data);
+      const response = await api.patch<Goal>(`/api/v1/goals/${id}`, data);
       return response.data;
     },
     onSuccess: (_, { id }) => {
@@ -242,7 +242,7 @@ export function useDeleteGoal() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/goals/${id}`);
+      await api.delete(`/api/v1/goals/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
@@ -255,7 +255,7 @@ export function usePauseGoal() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<Goal>(`/goals/${id}/pause`);
+      const response = await api.post<Goal>(`/api/v1/goals/${id}/pause`);
       return response.data;
     },
     onSuccess: () => {
@@ -269,7 +269,7 @@ export function useResumeGoal() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<Goal>(`/goals/${id}/resume`);
+      const response = await api.post<Goal>(`/api/v1/goals/${id}/resume`);
       return response.data;
     },
     onSuccess: () => {
@@ -282,7 +282,7 @@ export function useGoalHistory(id: string) {
   return useQuery({
     queryKey: ['goals', id, 'history'],
     queryFn: async () => {
-      const response = await api.get<GoalHistory[]>(`/goals/${id}/history`);
+      const response = await api.get<GoalHistory[]>(`/api/v1/goals/${id}/history`);
       return response.data;
     },
     enabled: !!id,
@@ -298,7 +298,7 @@ export function useGoalProjection(goalId: string) {
   return useQuery({
     queryKey: ['goals', goalId, 'projection'],
     queryFn: async () => {
-      const response = await api.get<GoalProjection & { daysRemaining?: number }>(`/goals/${goalId}/projection`);
+      const response = await api.get<GoalProjection & { daysRemaining?: number }>(`/api/v1/goals/${goalId}/projection`);
       return response.data;
     },
     enabled: !!goalId,
@@ -313,7 +313,7 @@ export function useGoalTrends(goalId: string, period: 'day' | 'week' | 'month' =
   return useQuery({
     queryKey: ['goals', goalId, 'trends', period],
     queryFn: async () => {
-      const response = await api.get<GoalTrendPoint[]>(`/goals/${goalId}/trends?period=${period}`);
+      const response = await api.get<GoalTrendPoint[]>(`/api/v1/goals/${goalId}/trends?period=${period}`);
       return response.data;
     },
     enabled: !!goalId,
@@ -327,7 +327,7 @@ export function useCompareGoals(goalId1: string, goalId2: string) {
   return useQuery({
     queryKey: ['goals', 'compare', goalId1, goalId2],
     queryFn: async () => {
-      const response = await api.get<GoalComparisonResult>(`/goals/compare?goal1=${goalId1}&goal2=${goalId2}`);
+      const response = await api.get<GoalComparisonResult>(`/api/v1/goals/compare?goal1=${goalId1}&goal2=${goalId2}`);
       return response.data;
     },
     enabled: !!goalId1 && !!goalId2,
@@ -342,7 +342,7 @@ export function useTeamGoalStats(teamId?: string) {
     queryKey: ['goals', 'team-stats', teamId],
     queryFn: async () => {
       const params = teamId ? `?teamId=${teamId}` : '';
-      const response = await api.get<GoalStats>(`/goals/team-stats${params}`);
+      const response = await api.get<GoalStats>(`/api/v1/goals/team-stats${params}`);
       return response.data;
     },
   });
@@ -356,7 +356,7 @@ export function useUpdateGoalProgress() {
 
   return useMutation({
     mutationFn: async ({ goalId, value, source }: { goalId: string; value: number; source?: string }) => {
-      const response = await api.post<Goal>(`/goals/${goalId}/progress`, { value, source });
+      const response = await api.post<Goal>(`/api/v1/goals/${goalId}/progress`, { value, source });
       return response.data;
     },
     onSuccess: (_, { goalId }) => {
@@ -374,7 +374,7 @@ export function useRecalculateProjection() {
 
   return useMutation({
     mutationFn: async (goalId: string) => {
-      const response = await api.post<GoalProjection>(`/goals/${goalId}/projection/recalculate`);
+      const response = await api.post<GoalProjection>(`/api/v1/goals/${goalId}/projection/recalculate`);
       return response.data;
     },
     onSuccess: (_, goalId) => {

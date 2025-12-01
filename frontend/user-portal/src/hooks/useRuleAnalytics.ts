@@ -100,7 +100,7 @@ export function useRuleAnalytics(
     queryKey: ['rule-analytics', linkId, options],
     queryFn: async () => {
       const { data } = await api.get<RuleAnalyticsResult>(
-        `/links/${linkId}/redirect-rules/analytics`,
+        `/api/v1/links/${linkId}/redirect-rules/analytics`,
         {
           params: {
             startDate: options?.startDate,
@@ -131,7 +131,7 @@ export function useRuleStats(linkId: string) {
           matchCount: number;
           lastMatchedAt?: string;
         }>;
-      }>(`/links/${linkId}/redirect-rules/stats`);
+      }>(`/api/v1/links/${linkId}/redirect-rules/stats`);
       return data;
     },
     enabled: !!linkId,
@@ -146,7 +146,7 @@ export function useRuleMatchHistory(ruleId: string, days: number = 30) {
     queryKey: ['rule-history', ruleId, days],
     queryFn: async () => {
       const { data } = await api.get<RuleMatchHistory>(
-        `/redirect-rules/${ruleId}/history`,
+        `/api/v1/redirect-rules/${ruleId}/history`,
         {
           params: { days },
         },
@@ -176,7 +176,7 @@ export function useCompareRulePerformance() {
       period2End: string;
     }) => {
       const { data } = await api.post<RulePerformanceComparison>(
-        `/links/${linkId}/redirect-rules/compare`,
+        `/api/v1/links/${linkId}/redirect-rules/compare`,
         {
           period1Start,
           period1End,
@@ -197,8 +197,8 @@ export function useRulesWithPerformance(linkId: string) {
     queryKey: ['rules-performance', linkId],
     queryFn: async () => {
       const [rulesResponse, analyticsResponse] = await Promise.all([
-        api.get(`/links/${linkId}/redirect-rules`),
-        api.get<RuleAnalyticsResult>(`/links/${linkId}/redirect-rules/analytics`),
+        api.get(`/api/v1/links/${linkId}/redirect-rules`),
+        api.get<RuleAnalyticsResult>(`/api/v1/links/${linkId}/redirect-rules/analytics`),
       ]);
 
       // Merge rule data with performance metrics

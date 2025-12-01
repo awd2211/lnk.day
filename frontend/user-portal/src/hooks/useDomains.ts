@@ -43,7 +43,7 @@ export function useDomains() {
   return useQuery({
     queryKey: ['domains'],
     queryFn: async () => {
-      const { data } = await api.get('/domains');
+      const { data } = await api.get('/api/v1/domains');
       return data as CustomDomain[];
     },
   });
@@ -55,7 +55,7 @@ export function useDomain(id: string | null) {
     queryKey: ['domains', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/domains/${id}`);
+      const { data } = await api.get(`/api/v1/domains/${id}`);
       return data as CustomDomain;
     },
     enabled: !!id,
@@ -68,7 +68,7 @@ export function useDomainVerification(id: string | null) {
     queryKey: ['domains', id, 'verify'],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/domains/${id}/verify`);
+      const { data } = await api.get(`/api/v1/domains/${id}/verify`);
       return data as { isValid: boolean; errors: string[] };
     },
     enabled: !!id,
@@ -85,7 +85,7 @@ export function useAddDomain() {
 
   return useMutation({
     mutationFn: async (data: CreateDomainData) => {
-      const response = await api.post('/domains', data);
+      const response = await api.post('/api/v1/domains', data);
       return response.data as CustomDomain;
     },
     onSuccess: () => {
@@ -100,7 +100,7 @@ export function useUpdateDomain() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateDomainData }) => {
-      const response = await api.patch(`/domains/${id}`, data);
+      const response = await api.patch(`/api/v1/domains/${id}`, data);
       return response.data as CustomDomain;
     },
     onSuccess: (_, { id }) => {
@@ -116,7 +116,7 @@ export function useRemoveDomain() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/domains/${id}`);
+      await api.delete(`/api/v1/domains/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['domains'] });
@@ -130,7 +130,7 @@ export function useVerifyDomain() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/domains/${id}/verify`);
+      const response = await api.post(`/api/v1/domains/${id}/verify`);
       return response.data as CustomDomain;
     },
     onSuccess: (_, id) => {
@@ -146,7 +146,7 @@ export function useSetDefaultDomain() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/domains/${id}/set-default`);
+      const response = await api.post(`/api/v1/domains/${id}/set-default`);
       return response.data as CustomDomain;
     },
     onSuccess: () => {

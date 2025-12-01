@@ -374,7 +374,7 @@ export function useBioLinks() {
   return useQuery({
     queryKey: ['bio-links'],
     queryFn: async () => {
-      const { data } = await linkApi.get('/bio-links');
+      const { data } = await linkApi.get('/api/v1/bio-links');
       return data as BioLink[];
     },
   });
@@ -386,7 +386,7 @@ export function useBioLink(id: string | null) {
     queryKey: ['bio-links', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await linkApi.get(`/bio-links/${id}`);
+      const { data } = await linkApi.get(`/api/v1/bio-links/${id}`);
       return data as BioLink;
     },
     enabled: !!id,
@@ -399,7 +399,7 @@ export function useBioLinkBySlug(slug: string | null) {
     queryKey: ['bio-links', 'slug', slug],
     queryFn: async () => {
       if (!slug) return null;
-      const { data } = await linkApi.get(`/bio-links/slug/${slug}`);
+      const { data } = await linkApi.get(`/api/v1/bio-links/slug/${slug}`);
       return data as BioLink;
     },
     enabled: !!slug,
@@ -411,7 +411,7 @@ export function useBioLinkThemes() {
   return useQuery({
     queryKey: ['bio-links', 'themes'],
     queryFn: async () => {
-      const { data } = await linkApi.get('/bio-links/themes');
+      const { data } = await linkApi.get('/api/v1/bio-links/themes');
       return data as BioLinkTheme[];
     },
   });
@@ -423,7 +423,7 @@ export function useCreateBioLink() {
 
   return useMutation({
     mutationFn: async (data: CreateBioLinkData) => {
-      const response = await linkApi.post('/bio-links', data);
+      const response = await linkApi.post('/api/v1/bio-links', data);
       return response.data as BioLink;
     },
     onSuccess: () => {
@@ -438,7 +438,7 @@ export function useUpdateBioLink() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateBioLinkData }) => {
-      const response = await linkApi.put(`/bio-links/${id}`, data);
+      const response = await linkApi.put(`/api/v1/bio-links/${id}`, data);
       return response.data as BioLink;
     },
     onSuccess: (_, { id }) => {
@@ -454,7 +454,7 @@ export function useDeleteBioLink() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await linkApi.delete(`/bio-links/${id}`);
+      await linkApi.delete(`/api/v1/bio-links/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bio-links'] });
@@ -468,7 +468,7 @@ export function useToggleBioLinkPublish() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await linkApi.post(`/bio-links/${id}/toggle-publish`);
+      const response = await linkApi.post(`/api/v1/bio-links/${id}/toggle-publish`);
       return response.data as BioLink;
     },
     onSuccess: (_, id) => {

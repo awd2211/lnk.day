@@ -70,7 +70,7 @@ export function useCreateDeepLink() {
         fallbackUrl?: string;
         fallbackBehavior?: 'redirect' | 'app_store' | 'custom';
       };
-    }) => deepLinkService.create(linkId, data),
+    }) => deepLinkService.create({ linkId, ...data }),
     onSuccess: (_, { linkId }) => {
       queryClient.invalidateQueries({ queryKey: ['deep-links', linkId] });
     },

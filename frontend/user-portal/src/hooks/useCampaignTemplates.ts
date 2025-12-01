@@ -79,7 +79,7 @@ export function useCampaignTemplates(options?: { includeSystem?: boolean }) {
       if (options?.includeSystem) {
         params.append('includeSystem', 'true');
       }
-      const response = await api.get<CampaignTemplate[]>(`/campaigns/templates?${params.toString()}`);
+      const response = await api.get<CampaignTemplate[]>(`/api/v1/campaigns/templates?${params.toString()}`);
       return response.data;
     },
   });
@@ -90,7 +90,7 @@ export function useCampaignTemplate(id: string) {
   return useQuery({
     queryKey: ['campaign-templates', id],
     queryFn: async () => {
-      const response = await api.get<CampaignTemplate>(`/campaigns/templates/${id}`);
+      const response = await api.get<CampaignTemplate>(`/api/v1/campaigns/templates/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -102,7 +102,7 @@ export function useCampaignTemplateCategories() {
   return useQuery({
     queryKey: ['campaign-template-categories'],
     queryFn: async () => {
-      const response = await api.get<CampaignTemplateCategory[]>('/campaigns/templates/categories');
+      const response = await api.get<CampaignTemplateCategory[]>('/api/v1/campaigns/templates/categories');
       return response.data;
     },
   });
@@ -114,7 +114,7 @@ export function useCreateCampaignTemplate() {
 
   return useMutation({
     mutationFn: async (data: CreateCampaignTemplateDto) => {
-      const response = await api.post<CampaignTemplate>('/campaigns/templates', data);
+      const response = await api.post<CampaignTemplate>('/api/v1/campaigns/templates', data);
       return response.data;
     },
     onSuccess: () => {
@@ -134,7 +134,7 @@ export function useSaveCampaignAsTemplate() {
       description?: string;
       isPublic?: boolean;
     }) => {
-      const response = await api.post<CampaignTemplate>(`/campaigns/${campaignId}/save-as-template`, {
+      const response = await api.post<CampaignTemplate>(`/api/v1/campaigns/${campaignId}/save-as-template`, {
         name: templateName,
         description,
         isPublic,
@@ -153,7 +153,7 @@ export function useUpdateCampaignTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateCampaignTemplateDto> }) => {
-      const response = await api.patch<CampaignTemplate>(`/campaigns/templates/${id}`, data);
+      const response = await api.patch<CampaignTemplate>(`/api/v1/campaigns/templates/${id}`, data);
       return response.data;
     },
     onSuccess: (_, variables) => {
@@ -169,7 +169,7 @@ export function useDeleteCampaignTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/campaigns/templates/${id}`);
+      await api.delete(`/api/v1/campaigns/templates/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaign-templates'] });
@@ -183,7 +183,7 @@ export function useDuplicateCampaignTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<CampaignTemplate>(`/campaigns/templates/${id}/duplicate`);
+      const response = await api.post<CampaignTemplate>(`/api/v1/campaigns/templates/${id}/duplicate`);
       return response.data;
     },
     onSuccess: () => {
@@ -207,7 +207,7 @@ export function useCreateCampaignFromTemplate() {
         budget?: number;
       };
     }) => {
-      const response = await api.post(`/campaigns/templates/${templateId}/create-campaign`, overrides);
+      const response = await api.post(`/api/v1/campaigns/templates/${templateId}/create-campaign`, overrides);
       return response.data;
     },
     onSuccess: () => {

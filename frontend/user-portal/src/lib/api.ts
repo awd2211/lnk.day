@@ -177,7 +177,7 @@ export const qrApi = api;
 export const authService = {
   login: (email: string, password: string) => api.post('/api/v1/auth/login', { email, password }),
   register: (data: { name: string; email: string; password: string }) => api.post('/api/v1/auth/register', data),
-  refreshToken: (refreshToken: string) => api.post('/api/api/v1/auth/refresh', { refreshToken }),
+  refreshToken: (refreshToken: string) => api.post('/api/v1/auth/refresh', { refreshToken }),
   me: () => api.get('/api/v1/users/me'),
   updateProfile: (data: any) => api.put('/api/v1/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
@@ -196,26 +196,27 @@ export const authService = {
 export const linkService = {
   getAll: (params?: { page?: number; limit?: number; status?: string; search?: string; folderId?: string }) =>
     linkApi.get('/api/v1/links', { params }),
-  getOne: (id: string) => linkApi.get(`/api/links/${id}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/links/${id}`),
   create: (data: { originalUrl: string; customCode?: string; title?: string; tags?: string[] }) =>
     linkApi.post('/api/v1/links', data),
-  update: (id: string, data: any) => linkApi.put(`/api/links/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/links/${id}`),
-  getStats: (id: string) => linkApi.get(`/api/links/${id}/stats`),
+  update: (id: string, data: any) => linkApi.put(`/api/v1/links/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/links/${id}`),
+  getStats: (id: string) => linkApi.get(`/api/v1/links/${id}/stats`),
   bulkCreate: (links: Array<{ originalUrl: string; title?: string }>) =>
     linkApi.post('/api/v1/links/bulk', { links }),
   bulkOperation: (ids: string[], operation: string, data?: any) =>
     linkApi.post('/api/v1/links/bulk/operation', { ids, operation, ...data }),
 };
 
-// Analytics API
+// Analytics API (通过 api-gateway 代理到 analytics-service)
 export const analyticsService = {
-  getSummary: () => analyticsApi.get('/api/v1/analytics/summary'),
+  getSummary: () => analyticsApi.get('/api/v1/analytics/team'),
   getLinkAnalytics: (linkId: string, params?: { startDate?: string; endDate?: string }) =>
-    analyticsApi.get(`/api/analytics/links/${linkId}`, { params }),
+    analyticsApi.get(`/api/v1/analytics/link/${linkId}`, { params }),
   getTeamAnalytics: (params?: { startDate?: string; endDate?: string }) =>
     analyticsApi.get('/api/v1/analytics/team', { params }),
-  getRealtime: (linkId: string) => analyticsApi.get(`/api/analytics/links/${linkId}/realtime`),
+  getRealtime: (linkId: string) => analyticsApi.get(`/api/v1/analytics/realtime/${linkId}`),
+  getTeamRealtime: (teamId: string) => analyticsApi.get(`/api/v1/analytics/realtime/team/${teamId}`),
 };
 
 // QR Code API
@@ -251,10 +252,13 @@ export const qrService = {
   getContentTypes: () => qrApi.get('/api/v1/qr/content-types'),
 };
 
-// Deep Link API
+// Deep Link API (deeplink-service: 60008)
 export const deepLinkService = {
-  get: (linkId: string) => linkApi.get(`/api/links/${linkId}/deep-link`),
-  create: (linkId: string, data: {
+  getAll: (params?: { page?: number; limit?: number }) =>
+    api.get('/api/v1/deeplinks', { params }),
+  get: (id: string) => api.get(`/api/v1/deeplinks/${id}`),
+  create: (data: {
+    linkId?: string;
     iosConfig?: {
       appStoreId?: string;
       bundleId?: string;
@@ -269,44 +273,44 @@ export const deepLinkService = {
     };
     fallbackUrl?: string;
     fallbackBehavior?: 'redirect' | 'app_store' | 'custom';
-  }) => linkApi.post(`/api/links/${linkId}/deep-link`, data),
-  update: (linkId: string, data: any) => linkApi.put(`/api/links/${linkId}/deep-link`, data),
-  delete: (linkId: string) => linkApi.delete(`/api/links/${linkId}/deep-link`),
-  resolve: (linkId: string, userAgent?: string) =>
-    linkApi.post(`/api/links/${linkId}/deep-link/resolve`, { userAgent }),
+  }) => api.post('/api/v1/deeplinks', data),
+  update: (id: string, data: any) => api.put(`/api/v1/deeplinks/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/deeplinks/${id}`),
+  resolve: (id: string, userAgent?: string) =>
+    api.post(`/api/v1/deeplinks/${id}/resolve`, { userAgent }),
 };
 
 // A/B Test API
 export const abTestService = {
   getAll: (params?: { page?: number; limit?: number; status?: string }) =>
     linkApi.get('/api/v1/ab-tests', { params }),
-  getOne: (id: string) => linkApi.get(`/api/ab-tests/${id}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/ab-tests/${id}`),
   create: (data: {
     name: string;
     linkId: string;
     variants: Array<{ name: string; url: string; weight: number }>;
     targetMetric?: string;
   }) => linkApi.post('/api/v1/ab-tests', data),
-  update: (id: string, data: any) => linkApi.put(`/api/ab-tests/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/ab-tests/${id}`),
-  getStats: (id: string) => linkApi.get(`/api/ab-tests/${id}/stats`),
-  getComparison: (id: string) => linkApi.get(`/api/ab-tests/${id}/comparison`),
-  start: (id: string) => linkApi.post(`/api/ab-tests/${id}/start`),
-  pause: (id: string) => linkApi.post(`/api/ab-tests/${id}/pause`),
+  update: (id: string, data: any) => linkApi.put(`/api/v1/ab-tests/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/ab-tests/${id}`),
+  getStats: (id: string) => linkApi.get(`/api/v1/ab-tests/${id}/stats`),
+  getComparison: (id: string) => linkApi.get(`/api/v1/ab-tests/${id}/comparison`),
+  start: (id: string) => linkApi.post(`/api/v1/ab-tests/${id}/start`),
+  pause: (id: string) => linkApi.post(`/api/v1/ab-tests/${id}/pause`),
   complete: (id: string, winnerId?: string) =>
-    linkApi.post(`/api/ab-tests/${id}/complete`, { winnerId }),
+    linkApi.post(`/api/v1/ab-tests/${id}/complete`, { winnerId }),
 };
 
 // Folder API
 export const folderService = {
   getAll: () => linkApi.get('/api/v1/folders'),
   getTree: () => linkApi.get('/api/v1/folders/tree'),
-  getOne: (id: string) => linkApi.get(`/api/folders/${id}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/folders/${id}`),
   create: (data: { name: string; color?: string; icon?: string; parentId?: string }) =>
     linkApi.post('/api/v1/folders', data),
   update: (id: string, data: { name?: string; color?: string; icon?: string }) =>
-    linkApi.put(`/api/folders/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/folders/${id}`),
+    linkApi.put(`/api/v1/folders/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/folders/${id}`),
   reorder: (orderedIds: string[]) => linkApi.post('/api/v1/folders/reorder', { orderedIds }),
 };
 
@@ -314,15 +318,15 @@ export const folderService = {
 export const linkTemplateService = {
   getAll: (params?: { page?: number; limit?: number; search?: string; favoritesOnly?: boolean }) =>
     linkApi.get('/api/v1/link-templates', { params }),
-  getOne: (id: string) => linkApi.get(`/api/link-templates/${id}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/link-templates/${id}`),
   create: (data: any) => linkApi.post('/api/v1/link-templates', data),
-  update: (id: string, data: any) => linkApi.put(`/api/link-templates/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/link-templates/${id}`),
-  toggleFavorite: (id: string) => linkApi.post(`/api/link-templates/${id}/favorite`),
+  update: (id: string, data: any) => linkApi.put(`/api/v1/link-templates/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/link-templates/${id}`),
+  toggleFavorite: (id: string) => linkApi.post(`/api/v1/link-templates/${id}/favorite`),
   createLinkFromTemplate: (data: { templateId: string; originalUrl: string; customSlug?: string; title?: string }) =>
     linkApi.post('/api/v1/link-templates/create-link', data),
   getPresets: () => linkApi.get('/api/v1/link-templates/presets'),
-  getPresetsByCategory: (category: string) => linkApi.get(`/api/link-templates/presets/category/${category}`),
+  getPresetsByCategory: (category: string) => linkApi.get(`/api/v1/link-templates/presets/category/${category}`),
   createFromPreset: (presetId: string, name: string) =>
     linkApi.post('/api/v1/link-templates/from-preset', { presetId, name }),
   getMostUsed: (limit?: number) => linkApi.get('/api/v1/link-templates/most-used', { params: { limit } }),
@@ -331,15 +335,15 @@ export const linkTemplateService = {
 
 // Redirect Rules API
 export const redirectRulesService = {
-  getAll: (linkId: string) => linkApi.get(`/api/redirect-rules/link/${linkId}`),
-  getOne: (id: string) => linkApi.get(`/api/redirect-rules/${id}`),
-  create: (linkId: string, data: any) => linkApi.post(`/api/redirect-rules/link/${linkId}`, data),
-  update: (id: string, data: any) => linkApi.put(`/api/redirect-rules/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/redirect-rules/${id}`),
-  toggle: (id: string) => linkApi.post(`/api/redirect-rules/${id}/toggle`),
+  getAll: (linkId: string) => linkApi.get(`/api/v1/redirect-rules/link/${linkId}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/redirect-rules/${id}`),
+  create: (linkId: string, data: any) => linkApi.post(`/api/v1/redirect-rules/link/${linkId}`, data),
+  update: (id: string, data: any) => linkApi.put(`/api/v1/redirect-rules/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/redirect-rules/${id}`),
+  toggle: (id: string) => linkApi.post(`/api/v1/redirect-rules/${id}/toggle`),
   reorder: (linkId: string, ruleIds: string[]) =>
-    linkApi.post(`/api/redirect-rules/link/${linkId}/reorder`, { ruleIds }),
-  getStats: (linkId: string) => linkApi.get(`/api/redirect-rules/link/${linkId}/stats`),
+    linkApi.post(`/api/v1/redirect-rules/link/${linkId}/reorder`, { ruleIds }),
+  getStats: (linkId: string) => linkApi.get(`/api/v1/redirect-rules/link/${linkId}/stats`),
 };
 
 // Security API
@@ -354,7 +358,7 @@ export const securityService = {
   getSuspendedLinks: (params?: { limit?: number; offset?: number }) =>
     linkApi.get('/api/v1/security/suspended-links', { params }),
   reinstateLink: (linkId: string, reason: string) =>
-    linkApi.post(`/api/security/suspended-links/${linkId}/reinstate`, { reason }),
+    linkApi.post(`/api/v1/security/suspended-links/${linkId}/reinstate`, { reason }),
   checkAndHandle: (url: string) =>
     linkApi.post('/api/v1/security/check-and-handle', { url }),
 };
@@ -362,7 +366,7 @@ export const securityService = {
 // API Keys API
 export const apiKeyService = {
   getAll: () => api.get('/api/v1/api-keys'),
-  getOne: (id: string) => api.get(`/api/api-keys/${id}`),
+  getOne: (id: string) => api.get(`/api/v1/api-keys/${id}`),
   create: (data: {
     name: string;
     scopes: string[];
@@ -370,10 +374,10 @@ export const apiKeyService = {
     ipWhitelist?: string[];
   }) => api.post('/api/v1/api-keys', data),
   update: (id: string, data: { name?: string; scopes?: string[]; ipWhitelist?: string[] }) =>
-    api.put(`/api/api-keys/${id}`, data),
-  delete: (id: string) => api.delete(`/api/api-keys/${id}`),
-  revoke: (id: string) => api.post(`/api/api-keys/${id}/revoke`),
-  regenerate: (id: string) => api.post(`/api/api-keys/${id}/regenerate`),
+    api.put(`/api/v1/api-keys/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/api-keys/${id}`),
+  revoke: (id: string) => api.post(`/api/v1/api-keys/${id}/revoke`),
+  regenerate: (id: string) => api.post(`/api/v1/api-keys/${id}/regenerate`),
   getScopes: () => api.get('/api/v1/api-keys/scopes/list'),
 };
 
@@ -392,7 +396,7 @@ export const billingService = {
   getInvoices: (params?: { limit?: number; starting_after?: string }) =>
     api.get('/api/v1/billing/invoices', { params }),
   downloadInvoice: (invoiceId: string) =>
-    api.get(`/api/billing/invoices/${invoiceId}/download`, { responseType: 'blob' }),
+    api.get(`/api/v1/billing/invoices/${invoiceId}/download`, { responseType: 'blob' }),
 
   // Stripe
   createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
@@ -402,7 +406,7 @@ export const billingService = {
   setDefaultPaymentMethod: (paymentMethodId: string) =>
     api.post('/api/v1/stripe/payment-methods/default', { paymentMethodId }),
   deletePaymentMethod: (paymentMethodId: string) =>
-    api.delete(`/api/stripe/payment-methods/${paymentMethodId}`),
+    api.delete(`/api/v1/stripe/payment-methods/${paymentMethodId}`),
 };
 
 // Privacy API
@@ -428,19 +432,20 @@ export const quotaService = {
 export const userService = {
   // Team management
   getCurrentTeam: () => api.get('/api/v1/teams/current'),
-  getTeamMembers: (teamId: string) => api.get(`/api/teams/${teamId}/members`),
-  getTeamInvitations: (teamId: string) => api.get(`/api/teams/${teamId}/invitations`),
+  createTeam: (data: { name: string }) => api.post('/api/v1/teams', data),
+  getTeamMembers: (teamId: string) => api.get(`/api/v1/teams/${teamId}/members`),
+  getTeamInvitations: (teamId: string) => api.get(`/api/v1/teams/${teamId}/invitations`),
   inviteTeamMember: (teamId: string, data: { email: string; role: string }) =>
-    api.post(`/api/teams/${teamId}/members/invite`, data),
+    api.post(`/api/v1/teams/${teamId}/members/invite`, data),
   updateTeamMemberRole: (teamId: string, memberId: string, data: { role: string }) =>
-    api.patch(`/api/teams/${teamId}/members/${memberId}`, data),
+    api.patch(`/api/v1/teams/${teamId}/members/${memberId}`, data),
   removeTeamMember: (teamId: string, memberId: string) =>
-    api.delete(`/api/teams/${teamId}/members/${memberId}`),
+    api.delete(`/api/v1/teams/${teamId}/members/${memberId}`),
   cancelTeamInvitation: (teamId: string, invitationId: string) =>
-    api.delete(`/api/teams/${teamId}/invitations/${invitationId}`),
+    api.delete(`/api/v1/teams/${teamId}/invitations/${invitationId}`),
   resendTeamInvitation: (teamId: string, invitationId: string) =>
-    api.post(`/api/teams/${teamId}/invitations/${invitationId}/resend`),
-  updateTeam: (teamId: string, data: any) => api.patch(`/api/teams/${teamId}`, data),
+    api.post(`/api/v1/teams/${teamId}/invitations/${invitationId}/resend`),
+  updateTeam: (teamId: string, data: any) => api.patch(`/api/v1/teams/${teamId}`, data),
 };
 
 // Campaign API uses the same api-gateway
@@ -450,65 +455,153 @@ const campaignApi = api;
 export const goalsService = {
   getAll: (params?: { campaignId?: string }) =>
     campaignApi.get('/api/v1/goals', { params }),
-  getOne: (id: string) => campaignApi.get(`/api/goals/${id}`),
+  getOne: (id: string) => campaignApi.get(`/api/v1/goals/${id}`),
   create: (data: any) => campaignApi.post('/api/v1/goals', data),
-  update: (id: string, data: any) => campaignApi.patch(`/api/goals/${id}`, data),
-  delete: (id: string) => campaignApi.delete(`/api/goals/${id}`),
+  update: (id: string, data: any) => campaignApi.patch(`/api/v1/goals/${id}`, data),
+  delete: (id: string) => campaignApi.delete(`/api/v1/goals/${id}`),
   getStats: () => campaignApi.get('/api/v1/goals/stats'),
-  pause: (id: string) => campaignApi.post(`/api/goals/${id}/pause`),
-  resume: (id: string) => campaignApi.post(`/api/goals/${id}/resume`),
-  getHistory: (id: string) => campaignApi.get(`/api/goals/${id}/history`),
-  getProjection: (id: string) => campaignApi.get(`/api/goals/${id}/projection`),
+  pause: (id: string) => campaignApi.post(`/api/v1/goals/${id}/pause`),
+  resume: (id: string) => campaignApi.post(`/api/v1/goals/${id}/resume`),
+  getHistory: (id: string) => campaignApi.get(`/api/v1/goals/${id}/history`),
+  getProjection: (id: string) => campaignApi.get(`/api/v1/goals/${id}/projection`),
   getTrends: (id: string, period?: string) =>
-    campaignApi.get(`/api/goals/${id}/trends`, { params: { period } }),
+    campaignApi.get(`/api/v1/goals/${id}/trends`, { params: { period } }),
   compareGoals: (goalId1: string, goalId2: string) =>
     campaignApi.get('/api/v1/goals/compare', { params: { goal1: goalId1, goal2: goalId2 } }),
   getTeamStats: (teamId?: string) =>
     campaignApi.get('/api/v1/goals/team-stats', { params: { teamId } }),
   updateProgress: (id: string, value: number, source?: string) =>
-    campaignApi.post(`/api/goals/${id}/progress`, { value, source }),
+    campaignApi.post(`/api/v1/goals/${id}/progress`, { value, source }),
   recalculateProjection: (id: string) =>
-    campaignApi.post(`/api/goals/${id}/projection/recalculate`),
+    campaignApi.post(`/api/v1/goals/${id}/projection/recalculate`),
 };
 
 // Page API uses the same api-gateway
 const pageApi = api;
 
-// Bio Links API
+// Bio Links API (page-service: 60007)
 export const bioLinksService = {
   getAll: (params?: { page?: number; limit?: number; status?: string }) =>
     pageApi.get('/api/v1/bio-links', { params }),
-  getOne: (id: string) => pageApi.get(`/api/bio-links/${id}`),
-  getByUsername: (username: string) => pageApi.get(`/api/bio-links/username/${username}`),
+  getOne: (id: string) => pageApi.get(`/api/v1/bio-links/${id}`),
+  getByUsername: (username: string) => pageApi.get(`/api/v1/bio-links/username/${username}`),
   create: (data: any) => pageApi.post('/api/v1/bio-links', data),
-  update: (id: string, data: any) => pageApi.patch(`/api/bio-links/${id}`, data),
-  delete: (id: string) => pageApi.delete(`/api/bio-links/${id}`),
-  publish: (id: string) => pageApi.post(`/api/bio-links/${id}/publish`),
-  unpublish: (id: string) => pageApi.post(`/api/bio-links/${id}/unpublish`),
+  update: (id: string, data: any) => pageApi.patch(`/api/v1/bio-links/${id}`, data),
+  delete: (id: string) => pageApi.delete(`/api/v1/bio-links/${id}`),
+  publish: (id: string) => pageApi.post(`/api/v1/bio-links/${id}/publish`),
+  unpublish: (id: string) => pageApi.post(`/api/v1/bio-links/${id}/unpublish`),
   checkUsernameAvailability: (username: string) =>
     pageApi.get('/api/v1/bio-links/check-username', { params: { username } }),
   getAnalytics: (id: string, params?: { startDate?: string; endDate?: string }) =>
-    pageApi.get(`/api/bio-links/${id}/analytics`, { params }),
+    pageApi.get(`/api/v1/bio-links/${id}/analytics`, { params }),
   // Block management
-  getBlocks: (bioLinkId: string) => pageApi.get(`/api/bio-links/${bioLinkId}/blocks`),
+  getBlocks: (bioLinkId: string) => pageApi.get(`/api/v1/bio-links/${bioLinkId}/blocks`),
   createBlock: (bioLinkId: string, data: any) =>
-    pageApi.post(`/api/bio-links/${bioLinkId}/blocks`, data),
+    pageApi.post(`/api/v1/bio-links/${bioLinkId}/blocks`, data),
   updateBlock: (bioLinkId: string, blockId: string, data: any) =>
-    pageApi.patch(`/api/bio-links/${bioLinkId}/blocks/${blockId}`, data),
+    pageApi.patch(`/api/v1/bio-links/${bioLinkId}/blocks/${blockId}`, data),
   deleteBlock: (bioLinkId: string, blockId: string) =>
-    pageApi.delete(`/api/bio-links/${bioLinkId}/blocks/${blockId}`),
+    pageApi.delete(`/api/v1/bio-links/${bioLinkId}/blocks/${blockId}`),
   reorderBlocks: (bioLinkId: string, blockIds: string[]) =>
-    pageApi.post(`/api/bio-links/${bioLinkId}/blocks/reorder`, { blockIds }),
+    pageApi.post(`/api/v1/bio-links/${bioLinkId}/blocks/reorder`, { blockIds }),
 };
 
 // Saved Search API
 export const savedSearchService = {
   getAll: () => linkApi.get('/api/v1/saved-searches'),
-  getOne: (id: string) => linkApi.get(`/api/saved-searches/${id}`),
+  getOne: (id: string) => linkApi.get(`/api/v1/saved-searches/${id}`),
   create: (data: any) => linkApi.post('/api/v1/saved-searches', data),
-  update: (id: string, data: any) => linkApi.patch(`/api/saved-searches/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/saved-searches/${id}`),
-  execute: (id: string) => linkApi.post(`/api/saved-searches/${id}/execute`),
-  testNotification: (id: string) => linkApi.post(`/api/saved-searches/${id}/test-notification`),
-  getMatchCount: (id: string) => linkApi.get(`/api/saved-searches/${id}/match-count`),
+  update: (id: string, data: any) => linkApi.patch(`/api/v1/saved-searches/${id}`, data),
+  delete: (id: string) => linkApi.delete(`/api/v1/saved-searches/${id}`),
+  execute: (id: string) => linkApi.post(`/api/v1/saved-searches/${id}/execute`),
+  testNotification: (id: string) => linkApi.post(`/api/v1/saved-searches/${id}/test-notification`),
+  getMatchCount: (id: string) => linkApi.get(`/api/v1/saved-searches/${id}/match-count`),
+};
+
+// Domain API (domain-service: 60014)
+export const domainService = {
+  getAll: (params?: { page?: number; limit?: number }) =>
+    api.get('/api/v1/domains', { params }),
+  getOne: (id: string) => api.get(`/api/v1/domains/${id}`),
+  create: (data: { domain: string; isDefault?: boolean }) =>
+    api.post('/api/v1/domains', data),
+  update: (id: string, data: any) => api.put(`/api/v1/domains/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/domains/${id}`),
+  verify: (id: string) => api.post(`/api/v1/domains/${id}/verify`),
+  setDefault: (id: string) => api.post(`/api/v1/domains/${id}/set-default`),
+  getDnsRecords: (id: string) => api.get(`/api/v1/domains/${id}/dns-records`),
+};
+
+// Notification API (notification-service: 60020)
+export const notificationService = {
+  getAll: (params?: { page?: number; limit?: number; read?: boolean }) =>
+    api.get('/api/v1/notifications', { params }),
+  getOne: (id: string) => api.get(`/api/v1/notifications/${id}`),
+  markAsRead: (id: string) => api.post(`/api/v1/notifications/${id}/read`),
+  markAllAsRead: () => api.post('/api/v1/notifications/read-all'),
+  delete: (id: string) => api.delete(`/api/v1/notifications/${id}`),
+  getUnreadCount: () => api.get('/api/v1/notifications/unread-count'),
+  getPreferences: () => api.get('/api/v1/notifications/preferences'),
+  updatePreferences: (data: any) => api.put('/api/v1/notifications/preferences', data),
+};
+
+// Webhook API (webhook-service: 60017)
+export const webhookService = {
+  getAll: (params?: { page?: number; limit?: number }) =>
+    api.get('/api/v1/webhooks', { params }),
+  getOne: (id: string) => api.get(`/api/v1/webhooks/${id}`),
+  create: (data: {
+    name: string;
+    url: string;
+    events: string[];
+    secret?: string;
+    active?: boolean;
+  }) => api.post('/api/v1/webhooks', data),
+  update: (id: string, data: any) => api.put(`/api/v1/webhooks/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/webhooks/${id}`),
+  test: (id: string) => api.post(`/api/v1/webhooks/${id}/test`),
+  getLogs: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/api/v1/webhooks/${id}/logs`, { params }),
+  getEvents: () => api.get('/api/v1/webhooks/events'),
+};
+
+// Campaign API (campaign-service: 60004)
+export const campaignService = {
+  getAll: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get('/api/v1/campaigns', { params }),
+  getOne: (id: string) => api.get(`/api/v1/campaigns/${id}`),
+  create: (data: any) => api.post('/api/v1/campaigns', data),
+  update: (id: string, data: any) => api.put(`/api/v1/campaigns/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/campaigns/${id}`),
+  getStats: (id: string) => api.get(`/api/v1/campaigns/${id}/stats`),
+  start: (id: string) => api.post(`/api/v1/campaigns/${id}/start`),
+  pause: (id: string) => api.post(`/api/v1/campaigns/${id}/pause`),
+  complete: (id: string) => api.post(`/api/v1/campaigns/${id}/complete`),
+};
+
+// Integration API (integration-service: 60016)
+export const integrationService = {
+  // General integrations
+  getAll: () => api.get('/api/v1/integrations'),
+  getOne: (id: string) => api.get(`/api/v1/integrations/${id}`),
+  connect: (platform: string, data: any) =>
+    api.post(`/api/v1/integrations/${platform}/connect`, data),
+  disconnect: (id: string) => api.delete(`/api/v1/integrations/${id}`),
+  sync: (id: string) => api.post(`/api/v1/integrations/${id}/sync`),
+
+  // Zapier
+  getZapierWebhooks: () => api.get('/api/v1/zapier/webhooks'),
+  createZapierWebhook: (data: any) => api.post('/api/v1/zapier/webhooks', data),
+
+  // HubSpot
+  getHubSpotContacts: (params?: any) => api.get('/api/v1/hubspot/contacts', { params }),
+  syncHubSpotContacts: () => api.post('/api/v1/hubspot/sync'),
+
+  // Salesforce
+  getSalesforceLeads: (params?: any) => api.get('/api/v1/salesforce/leads', { params }),
+  syncSalesforceLeads: () => api.post('/api/v1/salesforce/sync'),
+
+  // Shopify
+  getShopifyProducts: (params?: any) => api.get('/api/v1/shopify/products', { params }),
+  createShopifyLink: (productId: string) => api.post(`/api/v1/shopify/products/${productId}/link`),
 };

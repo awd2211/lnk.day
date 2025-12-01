@@ -72,6 +72,26 @@ export function useRealtimeAnalytics(linkId: string) {
   });
 }
 
+export interface TeamRealtimeStats {
+  team_id: string;
+  clicks_this_minute: number;
+  clicks_last_5_minutes: number;
+  clicks_this_hour: number;
+  timestamp: string;
+}
+
+export function useTeamRealtimeAnalytics(teamId?: string) {
+  return useQuery({
+    queryKey: ['analytics', 'realtime', 'team', teamId],
+    queryFn: async () => {
+      const { data } = await analyticsService.getTeamRealtime(teamId!);
+      return data as TeamRealtimeStats;
+    },
+    enabled: !!teamId,
+    refetchInterval: 5000, // Refresh every 5 seconds
+  });
+}
+
 export function useClickTrends(period: string = '7d') {
   return useQuery({
     queryKey: ['analytics', 'trends', period],

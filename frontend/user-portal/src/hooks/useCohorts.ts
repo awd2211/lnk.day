@@ -156,7 +156,7 @@ export function useCohorts(teamId: string, activeOnly: boolean = true) {
     queryKey: ['cohorts', teamId, activeOnly],
     queryFn: async () => {
       const { data } = await api.get<{ cohorts: Cohort[]; total: number }>(
-        '/analytics/cohorts',
+        '/api/v1/analytics/cohorts',
         {
           params: { active_only: activeOnly },
           headers: { 'X-Team-ID': teamId },
@@ -172,7 +172,7 @@ export function useCohort(cohortId: string, teamId: string) {
   return useQuery({
     queryKey: ['cohort', cohortId, teamId],
     queryFn: async () => {
-      const { data } = await api.get<Cohort>(`/analytics/cohorts/${cohortId}`, {
+      const { data } = await api.get<Cohort>(`/api/v1/analytics/cohorts/${cohortId}`, {
         headers: { 'X-Team-ID': teamId },
       });
       return data;
@@ -186,7 +186,7 @@ export function useCreateCohort() {
 
   return useMutation({
     mutationFn: async ({ teamId, cohort }: { teamId: string; cohort: CohortCreate }) => {
-      const { data } = await api.post<Cohort>('/analytics/cohorts', cohort, {
+      const { data } = await api.post<Cohort>('/api/v1/analytics/cohorts', cohort, {
         headers: { 'X-Team-ID': teamId },
       });
       return data;
@@ -210,7 +210,7 @@ export function useUpdateCohort() {
       teamId: string;
       updates: CohortUpdate;
     }) => {
-      const { data } = await api.patch<Cohort>(`/analytics/cohorts/${cohortId}`, updates, {
+      const { data } = await api.patch<Cohort>(`/api/v1/analytics/cohorts/${cohortId}`, updates, {
         headers: { 'X-Team-ID': teamId },
       });
       return data;
@@ -227,7 +227,7 @@ export function useDeleteCohort() {
 
   return useMutation({
     mutationFn: async ({ cohortId, teamId }: { cohortId: string; teamId: string }) => {
-      await api.delete(`/analytics/cohorts/${cohortId}`, {
+      await api.delete(`/api/v1/analytics/cohorts/${cohortId}`, {
         headers: { 'X-Team-ID': teamId },
       });
     },
@@ -253,7 +253,7 @@ export function useCohortAnalysis(
     queryKey: ['cohort-analysis', cohortId, teamId, options],
     queryFn: async () => {
       const { data } = await api.get<CohortAnalysis>(
-        `/analytics/cohorts/${cohortId}/analyze`,
+        `/api/v1/analytics/cohorts/${cohortId}/analyze`,
         {
           params: {
             start_date: options?.startDate,
@@ -282,7 +282,7 @@ export function useRetentionMatrix(
     queryKey: ['retention-matrix', cohortId, teamId, options],
     queryFn: async () => {
       const { data } = await api.get<RetentionMatrix>(
-        `/analytics/cohorts/${cohortId}/retention-matrix`,
+        `/api/v1/analytics/cohorts/${cohortId}/retention-matrix`,
         {
           params: {
             start_date: options?.startDate,
@@ -310,7 +310,7 @@ export function useCohortSegments(
     queryKey: ['cohort-segments', cohortId, teamId, segmentBy, options],
     queryFn: async () => {
       const { data } = await api.get<{ segments: CohortSegment[]; total: number }>(
-        `/analytics/cohorts/${cohortId}/segments`,
+        `/api/v1/analytics/cohorts/${cohortId}/segments`,
         {
           params: {
             segment_by: segmentBy,
@@ -338,7 +338,7 @@ export function useCohortInsights(
     queryKey: ['cohort-insights', cohortId, teamId, options],
     queryFn: async () => {
       const { data } = await api.get<{ insights: CohortInsight[] }>(
-        `/analytics/cohorts/${cohortId}/insights`,
+        `/api/v1/analytics/cohorts/${cohortId}/insights`,
         {
           params: {
             start_date: options?.startDate,
@@ -360,7 +360,7 @@ export function useCohortPresets() {
     queryKey: ['cohort-presets'],
     queryFn: async () => {
       const { data } = await api.get<{ presets: PresetCohort[] }>(
-        '/analytics/cohorts/presets',
+        '/api/v1/analytics/cohorts/presets',
       );
       return data.presets;
     },
@@ -381,7 +381,7 @@ export function useCreateCohortFromPreset() {
       name?: string;
     }) => {
       const { data } = await api.post<Cohort>(
-        '/analytics/cohorts/from-preset',
+        '/api/v1/analytics/cohorts/from-preset',
         { preset_id: presetId, name },
         { headers: { 'X-Team-ID': teamId } },
       );
@@ -400,7 +400,7 @@ export function useWeeklyRetention(teamId: string, weeks: number = 12) {
     queryKey: ['weekly-retention', teamId, weeks],
     queryFn: async () => {
       const { data } = await api.get<QuickRetentionResult>(
-        '/analytics/cohorts/quick/weekly-retention',
+        '/api/v1/analytics/cohorts/quick/weekly-retention',
         {
           params: { weeks },
           headers: { 'X-Team-ID': teamId },
@@ -417,7 +417,7 @@ export function useMonthlyRetention(teamId: string, months: number = 6) {
     queryKey: ['monthly-retention', teamId, months],
     queryFn: async () => {
       const { data } = await api.get<QuickRetentionResult>(
-        '/analytics/cohorts/quick/monthly-retention',
+        '/api/v1/analytics/cohorts/quick/monthly-retention',
         {
           params: { months },
           headers: { 'X-Team-ID': teamId },
@@ -434,7 +434,7 @@ export function useAcquisitionTrend(teamId: string, days: number = 30) {
     queryKey: ['acquisition-trend', teamId, days],
     queryFn: async () => {
       const { data } = await api.get<AcquisitionTrend>(
-        '/analytics/cohorts/quick/acquisition-trend',
+        '/api/v1/analytics/cohorts/quick/acquisition-trend',
         {
           params: { days },
           headers: { 'X-Team-ID': teamId },
@@ -464,7 +464,7 @@ export function useExportCohortData() {
       endDate?: string;
     }) => {
       const { data } = await api.get<{ format: string; data: unknown }>(
-        `/analytics/cohorts/${cohortId}/export`,
+        `/api/v1/analytics/cohorts/${cohortId}/export`,
         {
           params: { format, start_date: startDate, end_date: endDate },
           headers: { 'X-Team-ID': teamId },
@@ -495,7 +495,7 @@ export function useCompareCohortSegments() {
       endDate?: string;
     }) => {
       const { data } = await api.post(
-        `/analytics/cohorts/${cohortId}/compare`,
+        `/api/v1/analytics/cohorts/${cohortId}/compare`,
         { segment_field: segmentField, segment_values: segmentValues },
         {
           params: { start_date: startDate, end_date: endDate },

@@ -112,7 +112,7 @@ export function useWebhooks() {
   return useQuery({
     queryKey: ['webhooks'],
     queryFn: async () => {
-      const { data } = await api.get('/webhooks');
+      const { data } = await api.get('/api/v1/webhooks');
       return data as { data: Webhook[]; total: number; page: number; limit: number };
     },
   });
@@ -124,7 +124,7 @@ export function useWebhook(id: string | null) {
     queryKey: ['webhooks', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/webhooks/${id}`);
+      const { data } = await api.get(`/api/v1/webhooks/${id}`);
       return data as Webhook;
     },
     enabled: !!id,
@@ -136,7 +136,7 @@ export function useWebhookEvents() {
   return useQuery({
     queryKey: ['webhooks', 'events'],
     queryFn: async () => {
-      const { data } = await api.get('/webhooks/events');
+      const { data } = await api.get('/api/v1/webhooks/events');
       return data as { events: WebhookEventInfo[] };
     },
   });
@@ -148,7 +148,7 @@ export function useWebhookDeliveries(webhookId: string | null) {
     queryKey: ['webhooks', webhookId, 'deliveries'],
     queryFn: async () => {
       if (!webhookId) return null;
-      const { data } = await api.get(`/webhooks/${webhookId}/deliveries`);
+      const { data } = await api.get(`/api/v1/webhooks/${webhookId}/deliveries`);
       return data as { data: WebhookDelivery[]; total: number };
     },
     enabled: !!webhookId,
@@ -161,7 +161,7 @@ export function useCreateWebhook() {
 
   return useMutation({
     mutationFn: async (data: CreateWebhookData) => {
-      const response = await api.post('/webhooks', data);
+      const response = await api.post('/api/v1/webhooks', data);
       return response.data as Webhook;
     },
     onSuccess: () => {
@@ -176,7 +176,7 @@ export function useUpdateWebhook() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateWebhookData }) => {
-      const response = await api.put(`/webhooks/${id}`, data);
+      const response = await api.put(`/api/v1/webhooks/${id}`, data);
       return response.data as Webhook;
     },
     onSuccess: (_, { id }) => {
@@ -192,7 +192,7 @@ export function useEnableWebhook() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/webhooks/${id}/enable`);
+      const response = await api.post(`/api/v1/webhooks/${id}/enable`);
       return response.data as Webhook;
     },
     onSuccess: () => {
@@ -207,7 +207,7 @@ export function useDisableWebhook() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/webhooks/${id}/disable`);
+      const response = await api.post(`/api/v1/webhooks/${id}/disable`);
       return response.data as Webhook;
     },
     onSuccess: () => {
@@ -222,7 +222,7 @@ export function useRegenerateWebhookSecret() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/webhooks/${id}/regenerate-secret`);
+      const response = await api.post(`/api/v1/webhooks/${id}/regenerate-secret`);
       return response.data as { secret: string };
     },
     onSuccess: (_, id) => {
@@ -236,7 +236,7 @@ export function useRegenerateWebhookSecret() {
 export function useTestWebhook() {
   return useMutation({
     mutationFn: async ({ id, event }: { id: string; event: WebhookEventType }) => {
-      const response = await api.post(`/webhooks/${id}/test`, { event });
+      const response = await api.post(`/api/v1/webhooks/${id}/test`, { event });
       return response.data as {
         success: boolean;
         statusCode?: number;
@@ -253,7 +253,7 @@ export function useRetryDelivery() {
 
   return useMutation({
     mutationFn: async (deliveryId: string) => {
-      const response = await api.post(`/webhooks/deliveries/${deliveryId}/retry`);
+      const response = await api.post(`/api/v1/webhooks/deliveries/${deliveryId}/retry`);
       return response.data;
     },
     onSuccess: () => {
@@ -268,7 +268,7 @@ export function useDeleteWebhook() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/webhooks/${id}`);
+      await api.delete(`/api/v1/webhooks/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });

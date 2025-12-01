@@ -128,7 +128,7 @@ export function useSSOConfigs() {
   return useQuery({
     queryKey: ['sso', 'configs'],
     queryFn: async () => {
-      const { data } = await api.get('/sso/configs');
+      const { data } = await api.get('/api/v1/sso/configs');
       return data as SSOConfig[];
     },
   });
@@ -140,7 +140,7 @@ export function useSSOConfig(id: string | null) {
     queryKey: ['sso', 'configs', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/sso/configs/${id}`);
+      const { data } = await api.get(`/api/v1/sso/configs/${id}`);
       return data as SSOConfig;
     },
     enabled: !!id,
@@ -152,7 +152,7 @@ export function useSAMLMetadata() {
   return useQuery({
     queryKey: ['sso', 'saml', 'metadata'],
     queryFn: async () => {
-      const { data } = await api.get('/sso/saml/metadata');
+      const { data } = await api.get('/api/v1/sso/saml/metadata');
       return data as SAMLMetadata;
     },
   });
@@ -164,7 +164,7 @@ export function useCreateSAMLConfig() {
 
   return useMutation({
     mutationFn: async (data: CreateSAMLConfigData) => {
-      const response = await api.post('/sso/saml/config', data);
+      const response = await api.post('/api/v1/sso/saml/config', data);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -179,7 +179,7 @@ export function useImportSAMLMetadata() {
 
   return useMutation({
     mutationFn: async (data: ImportSAMLMetadataData) => {
-      const response = await api.post('/sso/saml/config/import-metadata', data);
+      const response = await api.post('/api/v1/sso/saml/config/import-metadata', data);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -194,7 +194,7 @@ export function useCreateOIDCConfig() {
 
   return useMutation({
     mutationFn: async (data: CreateOIDCConfigData) => {
-      const response = await api.post('/sso/oidc/config', data);
+      const response = await api.post('/api/v1/sso/oidc/config', data);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -209,7 +209,7 @@ export function useCreateLDAPConfig() {
 
   return useMutation({
     mutationFn: async (data: CreateLDAPConfigData) => {
-      const response = await api.post('/sso/ldap/config', data);
+      const response = await api.post('/api/v1/sso/ldap/config', data);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -224,7 +224,7 @@ export function useUpdateSSOConfig() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateSSOConfigData }) => {
-      const response = await api.put(`/sso/configs/${id}`, data);
+      const response = await api.put(`/api/v1/sso/configs/${id}`, data);
       return response.data as SSOConfig;
     },
     onSuccess: (_, { id }) => {
@@ -240,7 +240,7 @@ export function useActivateSSOConfig() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/sso/configs/${id}/activate`);
+      const response = await api.post(`/api/v1/sso/configs/${id}/activate`);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -255,7 +255,7 @@ export function useDeactivateSSOConfig() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/sso/configs/${id}/deactivate`);
+      const response = await api.post(`/api/v1/sso/configs/${id}/deactivate`);
       return response.data as SSOConfig;
     },
     onSuccess: () => {
@@ -270,7 +270,7 @@ export function useDeleteSSOConfig() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/sso/configs/${id}`);
+      await api.delete(`/api/v1/sso/configs/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sso', 'configs'] });
@@ -282,7 +282,7 @@ export function useDeleteSSOConfig() {
 export function useTestSSOConnection() {
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/sso/configs/${id}/test`);
+      const response = await api.post(`/api/v1/sso/configs/${id}/test`);
       return response.data as TestConnectionResult;
     },
   });

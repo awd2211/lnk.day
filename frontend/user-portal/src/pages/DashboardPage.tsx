@@ -47,18 +47,34 @@ export default function DashboardPage() {
   // Click trends for chart
   const { data: trends } = useClickTrends('7d');
 
-  // Generate mock trends data if API fails
+  // Generate trends data from API or fallback
   const trendData = (trends?.data && Array.isArray(trends.data) ? trends.data : null) || Array.from({ length: 7 }, (_, i) => ({
     date: format(subDays(new Date(), 6 - i), 'MM/dd'),
-    clicks: Math.floor(Math.random() * 500) + 100,
+    clicks: 0,
   }));
 
-  // Device distribution mock data
-  const deviceData = [
-    { name: 'Mobile', value: 58, color: '#3b82f6' },
-    { name: 'Desktop', value: 35, color: '#8b5cf6' },
-    { name: 'Tablet', value: 7, color: '#f59e0b' },
-  ];
+  // Device distribution from analytics API
+  const deviceColors: Record<string, string> = {
+    mobile: '#3b82f6',
+    desktop: '#8b5cf6',
+    tablet: '#f59e0b',
+    other: '#6b7280',
+  };
+
+  const deviceData = analytics?.topDevices?.length
+    ? analytics.topDevices.map((d) => {
+        const total = analytics.topDevices!.reduce((sum, item) => sum + item.clicks, 0);
+        return {
+          name: d.device === 'mobile' ? 'Mobile' : d.device === 'desktop' ? 'Desktop' : d.device === 'tablet' ? 'Tablet' : d.device,
+          value: total > 0 ? Math.round((d.clicks / total) * 100) : 0,
+          color: deviceColors[d.device.toLowerCase()] || '#6b7280',
+        };
+      })
+    : [
+        { name: 'Mobile', value: 0, color: '#3b82f6' },
+        { name: 'Desktop', value: 0, color: '#8b5cf6' },
+        { name: 'Tablet', value: 0, color: '#f59e0b' },
+      ];
 
   const stats = [
     {

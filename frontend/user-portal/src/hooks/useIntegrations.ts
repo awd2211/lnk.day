@@ -50,8 +50,12 @@ export function useIntegrations() {
   return useQuery({
     queryKey: ['integrations'],
     queryFn: async () => {
-      const response = await api.get<Integration[]>('/integrations');
-      return response.data;
+      const response = await api.get<{ items: Integration[]; total: number } | Integration[]>('/api/v1/integrations');
+      // 处理两种响应格式：数组或带 items 的对象
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return response.data.items || [];
     },
   });
 }
@@ -60,7 +64,7 @@ export function useAvailableIntegrations() {
   return useQuery({
     queryKey: ['integrations', 'available'],
     queryFn: async () => {
-      const response = await api.get<AvailableIntegration[]>('/integrations/available');
+      const response = await api.get<AvailableIntegration[]>('/api/v1/integrations/available');
       return response.data;
     },
   });
@@ -71,7 +75,7 @@ export function useConnectIntegration() {
 
   return useMutation({
     mutationFn: async ({ type, config }: { type: Integration['type']; config?: Record<string, any> }) => {
-      const response = await api.post<{ authUrl?: string; integration?: Integration }>(`/integrations/${type}/connect`, config);
+      const response = await api.post<{ authUrl?: string; integration?: Integration }>(`/api/v1/integrations/${type}/connect`, config);
       return response.data;
     },
     onSuccess: () => {
@@ -85,7 +89,7 @@ export function useDisconnectIntegration() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/integrations/${id}`);
+      await api.delete(`/api/v1/integrations/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
@@ -98,7 +102,7 @@ export function useSyncIntegration() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<Integration>(`/integrations/${id}/sync`);
+      const response = await api.post<Integration>(`/api/v1/integrations/${id}/sync`);
       return response.data;
     },
     onSuccess: () => {
@@ -112,7 +116,7 @@ export function useUpdateIntegrationConfig() {
 
   return useMutation({
     mutationFn: async ({ id, config }: { id: string; config: Record<string, any> }) => {
-      const response = await api.patch<Integration>(`/integrations/${id}`, { config });
+      const response = await api.patch<Integration>(`/api/v1/integrations/${id}`, { config });
       return response.data;
     },
     onSuccess: () => {
@@ -126,8 +130,12 @@ export function useNotificationChannels() {
   return useQuery({
     queryKey: ['notification-channels'],
     queryFn: async () => {
-      const response = await api.get<NotificationChannel[]>('/notifications/channels');
-      return response.data;
+      const response = await api.get<{ items: NotificationChannel[]; total: number } | NotificationChannel[]>('/api/v1/notifications/channels');
+      // 处理两种响应格式
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      return response.data.items || [];
     },
   });
 }
@@ -137,7 +145,7 @@ export function useCreateNotificationChannel() {
 
   return useMutation({
     mutationFn: async (data: CreateChannelDto) => {
-      const response = await api.post<NotificationChannel>('/notifications/channels', data);
+      const response = await api.post<NotificationChannel>('/api/v1/notifications/channels', data);
       return response.data;
     },
     onSuccess: () => {
@@ -151,7 +159,7 @@ export function useUpdateNotificationChannel() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateChannelDto> }) => {
-      const response = await api.patch<NotificationChannel>(`/notifications/channels/${id}`, data);
+      const response = await api.patch<NotificationChannel>(`/api/v1/notifications/channels/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -165,7 +173,7 @@ export function useDeleteNotificationChannel() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/notifications/channels/${id}`);
+      await api.delete(`/api/v1/notifications/channels/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
@@ -178,7 +186,7 @@ export function useToggleNotificationChannel() {
 
   return useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
-      const response = await api.patch<NotificationChannel>(`/notifications/channels/${id}`, { enabled });
+      const response = await api.patch<NotificationChannel>(`/api/v1/notifications/channels/${id}`, { enabled });
       return response.data;
     },
     onSuccess: () => {
@@ -190,7 +198,7 @@ export function useToggleNotificationChannel() {
 export function useTestNotificationChannel() {
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<{ success: boolean; message?: string }>(`/notifications/channels/${id}/test`);
+      const response = await api.post<{ success: boolean; message?: string }>(`/api/v1/notifications/channels/${id}/test`);
       return response.data;
     },
   });
@@ -200,7 +208,7 @@ export function useNotificationEvents() {
   return useQuery({
     queryKey: ['notification-events'],
     queryFn: async () => {
-      const response = await api.get<{ event: string; name: string; description: string }[]>('/notifications/events');
+      const response = await api.get<{ event: string; name: string; description: string }[]>('/api/v1/notifications/events');
       return response.data;
     },
   });

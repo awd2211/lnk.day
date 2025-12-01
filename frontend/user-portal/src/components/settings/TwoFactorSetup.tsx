@@ -45,9 +45,10 @@ interface TwoFactorStatus {
 }
 
 interface EnableResponse {
-  qrCode: string; // Base64 encoded QR code image
+  qrCodeUrl: string; // Base64 encoded QR code image
   secret: string; // Manual entry secret
   backupCodes: string[];
+  otpAuthUrl?: string; // OTP auth URL for manual setup
 }
 
 export function TwoFactorSetup() {
@@ -327,7 +328,7 @@ export function TwoFactorSetup() {
               <div className="flex justify-center">
                 <div className="rounded-lg bg-white p-4">
                   <img
-                    src={enableData.qrCode}
+                    src={enableData.qrCodeUrl}
                     alt="2FA QR Code"
                     className="h-48 w-48"
                   />

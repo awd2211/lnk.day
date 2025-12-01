@@ -73,7 +73,7 @@ export function useSlackInstallation(teamId: string) {
   return useQuery({
     queryKey: ['slack-installation', teamId],
     queryFn: async () => {
-      const { data } = await api.get<SlackInstallation>('/slack/installation', {
+      const { data } = await api.get<SlackInstallation>('/api/v1/slack/installation', {
         params: { teamId },
       });
       return data;
@@ -86,7 +86,7 @@ export function useSlackChannels(teamId: string) {
   return useQuery({
     queryKey: ['slack-channels', teamId],
     queryFn: async () => {
-      const { data } = await api.get<{ channels: SlackChannel[] }>('/slack/channels', {
+      const { data } = await api.get<{ channels: SlackChannel[] }>('/api/v1/slack/channels', {
         params: { teamId },
       });
       return data.channels;
@@ -106,7 +106,7 @@ export function useUpdateSlackSettings() {
       teamId: string;
       settings: Partial<SlackSettings>;
     }) => {
-      const { data } = await api.put('/slack/settings', settings, {
+      const { data } = await api.put('/api/v1/slack/settings', settings, {
         params: { teamId },
       });
       return data;
@@ -122,7 +122,7 @@ export function useUninstallSlack() {
 
   return useMutation({
     mutationFn: async (teamId: string) => {
-      await api.delete('/slack/uninstall', { params: { teamId } });
+      await api.delete('/api/v1/slack/uninstall', { params: { teamId } });
     },
     onSuccess: (_, teamId) => {
       queryClient.invalidateQueries({ queryKey: ['slack-installation', teamId] });
@@ -137,7 +137,7 @@ export function useTeamsInstallations(teamId: string) {
     queryKey: ['teams-installations', teamId],
     queryFn: async () => {
       const { data } = await api.get<{ installations: TeamsInstallation[] }>(
-        '/teams-notifications/installations',
+        '/api/v1/teams-notifications/installations',
         { params: { teamId } },
       );
       return data.installations;
@@ -152,7 +152,7 @@ export function useCreateTeamsInstallation() {
   return useMutation({
     mutationFn: async (dto: CreateTeamsInstallationDto) => {
       const { data } = await api.post<{ installation: TeamsInstallation }>(
-        '/teams-notifications/installations',
+        '/api/v1/teams-notifications/installations',
         dto,
       );
       return data.installation;
@@ -177,7 +177,7 @@ export function useUpdateTeamsInstallation() {
       dto: UpdateTeamsSettingsDto;
     }) => {
       const { data } = await api.put<{ installation: TeamsInstallation }>(
-        `/teams-notifications/installations/${id}`,
+        `/api/v1/teams-notifications/installations/${id}`,
         dto,
         { params: { teamId } },
       );
@@ -194,7 +194,7 @@ export function useDeleteTeamsInstallation() {
 
   return useMutation({
     mutationFn: async ({ id, teamId }: { id: string; teamId: string }) => {
-      await api.delete(`/teams-notifications/installations/${id}`, {
+      await api.delete(`/api/v1/teams-notifications/installations/${id}`, {
         params: { teamId },
       });
     },
@@ -208,7 +208,7 @@ export function useTestTeamsInstallation() {
   return useMutation({
     mutationFn: async ({ id, teamId }: { id: string; teamId: string }) => {
       const { data } = await api.post<{ success: boolean }>(
-        `/teams-notifications/installations/${id}/test`,
+        `/api/v1/teams-notifications/installations/${id}/test`,
         {},
         { params: { teamId } },
       );
@@ -221,7 +221,7 @@ export function useValidateTeamsWebhook() {
   return useMutation({
     mutationFn: async (webhookUrl: string) => {
       const { data } = await api.post<{ valid: boolean }>(
-        '/teams-notifications/validate-webhook',
+        '/api/v1/teams-notifications/validate-webhook',
         { webhookUrl },
       );
       return data.valid;

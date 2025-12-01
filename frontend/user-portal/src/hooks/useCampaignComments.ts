@@ -70,7 +70,7 @@ export function useCampaignComments(campaignId: string) {
   return useQuery({
     queryKey: ['campaigns', campaignId, 'comments'],
     queryFn: async () => {
-      const response = await api.get<CampaignComment[]>(`/campaigns/${campaignId}/comments`);
+      const response = await api.get<CampaignComment[]>(`/api/v1/campaigns/${campaignId}/comments`);
       return response.data;
     },
     enabled: !!campaignId,
@@ -82,7 +82,7 @@ export function useCampaignActivity(campaignId: string) {
   return useQuery({
     queryKey: ['campaigns', campaignId, 'activity'],
     queryFn: async () => {
-      const response = await api.get<CampaignActivity[]>(`/campaigns/${campaignId}/activity`);
+      const response = await api.get<CampaignActivity[]>(`/api/v1/campaigns/${campaignId}/activity`);
       return response.data;
     },
     enabled: !!campaignId,
@@ -94,7 +94,7 @@ export function useCampaignCollaborators(campaignId: string) {
   return useQuery({
     queryKey: ['campaigns', campaignId, 'collaborators'],
     queryFn: async () => {
-      const response = await api.get<CampaignCollaborator[]>(`/campaigns/${campaignId}/collaborators`);
+      const response = await api.get<CampaignCollaborator[]>(`/api/v1/campaigns/${campaignId}/collaborators`);
       return response.data;
     },
     enabled: !!campaignId,
@@ -121,7 +121,7 @@ export function useAddComment(campaignId: string) {
         });
       }
 
-      const response = await api.post<CampaignComment>(`/campaigns/${campaignId}/comments`, formData, {
+      const response = await api.post<CampaignComment>(`/api/v1/campaigns/${campaignId}/comments`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return response.data;
@@ -139,7 +139,7 @@ export function useUpdateComment(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ commentId, data }: { commentId: string; data: UpdateCommentDto }) => {
-      const response = await api.patch<CampaignComment>(`/campaigns/${campaignId}/comments/${commentId}`, data);
+      const response = await api.patch<CampaignComment>(`/api/v1/campaigns/${campaignId}/comments/${commentId}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -154,7 +154,7 @@ export function useDeleteComment(campaignId: string) {
 
   return useMutation({
     mutationFn: async (commentId: string) => {
-      await api.delete(`/campaigns/${campaignId}/comments/${commentId}`);
+      await api.delete(`/api/v1/campaigns/${campaignId}/comments/${commentId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'comments'] });
@@ -169,7 +169,7 @@ export function usePinComment(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ commentId, pinned }: { commentId: string; pinned: boolean }) => {
-      const response = await api.post<CampaignComment>(`/campaigns/${campaignId}/comments/${commentId}/pin`, { pinned });
+      const response = await api.post<CampaignComment>(`/api/v1/campaigns/${campaignId}/comments/${commentId}/pin`, { pinned });
       return response.data;
     },
     onSuccess: () => {
@@ -184,7 +184,7 @@ export function useAddReaction(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ commentId, emoji }: { commentId: string; emoji: string }) => {
-      const response = await api.post(`/campaigns/${campaignId}/comments/${commentId}/reactions`, { emoji });
+      const response = await api.post(`/api/v1/campaigns/${campaignId}/comments/${commentId}/reactions`, { emoji });
       return response.data;
     },
     onSuccess: () => {
@@ -199,7 +199,7 @@ export function useRemoveReaction(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ commentId, emoji }: { commentId: string; emoji: string }) => {
-      await api.delete(`/campaigns/${campaignId}/comments/${commentId}/reactions/${emoji}`);
+      await api.delete(`/api/v1/campaigns/${campaignId}/comments/${commentId}/reactions/${emoji}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'comments'] });
@@ -213,7 +213,7 @@ export function useAddCollaborator(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: 'editor' | 'viewer' }) => {
-      const response = await api.post<CampaignCollaborator>(`/campaigns/${campaignId}/collaborators`, { userId, role });
+      const response = await api.post<CampaignCollaborator>(`/api/v1/campaigns/${campaignId}/collaborators`, { userId, role });
       return response.data;
     },
     onSuccess: () => {
@@ -229,7 +229,7 @@ export function useUpdateCollaborator(campaignId: string) {
 
   return useMutation({
     mutationFn: async ({ collaboratorId, role }: { collaboratorId: string; role: 'editor' | 'viewer' }) => {
-      const response = await api.patch<CampaignCollaborator>(`/campaigns/${campaignId}/collaborators/${collaboratorId}`, { role });
+      const response = await api.patch<CampaignCollaborator>(`/api/v1/campaigns/${campaignId}/collaborators/${collaboratorId}`, { role });
       return response.data;
     },
     onSuccess: () => {
@@ -244,7 +244,7 @@ export function useRemoveCollaborator(campaignId: string) {
 
   return useMutation({
     mutationFn: async (collaboratorId: string) => {
-      await api.delete(`/campaigns/${campaignId}/collaborators/${collaboratorId}`);
+      await api.delete(`/api/v1/campaigns/${campaignId}/collaborators/${collaboratorId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'collaborators'] });

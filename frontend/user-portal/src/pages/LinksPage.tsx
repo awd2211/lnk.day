@@ -136,14 +136,26 @@ export default function LinksPage() {
     setSelectedIds(newSet);
   };
 
+  // 确保 URL 有协议前缀
+  const ensureProtocol = (inputUrl: string): string => {
+    const trimmed = inputUrl.trim();
+    if (!trimmed) return trimmed;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
   // Handlers
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
 
+    const normalizedUrl = ensureProtocol(url);
+
     try {
       await createLink.mutateAsync({
-        originalUrl: url,
+        originalUrl: normalizedUrl,
         customCode: customCode || undefined,
         title: title || undefined,
       });

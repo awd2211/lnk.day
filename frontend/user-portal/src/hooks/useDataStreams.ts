@@ -110,7 +110,7 @@ export function useDataStreams() {
   return useQuery({
     queryKey: ['data-streams'],
     queryFn: async () => {
-      const response = await api.get<DataStream[]>('/data-streams');
+      const response = await api.get<DataStream[]>('/api/v1/data-streams');
       return response.data;
     },
   });
@@ -120,7 +120,7 @@ export function useDataStream(id: string) {
   return useQuery({
     queryKey: ['data-streams', id],
     queryFn: async () => {
-      const response = await api.get<DataStream>(`/data-streams/${id}`);
+      const response = await api.get<DataStream>(`/api/v1/data-streams/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -131,7 +131,7 @@ export function useDataStreamStats() {
   return useQuery({
     queryKey: ['data-streams', 'stats'],
     queryFn: async () => {
-      const response = await api.get<DataStreamStats>('/data-streams/stats');
+      const response = await api.get<DataStreamStats>('/api/v1/data-streams/stats');
       return response.data;
     },
   });
@@ -142,7 +142,7 @@ export function useCreateDataStream() {
 
   return useMutation({
     mutationFn: async (data: CreateDataStreamDto) => {
-      const response = await api.post<DataStream>('/data-streams', data);
+      const response = await api.post<DataStream>('/api/v1/data-streams', data);
       return response.data;
     },
     onSuccess: () => {
@@ -156,7 +156,7 @@ export function useUpdateDataStream() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateDataStreamDto> }) => {
-      const response = await api.patch<DataStream>(`/data-streams/${id}`, data);
+      const response = await api.patch<DataStream>(`/api/v1/data-streams/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -170,7 +170,7 @@ export function useDeleteDataStream() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/data-streams/${id}`);
+      await api.delete(`/api/v1/data-streams/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data-streams'] });
@@ -183,7 +183,7 @@ export function usePauseDataStream() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<DataStream>(`/data-streams/${id}/pause`);
+      const response = await api.post<DataStream>(`/api/v1/data-streams/${id}/pause`);
       return response.data;
     },
     onSuccess: () => {
@@ -197,7 +197,7 @@ export function useResumeDataStream() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<DataStream>(`/data-streams/${id}/resume`);
+      const response = await api.post<DataStream>(`/api/v1/data-streams/${id}/resume`);
       return response.data;
     },
     onSuccess: () => {
@@ -209,7 +209,7 @@ export function useResumeDataStream() {
 export function useTestDataStream() {
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<{ success: boolean; message?: string; latency?: number }>(`/data-streams/${id}/test`);
+      const response = await api.post<{ success: boolean; message?: string; latency?: number }>(`/api/v1/data-streams/${id}/test`);
       return response.data;
     },
   });
@@ -220,7 +220,7 @@ export function useBackfillDataStream() {
 
   return useMutation({
     mutationFn: async ({ id, request }: { id: string; request: BackfillRequest }) => {
-      const response = await api.post<{ jobId: string; estimatedEvents: number }>(`/data-streams/${id}/backfill`, request);
+      const response = await api.post<{ jobId: string; estimatedEvents: number }>(`/api/v1/data-streams/${id}/backfill`, request);
       return response.data;
     },
     onSuccess: () => {
@@ -238,7 +238,7 @@ export function useDataStreamLogs(id: string) {
         level: 'info' | 'warning' | 'error';
         message: string;
         details?: Record<string, any>;
-      }[]>(`/data-streams/${id}/logs`);
+      }[]>(`/api/v1/data-streams/${id}/logs`);
       return response.data;
     },
     enabled: !!id,

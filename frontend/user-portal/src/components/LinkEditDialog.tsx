@@ -91,6 +91,16 @@ export function LinkEditDialog({
     setTags(tags.filter((t) => t !== tag));
   };
 
+  // 确保 URL 有协议前缀
+  const ensureProtocol = (inputUrl: string): string => {
+    const trimmed = inputUrl.trim();
+    if (!trimmed) return trimmed;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -111,7 +121,7 @@ export function LinkEditDialog({
     }
 
     await onSave({
-      originalUrl,
+      originalUrl: ensureProtocol(originalUrl),
       title: title || undefined,
       tags,
       settings: Object.keys(settings).length > 0 ? settings : undefined,

@@ -93,7 +93,7 @@ export function useSavedSearches(options?: { includeTeam?: boolean }) {
   return useQuery({
     queryKey: ['saved-searches', options],
     queryFn: async () => {
-      const { data } = await api.get<SavedSearch[]>('/saved-searches', {
+      const { data } = await api.get<SavedSearch[]>('/api/v1/saved-searches', {
         params: { includeTeam: options?.includeTeam },
       });
       return data;
@@ -108,7 +108,7 @@ export function usePopularSearches(limit: number = 10) {
   return useQuery({
     queryKey: ['saved-searches', 'popular', limit],
     queryFn: async () => {
-      const { data } = await api.get<SavedSearch[]>('/saved-searches/popular', {
+      const { data } = await api.get<SavedSearch[]>('/api/v1/saved-searches/popular', {
         params: { limit },
       });
       return data;
@@ -123,7 +123,7 @@ export function useSavedSearch(id: string) {
   return useQuery({
     queryKey: ['saved-search', id],
     queryFn: async () => {
-      const { data } = await api.get<SavedSearch>(`/saved-searches/${id}`);
+      const { data } = await api.get<SavedSearch>(`/api/v1/saved-searches/${id}`);
       return data;
     },
     enabled: !!id,
@@ -138,7 +138,7 @@ export function useCreateSavedSearch() {
 
   return useMutation({
     mutationFn: async (input: CreateSavedSearchInput) => {
-      const { data } = await api.post<SavedSearch>('/saved-searches', input);
+      const { data } = await api.post<SavedSearch>('/api/v1/saved-searches', input);
       return data;
     },
     onSuccess: () => {
@@ -155,7 +155,7 @@ export function useUpdateSavedSearch() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: { id: string } & UpdateSavedSearchInput) => {
-      const { data } = await api.put<SavedSearch>(`/saved-searches/${id}`, input);
+      const { data } = await api.put<SavedSearch>(`/api/v1/saved-searches/${id}`, input);
       return data;
     },
     onSuccess: (data) => {
@@ -173,7 +173,7 @@ export function useDeleteSavedSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/saved-searches/${id}`);
+      await api.delete(`/api/v1/saved-searches/${id}`);
       return id;
     },
     onSuccess: () => {
@@ -199,7 +199,7 @@ export function useExecuteSavedSearch() {
       limit?: number;
     }) => {
       const { data } = await api.post<SavedSearchExecuteResult>(
-        `/saved-searches/${id}/execute`,
+        `/api/v1/saved-searches/${id}/execute`,
         null,
         { params: { page, limit } },
       );
@@ -221,7 +221,7 @@ export function useDuplicateSavedSearch() {
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name?: string }) => {
       const { data } = await api.post<SavedSearch>(
-        `/saved-searches/${id}/duplicate`,
+        `/api/v1/saved-searches/${id}/duplicate`,
         null,
         { params: { name } },
       );
@@ -241,7 +241,7 @@ export function useTogglePinSavedSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post<SavedSearch>(`/saved-searches/${id}/pin`);
+      const { data } = await api.post<SavedSearch>(`/api/v1/saved-searches/${id}/pin`);
       return data;
     },
     onSuccess: (data) => {
@@ -260,7 +260,7 @@ export function useShareSavedSearch() {
   return useMutation({
     mutationFn: async ({ id, visibility }: { id: string; visibility: SavedSearchVisibility }) => {
       const { data } = await api.post<SavedSearch>(
-        `/saved-searches/${id}/share`,
+        `/api/v1/saved-searches/${id}/share`,
         null,
         { params: { visibility } },
       );
@@ -280,7 +280,7 @@ export function useTestNotification() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data } = await api.post<{ success: boolean; errors: string[] }>(
-        `/saved-searches/${id}/test-notification`,
+        `/api/v1/saved-searches/${id}/test-notification`,
       );
       return data;
     },
@@ -301,7 +301,7 @@ export function useUpdateNotificationSettings() {
       id: string;
       notification: NotificationSettings;
     }) => {
-      const { data } = await api.put<SavedSearch>(`/saved-searches/${id}`, {
+      const { data } = await api.put<SavedSearch>(`/api/v1/saved-searches/${id}`, {
         notification,
       });
       return data;

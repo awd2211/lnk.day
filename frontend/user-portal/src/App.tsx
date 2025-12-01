@@ -39,6 +39,9 @@ const AuditLogPage = lazy(() => import('@/pages/AuditLogPage'));
 const DataStreamsPage = lazy(() => import('@/pages/DataStreamsPage'));
 const CampaignTemplatesPage = lazy(() => import('@/pages/CampaignTemplatesPage'));
 const AutomationPage = lazy(() => import('@/pages/AutomationPage'));
+const RealtimeAnalyticsPage = lazy(() => import('@/pages/RealtimeAnalyticsPage'));
+const AnalyticsReportsPage = lazy(() => import('@/pages/AnalyticsReportsPage'));
+const ApiKeysPage = lazy(() => import('@/pages/ApiKeysPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -114,6 +117,22 @@ function App() {
             }
           />
           <Route
+            path="/analytics/realtime"
+            element={
+              <ProtectedRoute>
+                <RealtimeAnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics/reports"
+            element={
+              <ProtectedRoute>
+                <AnalyticsReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/reports"
             element={
               <ProtectedRoute>
@@ -130,6 +149,22 @@ function App() {
             }
           />
           <Route
+            path="/pages"
+            element={
+              <ProtectedRoute>
+                <BioLinksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pages/:id/edit"
+            element={
+              <ProtectedRoute>
+                <BioLinkEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/bio-links/:id/edit"
             element={
               <ProtectedRoute>
@@ -138,7 +173,7 @@ function App() {
             }
           />
           <Route
-            path="/qr"
+            path="/qr-codes"
             element={
               <ProtectedRoute>
                 <QRPage />
@@ -234,6 +269,14 @@ function App() {
             }
           />
           <Route
+            path="/deeplinks"
+            element={
+              <ProtectedRoute>
+                <DeepLinksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/privacy"
             element={
               <ProtectedRoute>
@@ -302,6 +345,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <AutomationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/api-keys"
+            element={
+              <ProtectedRoute>
+                <ApiKeysPage />
               </ProtectedRoute>
             }
           />

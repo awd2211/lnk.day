@@ -110,7 +110,7 @@ export function useBatchUpdate() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/update',
+        '/api/v1/links/batch/update',
         { linkIds, ...options },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -141,7 +141,7 @@ export function useBatchDelete() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/delete',
+        '/api/v1/links/batch/delete',
         { linkIds, permanent },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -170,7 +170,7 @@ export function useBatchArchive() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/archive',
+        '/api/v1/links/batch/archive',
         { linkIds },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -199,7 +199,7 @@ export function useBatchRestore() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/restore',
+        '/api/v1/links/batch/restore',
         { linkIds },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -230,7 +230,7 @@ export function useBatchMoveToFolder() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/move',
+        '/api/v1/links/batch/move',
         { linkIds, folderId },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -262,7 +262,7 @@ export function useBatchAddTags() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/tags/add',
+        '/api/v1/links/batch/tags/add',
         { linkIds, tags },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -293,7 +293,7 @@ export function useBatchRemoveTags() {
       teamId?: string;
     }) => {
       const { data } = await api.post<BatchOperationResult>(
-        '/links/batch/tags/remove',
+        '/api/v1/links/batch/tags/remove',
         { linkIds, tags },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -317,7 +317,7 @@ export function useBulkSelectIds(query: BulkSelectQuery, teamId?: string) {
     queryKey: ['bulk-select', query, teamId],
     queryFn: async () => {
       const { data } = await api.get<{ ids: string[]; total: number }>(
-        '/links/batch/select',
+        '/api/v1/links/batch/select',
         {
           params: query,
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -342,7 +342,7 @@ export function useBulkSelectIdsMutation() {
       teamId?: string;
     }) => {
       const { data } = await api.get<{ ids: string[]; total: number }>(
-        '/links/batch/select',
+        '/api/v1/links/batch/select',
         {
           params: query,
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -372,7 +372,7 @@ export function useImportLinks() {
       teamId?: string;
     }) => {
       const { data } = await api.post<ImportResult>(
-        '/links/batch/import',
+        '/api/v1/links/batch/import',
         { links, skipDuplicates },
         {
           headers: teamId ? { 'X-Team-ID': teamId } : undefined,
@@ -407,7 +407,7 @@ export function useImportFromCsv() {
       formData.append('skipDuplicates', String(skipDuplicates));
 
       const { data } = await api.post<ImportResult>(
-        '/links/batch/import/csv',
+        '/api/v1/links/batch/import/csv',
         formData,
         {
           headers: {
@@ -431,7 +431,7 @@ export function useCsvTemplate() {
   return useQuery({
     queryKey: ['csv-template'],
     queryFn: async () => {
-      const { data } = await api.get<string>('/links/batch/template', {
+      const { data } = await api.get<string>('/api/v1/links/batch/template', {
         responseType: 'text',
       });
       return data;
@@ -447,7 +447,7 @@ export function useCsvTemplate() {
 export function useDownloadCsvTemplate() {
   return useMutation({
     mutationFn: async () => {
-      const response = await api.get('/links/batch/template', {
+      const response = await api.get('/api/v1/links/batch/template', {
         responseType: 'blob',
       });
 
@@ -479,7 +479,7 @@ export function useExportLinks() {
       options: ExportOptions;
       teamId?: string;
     }) => {
-      const response = await api.get('/links/batch/export', {
+      const response = await api.get('/api/v1/links/batch/export', {
         params: {
           format: options.format || 'csv',
           folderId: options.folderId,

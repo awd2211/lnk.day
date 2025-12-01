@@ -20,6 +20,12 @@ export interface Team {
   memberCount: number;
   createdAt: string;
   updatedAt: string;
+  isPersonal?: boolean; // 是否是个人工作区
+  owner?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
 export interface TeamInvitation {

@@ -99,7 +99,7 @@ export function useCampaigns(status?: CampaignStatus) {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (status) params.append('status', status);
-      const { data } = await api.get(`/campaigns?${params}`);
+      const { data } = await api.get(`/api/v1/campaigns?${params}`);
       return data as Campaign[];
     },
   });
@@ -110,7 +110,7 @@ export function useActiveCampaigns() {
   return useQuery({
     queryKey: ['campaigns', 'active'],
     queryFn: async () => {
-      const { data } = await api.get('/campaigns/active');
+      const { data } = await api.get('/api/v1/campaigns/active');
       return data as Campaign[];
     },
   });
@@ -122,7 +122,7 @@ export function useCampaign(id: string | null) {
     queryKey: ['campaigns', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/campaigns/${id}`);
+      const { data } = await api.get(`/api/v1/campaigns/${id}`);
       return data as Campaign;
     },
     enabled: !!id,
@@ -135,7 +135,7 @@ export function useCampaignStats(id: string | null) {
     queryKey: ['campaigns', id, 'stats'],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/campaigns/${id}/stats`);
+      const { data } = await api.get(`/api/v1/campaigns/${id}/stats`);
       return data as CampaignStats;
     },
     enabled: !!id,
@@ -148,7 +148,7 @@ export function useCreateCampaign() {
 
   return useMutation({
     mutationFn: async (data: CreateCampaignData) => {
-      const response = await api.post('/campaigns', data);
+      const response = await api.post('/api/v1/campaigns', data);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -163,7 +163,7 @@ export function useUpdateCampaign() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateCampaignData }) => {
-      const response = await api.put(`/campaigns/${id}`, data);
+      const response = await api.put(`/api/v1/campaigns/${id}`, data);
       return response.data as Campaign;
     },
     onSuccess: (_, { id }) => {
@@ -179,7 +179,7 @@ export function useStartCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/campaigns/${id}/start`);
+      const response = await api.post(`/api/v1/campaigns/${id}/start`);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -194,7 +194,7 @@ export function usePauseCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/campaigns/${id}/pause`);
+      const response = await api.post(`/api/v1/campaigns/${id}/pause`);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -209,7 +209,7 @@ export function useCompleteCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/campaigns/${id}/complete`);
+      const response = await api.post(`/api/v1/campaigns/${id}/complete`);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -224,7 +224,7 @@ export function useArchiveCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/campaigns/${id}/archive`);
+      const response = await api.post(`/api/v1/campaigns/${id}/archive`);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -239,7 +239,7 @@ export function useAddLinksToCampaign() {
 
   return useMutation({
     mutationFn: async ({ id, linkIds }: { id: string; linkIds: string[] }) => {
-      const response = await api.post(`/campaigns/${id}/links`, { linkIds });
+      const response = await api.post(`/api/v1/campaigns/${id}/links`, { linkIds });
       return response.data as Campaign;
     },
     onSuccess: (_, { id }) => {
@@ -255,7 +255,7 @@ export function useRemoveLinksFromCampaign() {
 
   return useMutation({
     mutationFn: async ({ id, linkIds }: { id: string; linkIds: string[] }) => {
-      const response = await api.delete(`/campaigns/${id}/links`, {
+      const response = await api.delete(`/api/v1/campaigns/${id}/links`, {
         data: { linkIds },
       });
       return response.data as Campaign;
@@ -273,7 +273,7 @@ export function useDuplicateCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/campaigns/${id}/duplicate`);
+      const response = await api.post(`/api/v1/campaigns/${id}/duplicate`);
       return response.data as Campaign;
     },
     onSuccess: () => {
@@ -288,7 +288,7 @@ export function useDeleteCampaign() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/campaigns/${id}`);
+      await api.delete(`/api/v1/campaigns/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
@@ -306,7 +306,7 @@ export function useBuildUtmUrl() {
       baseUrl: string;
       utmParams: UTMParams;
     }) => {
-      const response = await api.post('/campaigns/utm-builder', {
+      const response = await api.post('/api/v1/campaigns/utm-builder', {
         baseUrl,
         utmParams,
       });
