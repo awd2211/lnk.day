@@ -123,3 +123,10 @@ func (s *LinkService) InvalidateCache(ctx context.Context, code string) error {
 	cacheKey := fmt.Sprintf("link:%s", code)
 	return s.redis.Del(ctx, cacheKey).Err()
 }
+
+// IncrementClicksAsync increments clicks without context (for goroutine use)
+func (s *LinkService) IncrementClicksAsync(linkID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return s.IncrementClicks(ctx, linkID)
+}

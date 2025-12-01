@@ -193,26 +193,30 @@ class RabbitMQConsumer:
                     except ValueError:
                         timestamp = datetime.utcnow()
 
+                import uuid
                 data.append({
-                    "id": event.get("id", ""),
+                    "event_id": event.get("id", str(uuid.uuid4())),
+                    "event_type": "click",  # Enum value
                     "link_id": event.get("linkId", ""),
-                    "short_code": event.get("shortCode", ""),
+                    "user_id": "",  # Not available from redirect-service
                     "timestamp": timestamp,
-                    "ip": event.get("ip", ""),
-                    "user_agent": event.get("userAgent", ""),
-                    "referer": event.get("referer", ""),
+                    "visitor_ip": event.get("ip", ""),
                     "country": event.get("country", "Unknown"),
-                    "region": event.get("region", ""),
                     "city": event.get("city", ""),
-                    "device": event.get("device", ""),
-                    "browser": event.get("browser", ""),
+                    "device_type": event.get("device", ""),
                     "os": event.get("os", ""),
+                    "browser": event.get("browser", ""),
+                    "referrer": event.get("referer", ""),
+                    "utm_source": event.get("utmSource", ""),
+                    "utm_medium": event.get("utmMedium", ""),
+                    "utm_campaign": event.get("utmCampaign", ""),
                 })
 
             self.clickhouse.execute(
                 """
-                INSERT INTO clicks (id, link_id, short_code, timestamp, ip, user_agent,
-                                    referer, country, region, city, device, browser, os)
+                INSERT INTO link_events (event_id, event_type, link_id, user_id, timestamp,
+                                         visitor_ip, country, city, device_type, os, browser,
+                                         referrer, utm_source, utm_medium, utm_campaign)
                 VALUES
                 """,
                 data,

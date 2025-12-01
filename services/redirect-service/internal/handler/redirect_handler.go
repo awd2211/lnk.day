@@ -102,14 +102,20 @@ func (h *RedirectHandler) Redirect(c *fiber.Ctx) error {
 	// Determine redirect URL based on targeting rules
 	redirectURL := h.ruleService.ResolveTargetURL(c.Context(), link, visitorCtx)
 
+	// Copy values before goroutine (fiber context is not safe in goroutines)
+	ip := c.IP()
+	userAgent := c.Get("User-Agent")
+	referer := c.Get("Referer")
+	linkID := link.ID
+
 	// Track click asynchronously
 	go func() {
 		event := &model.ClickEvent{
-			LinkID:       link.ID,
+			LinkID:       linkID,
 			ShortCode:    code,
-			IP:           c.IP(),
-			UserAgent:    c.Get("User-Agent"),
-			Referer:      c.Get("Referer"),
+			IP:           ip,
+			UserAgent:    userAgent,
+			Referer:      referer,
 			Country:      geoInfo.Country,
 			Region:       geoInfo.Region,
 			City:         geoInfo.City,
@@ -125,7 +131,7 @@ func (h *RedirectHandler) Redirect(c *fiber.Ctx) error {
 		}
 
 		h.analyticsService.TrackClick(event)
-		h.linkService.IncrementClicks(c.Context(), link.ID)
+		h.linkService.IncrementClicksAsync(linkID)
 	}()
 
 	// Perform redirect
