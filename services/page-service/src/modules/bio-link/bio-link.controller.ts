@@ -87,6 +87,36 @@ export class BioLinkController {
     return { username, available };
   }
 
+  @Get('username/:username')
+  @Public()
+  @ApiOperation({ summary: '通过用户名获取公开的 Bio Link 页面数据' })
+  @ApiParam({ name: 'username', type: String })
+  async getByUsername(
+    @Param('username') username: string,
+    @Req() req: Request,
+  ) {
+    const result = await this.bioLinkService.getPublicPage(username);
+
+    // Track view (async)
+    this.bioLinkService.trackView(result.bioLink.id, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      referer: req.headers['referer'] as string,
+    }).catch(() => {});
+
+    // Filter sensitive data
+    const { settings, ...bioLink } = result.bioLink;
+    const safeSettings = {
+      sensitiveContent: settings.sensitiveContent,
+      sensitiveWarningMessage: settings.sensitiveWarningMessage,
+    };
+
+    return {
+      bioLink: { ...bioLink, settings: safeSettings },
+      items: result.items,
+    };
+  }
+
   @Get(':id')
   @RequirePermissions(Permission.PAGES_VIEW)
   @ApiOperation({ summary: '获取 Bio Link 详情' })

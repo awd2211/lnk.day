@@ -565,4 +565,37 @@ export class SalesforceService {
         keyPrefix: obj.keyPrefix,
       }));
   }
+
+  // ========== Sync Methods ==========
+
+  async syncData(teamId: string): Promise<{ leadsSynced: number; contactsSynced: number }> {
+    const connection = await this.getConnection(teamId);
+    if (!connection) {
+      throw new NotFoundException('Salesforce not connected');
+    }
+
+    let leadsSynced = 0;
+    let contactsSynced = 0;
+
+    // 同步 Leads
+    if (connection.settings?.syncLeads !== false) {
+      const leads = await this.getLeads(teamId, 100);
+      leadsSynced = leads.records?.length || 0;
+    }
+
+    // 同步 Contacts
+    if (connection.settings?.syncContacts !== false) {
+      const contacts = await this.getContacts(teamId, 100);
+      contactsSynced = contacts.records?.length || 0;
+    }
+
+    // 更新同步时间
+    connection.lastSyncAt = new Date();
+    await this.connectionRepo.save(connection);
+
+    return {
+      leadsSynced,
+      contactsSynced,
+    };
+  }
 }

@@ -233,4 +233,55 @@ export class DeepLinkService {
         },
       }));
   }
+
+  /**
+   * Get platform-wide deeplink statistics (for admin console)
+   */
+  async getGlobalStats(): Promise<{
+    totalDeepLinks: number;
+    enabledDeepLinks: number;
+    disabledDeepLinks: number;
+    withIOSConfig: number;
+    withAndroidConfig: number;
+    totalClicks: number;
+    totalInstalls: number;
+  }> {
+    const [
+      totalDeepLinks,
+      enabledDeepLinks,
+      disabledDeepLinks,
+    ] = await Promise.all([
+      this.deepLinkRepository.count(),
+      this.deepLinkRepository.count({ where: { enabled: true } }),
+      this.deepLinkRepository.count({ where: { enabled: false } }),
+    ]);
+
+    // Count deeplinks with iOS and Android configs
+    const withIOSConfig = await this.deepLinkRepository
+      .createQueryBuilder('dl')
+      .where('dl.iosConfig IS NOT NULL')
+      .getCount();
+
+    const withAndroidConfig = await this.deepLinkRepository
+      .createQueryBuilder('dl')
+      .where('dl.androidConfig IS NOT NULL')
+      .getCount();
+
+    // Get aggregated click and install stats
+    const aggregateResult = await this.deepLinkRepository
+      .createQueryBuilder('dl')
+      .select('SUM(dl.clicks)', 'totalClicks')
+      .addSelect('SUM(dl.installs)', 'totalInstalls')
+      .getRawOne();
+
+    return {
+      totalDeepLinks,
+      enabledDeepLinks,
+      disabledDeepLinks,
+      withIOSConfig,
+      withAndroidConfig,
+      totalClicks: parseInt(aggregateResult?.totalClicks || '0', 10),
+      totalInstalls: parseInt(aggregateResult?.totalInstalls || '0', 10),
+    };
+  }
 }

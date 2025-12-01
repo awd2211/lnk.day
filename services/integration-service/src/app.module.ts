@@ -9,6 +9,7 @@ import { HubSpotModule } from './modules/hubspot/hubspot.module';
 import { SalesforceModule } from './modules/salesforce/salesforce.module';
 import { ShopifyModule } from './modules/shopify/shopify.module';
 import { HealthModule } from './modules/health/health.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { HealthModule } from './modules/health/health.module';
     SalesforceModule,
     ShopifyModule,
     HealthModule,
+    IntegrationsModule,
   ],
   providers: [
     {

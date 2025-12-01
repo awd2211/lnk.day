@@ -514,6 +514,26 @@ export class HubSpotService {
     await this.connectionRepo.save(connection);
   }
 
+  // ========== Sync Methods ==========
+
+  async syncContacts(teamId: string): Promise<{ contactsSynced: number }> {
+    const connection = await this.getConnection(teamId);
+    if (!connection) {
+      throw new Error('No HubSpot connection found');
+    }
+
+    // 获取联系人列表
+    const contacts = await this.getContacts(teamId, 100);
+
+    // 更新同步时间
+    connection.lastSyncAt = new Date();
+    await this.connectionRepo.save(connection);
+
+    return {
+      contactsSynced: contacts.results?.length || 0,
+    };
+  }
+
   // ========== Custom Properties ==========
 
   async ensureCustomProperties(teamId: string): Promise<void> {

@@ -274,4 +274,48 @@ export class ZapierController {
       ],
     };
   }
+
+  // ==================== 前端兼容端点 ====================
+
+  @Get('webhooks')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @ApiOperation({ summary: 'List webhooks (alias for subscriptions)' })
+  async listWebhooks(@ScopedTeamId() teamId: string) {
+    const subscriptions = await this.zapierService.getSubscriptions(teamId);
+    return { items: subscriptions, total: subscriptions.length };
+  }
+
+  @Post('webhooks')
+  @ApiOperation({ summary: 'Create webhook subscription (alias for subscribe)' })
+  @ApiHeader({ name: 'x-team-id', required: true })
+  async createWebhook(
+    @ScopedTeamId() teamId: string,
+    @Body() dto: SubscribeDto,
+  ) {
+    const subscription = await this.zapierService.subscribeToTrigger(
+      teamId,
+      dto.event,
+      dto.webhookUrl,
+    );
+
+    return {
+      id: subscription.id,
+      event: subscription.event,
+      webhookUrl: subscription.webhookUrl,
+      enabled: subscription.enabled,
+      createdAt: subscription.createdAt,
+    };
+  }
+
+  @Delete('webhooks/:id')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete webhook (alias for unsubscribe)' })
+  async deleteWebhook(
+    @ScopedTeamId() teamId: string,
+    @Param('id') id: string,
+  ) {
+    await this.zapierService.unsubscribeFromTrigger(id, teamId);
+    return null;
+  }
 }

@@ -316,4 +316,19 @@ export class HubSpotController {
     );
     return { success: true };
   }
+
+  // ========== 前端兼容端点 ==========
+
+  @Post('sync')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @ApiOperation({ summary: 'Trigger HubSpot data sync' })
+  async triggerSync(@ScopedTeamId() teamId: string) {
+    // 触发同步任务
+    const result = await this.hubspotService.syncContacts(teamId);
+    return {
+      success: true,
+      message: 'Sync triggered successfully',
+      synced: result,
+    };
+  }
 }

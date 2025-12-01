@@ -22,6 +22,7 @@ import { SmsModule } from './modules/sms/sms.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { NotificationConfigModule } from './modules/config/config.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { NotificationConfigModule } from './modules/config/config.module';
     SmsModule,
     HealthModule,
     NotificationConfigModule,
+    NotificationsModule,
   ],
   providers: [
     {

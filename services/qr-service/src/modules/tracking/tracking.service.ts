@@ -219,4 +219,48 @@ export class TrackingService {
       take: limit,
     });
   }
+
+  /**
+   * Get platform-wide QR code statistics (for admin console)
+   */
+  async getGlobalStats(): Promise<{
+    totalQRCodes: number;
+    activeQRCodes: number;
+    inactiveQRCodes: number;
+    dynamicQRCodes: number;
+    staticQRCodes: number;
+    totalScans: number;
+    totalUniqueScans: number;
+  }> {
+    const [
+      totalQRCodes,
+      activeQRCodes,
+      inactiveQRCodes,
+      dynamicQRCodes,
+      staticQRCodes,
+    ] = await Promise.all([
+      this.qrRecordRepository.count(),
+      this.qrRecordRepository.count({ where: { isActive: true } }),
+      this.qrRecordRepository.count({ where: { isActive: false } }),
+      this.qrRecordRepository.count({ where: { type: QrType.DYNAMIC } }),
+      this.qrRecordRepository.count({ where: { type: QrType.STATIC } }),
+    ]);
+
+    // Get aggregated scan stats
+    const aggregateResult = await this.qrRecordRepository
+      .createQueryBuilder('qr')
+      .select('SUM(qr.scanCount)', 'totalScans')
+      .addSelect('SUM(qr.uniqueScans)', 'totalUniqueScans')
+      .getRawOne();
+
+    return {
+      totalQRCodes,
+      activeQRCodes,
+      inactiveQRCodes,
+      dynamicQRCodes,
+      staticQRCodes,
+      totalScans: parseInt(aggregateResult?.totalScans || '0', 10),
+      totalUniqueScans: parseInt(aggregateResult?.totalUniqueScans || '0', 10),
+    };
+  }
 }

@@ -766,4 +766,44 @@ export class PageService {
       </style>
     `;
   }
+
+  /**
+   * Get platform-wide page statistics (for admin console)
+   */
+  async getGlobalStats(): Promise<{
+    totalPages: number;
+    publishedPages: number;
+    draftPages: number;
+    archivedPages: number;
+    totalViews: number;
+    totalUniqueViews: number;
+  }> {
+    const [
+      totalPages,
+      publishedPages,
+      draftPages,
+      archivedPages,
+    ] = await Promise.all([
+      this.pageRepository.count(),
+      this.pageRepository.count({ where: { status: PageStatus.PUBLISHED } }),
+      this.pageRepository.count({ where: { status: PageStatus.DRAFT } }),
+      this.pageRepository.count({ where: { status: PageStatus.ARCHIVED } }),
+    ]);
+
+    // Get aggregated view stats
+    const aggregateResult = await this.pageRepository
+      .createQueryBuilder('page')
+      .select('SUM(page.views)', 'totalViews')
+      .addSelect('SUM(page.uniqueViews)', 'totalUniqueViews')
+      .getRawOne();
+
+    return {
+      totalPages,
+      publishedPages,
+      draftPages,
+      archivedPages,
+      totalViews: parseInt(aggregateResult?.totalViews || '0', 10),
+      totalUniqueViews: parseInt(aggregateResult?.totalUniqueViews || '0', 10),
+    };
+  }
 }

@@ -344,4 +344,18 @@ export class SalesforceController {
     );
     return { success: true };
   }
+
+  // ========== 前端兼容端点 ==========
+
+  @Post('sync')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @ApiOperation({ summary: 'Trigger Salesforce data sync' })
+  async triggerSync(@ScopedTeamId() teamId: string) {
+    const result = await this.salesforceService.syncData(teamId);
+    return {
+      success: true,
+      message: 'Sync triggered successfully',
+      ...result,
+    };
+  }
 }
