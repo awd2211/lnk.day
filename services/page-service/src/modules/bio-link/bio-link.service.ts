@@ -12,6 +12,8 @@ import {
   BioLink,
   BioLinkItem,
   BioLinkClick,
+  BioLinkSubscriber,
+  BioLinkContact,
   BioLinkStatus,
 } from './entities/bio-link.entity';
 import {
@@ -33,6 +35,10 @@ export class BioLinkService {
     private readonly bioLinkItemRepository: Repository<BioLinkItem>,
     @InjectRepository(BioLinkClick)
     private readonly bioLinkClickRepository: Repository<BioLinkClick>,
+    @InjectRepository(BioLinkSubscriber)
+    private readonly subscriberRepository: Repository<BioLinkSubscriber>,
+    @InjectRepository(BioLinkContact)
+    private readonly contactRepository: Repository<BioLinkContact>,
   ) {}
 
   // ==================== Bio Link CRUD ====================
@@ -56,9 +62,11 @@ export class BioLinkService {
       username: dto.username.toLowerCase(),
       userId,
       teamId,
+      // Cast theme to entity type (DTO allows flexible strings, entity has strict types)
+      theme: dto.theme as any,
     });
 
-    return this.bioLinkRepository.save(bioLink);
+    return this.bioLinkRepository.save(bioLink) as Promise<BioLink>;
   }
 
   async findAll(
@@ -152,15 +160,110 @@ export class BioLinkService {
     dto: UpdateBioLinkDto,
     userId: string,
     teamId: string,
-  ): Promise<BioLink> {
+  ): Promise<BioLink & { blocks: BioLinkItem[] }> {
     const bioLink = await this.findOne(id);
 
     if (bioLink.teamId !== teamId) {
       throw new ForbiddenException('Access denied');
     }
 
-    Object.assign(bioLink, dto);
-    return this.bioLinkRepository.save(bioLink);
+    // Handle blocks separately - save them to BioLinkItem table
+    const { blocks, ...bioLinkData } = dto as any;
+
+    // Update profile based on description and avatarUrl
+    if (bioLinkData.description !== undefined || bioLinkData.avatarUrl !== undefined) {
+      bioLink.profile = {
+        ...bioLink.profile,
+        bio: bioLinkData.description ?? bioLink.profile?.bio,
+        avatarUrl: bioLinkData.avatarUrl ?? bioLink.profile?.avatarUrl,
+      };
+      delete bioLinkData.description;
+      delete bioLinkData.avatarUrl;
+    }
+
+    // Handle isPublished -> status conversion
+    if (bioLinkData.isPublished !== undefined) {
+      bioLink.status = bioLinkData.isPublished ? BioLinkStatus.PUBLISHED : BioLinkStatus.DRAFT;
+      if (bioLinkData.isPublished && !bioLink.publishedAt) {
+        bioLink.publishedAt = new Date();
+      }
+      delete bioLinkData.isPublished;
+    }
+
+    // Update other bio link fields
+    Object.assign(bioLink, bioLinkData);
+    const savedBioLink = await this.bioLinkRepository.save(bioLink);
+
+    // If blocks are provided, sync them with the items table
+    if (blocks && Array.isArray(blocks)) {
+      await this.syncBlocks(id, blocks);
+    }
+
+    // Return with blocks
+    const updatedBlocks = await this.getItems(id);
+    return {
+      ...savedBioLink,
+      blocks: updatedBlocks,
+    };
+  }
+
+  // Sync blocks from frontend to BioLinkItem table
+  private async syncBlocks(bioLinkId: string, blocks: any[]): Promise<void> {
+    const existingItems = await this.bioLinkItemRepository.find({
+      where: { bioLinkId },
+    });
+
+    const existingIds = new Set(existingItems.map((item) => item.id));
+    const incomingIds = new Set(blocks.filter((b) => b.id).map((b) => b.id));
+
+    // Delete items that are not in the incoming blocks
+    const toDelete = existingItems.filter((item) => !incomingIds.has(item.id));
+    if (toDelete.length > 0) {
+      await this.bioLinkItemRepository.remove(toDelete);
+    }
+
+    // Update or create items
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i];
+      const itemData = {
+        bioLinkId,
+        type: block.type || 'link',
+        title: block.title || '',
+        url: block.url,
+        description: block.description,
+        thumbnailUrl: block.thumbnailUrl,
+        visible: block.isVisible ?? true,
+        order: block.sortOrder ?? i,
+        style: block.style || {},
+        settings: block.settings || {},
+        embed: block.embed,
+        product: block.product,
+        content: block.content,
+        carousel: block.carousel,
+        countdown: block.countdown,
+        music: block.music,
+        map: block.map,
+        subscribe: block.subscribe,
+        nft: block.nft,
+        podcast: block.podcast,
+        text: block.text,
+        image: block.image,
+        video: block.video,
+        contactForm: block.contactForm,
+      };
+
+      // Check if ID is a valid UUID (for existing items) or a temp ID (for new items)
+      const isValidUuid = block.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(block.id);
+
+      if (isValidUuid && existingIds.has(block.id)) {
+        // Update existing item
+        await this.bioLinkItemRepository.update(block.id, itemData);
+      } else {
+        // Create new item without specifying ID (let database generate it)
+        const newItem = this.bioLinkItemRepository.create(itemData);
+        await this.bioLinkItemRepository.save(newItem);
+      }
+    }
   }
 
   async remove(id: string, teamId: string): Promise<void> {
@@ -519,15 +622,192 @@ export class BioLinkService {
     };
   }
 
+  // ==================== Subscriptions ====================
+
+  async addSubscriber(
+    bioLinkId: string,
+    itemId: string,
+    data: {
+      email: string;
+      name?: string;
+      phone?: string;
+      ip?: string;
+      userAgent?: string;
+      country?: string;
+    },
+  ): Promise<BioLinkSubscriber> {
+    // Check if already subscribed
+    const existing = await this.subscriberRepository.findOne({
+      where: { bioLinkId, email: data.email },
+    });
+
+    if (existing) {
+      if (existing.status === 'unsubscribed') {
+        // Re-subscribe
+        existing.status = 'pending';
+        existing.unsubscribedAt = undefined;
+        return this.subscriberRepository.save(existing);
+      }
+      // Already subscribed
+      return existing;
+    }
+
+    const subscriber = this.subscriberRepository.create({
+      bioLinkId,
+      itemId,
+      ...data,
+      status: 'pending',
+    });
+
+    return this.subscriberRepository.save(subscriber);
+  }
+
+  async getSubscribers(
+    bioLinkId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: 'pending' | 'confirmed' | 'unsubscribed';
+    },
+  ): Promise<{ items: BioLinkSubscriber[]; total: number }> {
+    const page = options?.page || 1;
+    const limit = Math.min(options?.limit || 20, 100);
+
+    const queryBuilder = this.subscriberRepository.createQueryBuilder('subscriber');
+    queryBuilder.where('subscriber.bioLinkId = :bioLinkId', { bioLinkId });
+
+    if (options?.status) {
+      queryBuilder.andWhere('subscriber.status = :status', { status: options.status });
+    }
+
+    queryBuilder.orderBy('subscriber.createdAt', 'DESC');
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+    return { items, total };
+  }
+
+  async exportSubscribers(bioLinkId: string): Promise<BioLinkSubscriber[]> {
+    return this.subscriberRepository.find({
+      where: { bioLinkId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async unsubscribe(bioLinkId: string, email: string): Promise<void> {
+    const subscriber = await this.subscriberRepository.findOne({
+      where: { bioLinkId, email },
+    });
+
+    if (subscriber) {
+      subscriber.status = 'unsubscribed';
+      subscriber.unsubscribedAt = new Date();
+      await this.subscriberRepository.save(subscriber);
+    }
+  }
+
+  // ==================== Contact Form ====================
+
+  async submitContactForm(
+    bioLinkId: string,
+    itemId: string,
+    data: {
+      formData: Record<string, string>;
+      ip?: string;
+      userAgent?: string;
+      country?: string;
+    },
+  ): Promise<BioLinkContact> {
+    const contact = this.contactRepository.create({
+      bioLinkId,
+      itemId,
+      formData: data.formData,
+      ip: data.ip,
+      userAgent: data.userAgent,
+      country: data.country,
+      status: 'new',
+    });
+
+    const saved = await this.contactRepository.save(contact);
+
+    // TODO: Send notification email to bio link owner if configured
+    // This can be implemented with notification-service integration
+
+    return saved;
+  }
+
+  async getContactSubmissions(
+    bioLinkId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      status?: 'new' | 'read' | 'replied' | 'archived';
+      itemId?: string;
+    },
+  ): Promise<{ items: BioLinkContact[]; total: number }> {
+    const page = options?.page || 1;
+    const limit = Math.min(options?.limit || 20, 100);
+
+    const queryBuilder = this.contactRepository.createQueryBuilder('contact');
+    queryBuilder.where('contact.bioLinkId = :bioLinkId', { bioLinkId });
+
+    if (options?.status) {
+      queryBuilder.andWhere('contact.status = :status', { status: options.status });
+    }
+
+    if (options?.itemId) {
+      queryBuilder.andWhere('contact.itemId = :itemId', { itemId: options.itemId });
+    }
+
+    queryBuilder.orderBy('contact.createdAt', 'DESC');
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+    return { items, total };
+  }
+
+  async updateContactStatus(
+    contactId: string,
+    status: 'new' | 'read' | 'replied' | 'archived',
+  ): Promise<BioLinkContact> {
+    const contact = await this.contactRepository.findOne({
+      where: { id: contactId },
+    });
+
+    if (!contact) {
+      throw new NotFoundException('Contact submission not found');
+    }
+
+    contact.status = status;
+    if (status === 'replied') {
+      contact.repliedAt = new Date();
+    }
+
+    return this.contactRepository.save(contact);
+  }
+
+  async deleteContact(contactId: string): Promise<void> {
+    const contact = await this.contactRepository.findOne({
+      where: { id: contactId },
+    });
+
+    if (!contact) {
+      throw new NotFoundException('Contact submission not found');
+    }
+
+    await this.contactRepository.remove(contact);
+  }
+
   // ==================== Public Page Rendering ====================
 
-  async getPublicPage(username: string): Promise<{
+  async getPublicPage(username: string, isPreview = false): Promise<{
     bioLink: BioLink;
     items: BioLinkItem[];
   }> {
     const bioLink = await this.findByUsername(username);
 
-    if (bioLink.status !== BioLinkStatus.PUBLISHED) {
+    // 预览模式允许查看草稿，否则只能查看已发布的页面
+    if (!isPreview && bioLink.status !== BioLinkStatus.PUBLISHED) {
       throw new NotFoundException('Page not found');
     }
 

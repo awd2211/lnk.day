@@ -214,47 +214,8 @@ export class BioLinkItem {
   @Column({ nullable: true })
   description?: string;
 
-  @Column({
-    type: 'enum',
-    enum: [
-      'link',
-      'header',
-      'embed',
-      'product',
-      'collection',
-      'carousel',
-      'countdown',
-      'music',
-      'map',
-      'subscribe',
-      'nft',
-      'podcast',
-      'text',
-      'divider',
-      'image',
-      'video',
-      'contact_form',
-    ],
-    default: 'link',
-  })
-  type:
-    | 'link'
-    | 'header'
-    | 'embed'
-    | 'product'
-    | 'collection'
-    | 'carousel'
-    | 'countdown'
-    | 'music'
-    | 'map'
-    | 'subscribe'
-    | 'nft'
-    | 'podcast'
-    | 'text'
-    | 'divider'
-    | 'image'
-    | 'video'
-    | 'contact_form';
+  @Column({ default: 'link' })
+  type: string;
 
   @Column('jsonb', { default: {} })
   style: {
@@ -437,6 +398,9 @@ export class BioLinkItem {
   };
 
   @Column('jsonb', { nullable: true })
+  content?: Record<string, any>;
+
+  @Column('jsonb', { nullable: true })
   contactForm?: {
     fields: Array<{
       name: string;
@@ -515,4 +479,98 @@ export class BioLinkClick {
 
   @Column()
   timestamp: Date;
+}
+
+// Subscriber tracking for Bio Link
+@Entity('bio_link_subscribers')
+@Index(['bioLinkId', 'email'])
+@Index(['bioLinkId', 'itemId'])
+export class BioLinkSubscriber {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  @Index()
+  bioLinkId: string;
+
+  @Column({ nullable: true })
+  @Index()
+  itemId?: string;  // Which subscribe block captured this
+
+  @Column()
+  email: string;
+
+  @Column({ nullable: true })
+  name?: string;
+
+  @Column({ nullable: true })
+  phone?: string;
+
+  @Column({ nullable: true })
+  ip?: string;
+
+  @Column({ nullable: true })
+  userAgent?: string;
+
+  @Column({ nullable: true })
+  country?: string;
+
+  @Column({ default: 'pending' })
+  status: 'pending' | 'confirmed' | 'unsubscribed';
+
+  @Column({ nullable: true })
+  confirmedAt?: Date;
+
+  @Column({ nullable: true })
+  unsubscribedAt?: Date;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
+// Contact form submissions
+@Entity('bio_link_contacts')
+@Index(['bioLinkId', 'itemId'])
+@Index(['bioLinkId', 'createdAt'])
+export class BioLinkContact {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  @Index()
+  bioLinkId: string;
+
+  @Column({ nullable: true })
+  @Index()
+  itemId?: string;  // Which contact form block received this
+
+  @Column('jsonb')
+  formData: Record<string, string>;
+
+  @Column({ nullable: true })
+  ip?: string;
+
+  @Column({ nullable: true })
+  userAgent?: string;
+
+  @Column({ nullable: true })
+  country?: string;
+
+  @Column({ default: 'new' })
+  status: 'new' | 'read' | 'replied' | 'archived';
+
+  @Column({ nullable: true })
+  repliedAt?: Date;
+
+  @Column({ nullable: true })
+  notes?: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

@@ -41,7 +41,7 @@ import {
   BioLinkResponseDto,
   BioLinkAnalyticsDto,
 } from './dto/bio-link.dto';
-import { BioLink, BioLinkItem, BioLinkStatus } from './entities/bio-link.entity';
+import { BioLink, BioLinkItem, BioLinkStatus, BioLinkSubscriber, BioLinkContact } from './entities/bio-link.entity';
 
 @ApiTags('bio-links')
 @Controller('bio-links')
@@ -97,18 +97,23 @@ export class BioLinkController {
   @Public()
   @ApiOperation({ summary: '通过用户名获取公开的 Bio Link 页面数据' })
   @ApiParam({ name: 'username', type: String })
+  @ApiQuery({ name: 'preview', required: false, type: Boolean, description: '预览模式（允许查看草稿）' })
   async getByUsername(
     @Param('username') username: string,
+    @Query('preview') preview: string,
     @Req() req: Request,
   ) {
-    const result = await this.bioLinkService.getPublicPage(username);
+    const isPreview = preview === 'true' || preview === '1';
+    const result = await this.bioLinkService.getPublicPage(username, isPreview);
 
-    // Track view (async)
-    this.bioLinkService.trackView(result.bioLink.id, {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      referer: req.headers['referer'] as string,
-    }).catch(() => {});
+    // Track view (async) - only for non-preview visits
+    if (!isPreview) {
+      this.bioLinkService.trackView(result.bioLink.id, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        referer: req.headers['referer'] as string,
+      }).catch(() => {});
+    }
 
     // Filter sensitive data
     const { settings, ...bioLink } = result.bioLink;
@@ -267,6 +272,78 @@ export class BioLinkController {
   ): Promise<BioLinkAnalyticsDto> {
     return this.bioLinkService.getAnalytics(id, days || 30);
   }
+
+  // ==================== Subscribers Management ====================
+
+  @Get(':id/subscribers')
+  @RequirePermissions(Permission.PAGES_VIEW)
+  @ApiOperation({ summary: '获取订阅者列表' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'confirmed', 'unsubscribed'] })
+  async getSubscribers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: 'pending' | 'confirmed' | 'unsubscribed',
+  ) {
+    return this.bioLinkService.getSubscribers(id, { page, limit, status });
+  }
+
+  @Get(':id/subscribers/export')
+  @RequirePermissions(Permission.PAGES_VIEW)
+  @ApiOperation({ summary: '导出订阅者列表' })
+  @ApiParam({ name: 'id', type: String })
+  async exportSubscribers(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<BioLinkSubscriber[]> {
+    return this.bioLinkService.exportSubscribers(id);
+  }
+
+  // ==================== Contact Form Management ====================
+
+  @Get(':id/contacts')
+  @RequirePermissions(Permission.PAGES_VIEW)
+  @ApiOperation({ summary: '获取联系表单提交列表' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['new', 'read', 'replied', 'archived'] })
+  @ApiQuery({ name: 'itemId', required: false, description: '按表单块筛选' })
+  async getContacts(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: 'new' | 'read' | 'replied' | 'archived',
+    @Query('itemId') itemId?: string,
+  ) {
+    return this.bioLinkService.getContactSubmissions(id, { page, limit, status, itemId });
+  }
+
+  @Put(':id/contacts/:contactId/status')
+  @RequirePermissions(Permission.PAGES_EDIT)
+  @ApiOperation({ summary: '更新联系表单状态' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiParam({ name: 'contactId', type: String })
+  async updateContactStatus(
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Body() body: { status: 'new' | 'read' | 'replied' | 'archived' },
+  ): Promise<BioLinkContact> {
+    return this.bioLinkService.updateContactStatus(contactId, body.status);
+  }
+
+  @Delete(':id/contacts/:contactId')
+  @RequirePermissions(Permission.PAGES_DELETE)
+  @ApiOperation({ summary: '删除联系表单提交' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiParam({ name: 'contactId', type: String })
+  async deleteContact(
+    @Param('contactId', ParseUUIDPipe) contactId: string,
+  ): Promise<{ message: string }> {
+    await this.bioLinkService.deleteContact(contactId);
+    return { message: 'Contact deleted successfully' };
+  }
 }
 
 // Public controller for viewing bio pages
@@ -278,18 +355,23 @@ export class BioLinkPublicController {
   @Get('u/:username')
   @ApiOperation({ summary: '获取公开的 Bio Link 页面数据' })
   @ApiParam({ name: 'username', type: String })
+  @ApiQuery({ name: 'preview', required: false, type: Boolean, description: '预览模式（允许查看草稿）' })
   async getPublicPage(
     @Param('username') username: string,
+    @Query('preview') preview: string,
     @Req() req: Request,
   ) {
-    const result = await this.bioLinkService.getPublicPage(username);
+    const isPreview = preview === 'true' || preview === '1';
+    const result = await this.bioLinkService.getPublicPage(username, isPreview);
 
-    // Track view (async)
-    this.bioLinkService.trackView(result.bioLink.id, {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-      referer: req.headers['referer'] as string,
-    }).catch(() => {});
+    // Track view (async) - only for non-preview visits
+    if (!isPreview) {
+      this.bioLinkService.trackView(result.bioLink.id, {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        referer: req.headers['referer'] as string,
+      }).catch(() => {});
+    }
 
     // Filter sensitive data
     const { settings, ...bioLink } = result.bioLink;
@@ -332,6 +414,53 @@ export class BioLinkPublicController {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
+    return { success: true };
+  }
+
+  @Post('u/:username/subscribe/:itemId')
+  @ApiOperation({ summary: '订阅邮件列表' })
+  async subscribe(
+    @Param('username') username: string,
+    @Param('itemId') itemId: string,
+    @Body() body: { email: string; name?: string; phone?: string },
+    @Req() req: Request,
+  ) {
+    const bioLink = await this.bioLinkService.findByUsername(username);
+    const subscriber = await this.bioLinkService.addSubscriber(bioLink.id, itemId, {
+      email: body.email,
+      name: body.name,
+      phone: body.phone,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    return { success: true, id: subscriber.id };
+  }
+
+  @Post('u/:username/contact/:itemId')
+  @ApiOperation({ summary: '提交联系表单' })
+  async submitContact(
+    @Param('username') username: string,
+    @Param('itemId') itemId: string,
+    @Body() body: Record<string, string>,
+    @Req() req: Request,
+  ) {
+    const bioLink = await this.bioLinkService.findByUsername(username);
+    const contact = await this.bioLinkService.submitContactForm(bioLink.id, itemId, {
+      formData: body,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    return { success: true, id: contact.id };
+  }
+
+  @Post('u/:username/unsubscribe')
+  @ApiOperation({ summary: '取消订阅' })
+  async unsubscribe(
+    @Param('username') username: string,
+    @Body() body: { email: string },
+  ) {
+    const bioLink = await this.bioLinkService.findByUsername(username);
+    await this.bioLinkService.unsubscribe(bioLink.id, body.email);
     return { success: true };
   }
 }

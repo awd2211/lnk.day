@@ -91,8 +91,9 @@ export class SocialLinkDto implements SocialLink {
   visible?: boolean;
 }
 
-// Theme DTO
-export class BioThemeDto implements Partial<BioTheme> {
+// Theme DTO - flexible to accept frontend and backend formats
+// Note: Not implementing Partial<BioTheme> to allow flexible string values from frontend
+export class BioThemeDto {
   @ApiPropertyOptional({ example: '#ffffff' })
   @IsOptional()
   @IsString()
@@ -100,15 +101,11 @@ export class BioThemeDto implements Partial<BioTheme> {
 
   @ApiPropertyOptional()
   @IsOptional()
-  backgroundGradient?: {
-    type: 'linear' | 'radial';
-    colors: string[];
-    angle?: number;
-  };
+  backgroundGradient?: any;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsString()
   backgroundImage?: string;
 
   @ApiPropertyOptional({ example: '#1a1a1a' })
@@ -126,10 +123,10 @@ export class BioThemeDto implements Partial<BioTheme> {
   @IsString()
   fontFamily?: string;
 
-  @ApiPropertyOptional({ enum: ['filled', 'outlined', 'soft', 'shadow', 'glass'] })
+  @ApiPropertyOptional({ description: 'Button style: solid, outline, soft, filled, outlined, shadow, glass' })
   @IsOptional()
-  @IsEnum(['filled', 'outlined', 'soft', 'shadow', 'glass'])
-  buttonStyle?: 'filled' | 'outlined' | 'soft' | 'shadow' | 'glass';
+  @IsString()
+  buttonStyle?: string;
 
   @ApiPropertyOptional({ example: '#000000' })
   @IsOptional()
@@ -141,25 +138,45 @@ export class BioThemeDto implements Partial<BioTheme> {
   @IsString()
   buttonTextColor?: string;
 
-  @ApiPropertyOptional({ enum: ['none', 'small', 'medium', 'large', 'full'] })
+  @ApiPropertyOptional({ description: 'Button border radius: none, sm, md, lg, full, small, medium, large' })
   @IsOptional()
-  @IsEnum(['none', 'small', 'medium', 'large', 'full'])
-  buttonBorderRadius?: 'none' | 'small' | 'medium' | 'large' | 'full';
+  @IsString()
+  buttonBorderRadius?: string;
 
-  @ApiPropertyOptional({ enum: ['none', 'bounce', 'pulse', 'shake'] })
+  @ApiPropertyOptional({ description: 'Button radius alias' })
   @IsOptional()
-  @IsEnum(['none', 'bounce', 'pulse', 'shake'])
-  buttonAnimation?: 'none' | 'bounce' | 'pulse' | 'shake';
+  @IsString()
+  buttonRadius?: string;
 
-  @ApiPropertyOptional({ enum: ['standard', 'compact', 'spacious'] })
+  @ApiPropertyOptional({ description: 'Button animation: none, bounce, pulse, shake' })
   @IsOptional()
-  @IsEnum(['standard', 'compact', 'spacious'])
-  layout?: 'standard' | 'compact' | 'spacious';
+  @IsString()
+  buttonAnimation?: string;
+
+  @ApiPropertyOptional({ description: 'Layout: standard, compact, spacious' })
+  @IsOptional()
+  @IsString()
+  layout?: string;
 
   @ApiPropertyOptional({ example: 'midnight' })
   @IsOptional()
   @IsString()
   presetTheme?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  customCSS?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  id?: string;
 }
 
 // Settings DTO
@@ -302,6 +319,22 @@ export class UpdateBioLinkDto {
   @MaxLength(100)
   title?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
+
   @ApiPropertyOptional({ type: ProfileInfoDto })
   @IsOptional()
   @ValidateNested()
@@ -332,6 +365,27 @@ export class UpdateBioLinkDto {
   @ValidateNested()
   @Type(() => BioSeoDto)
   seo?: BioSeoDto;
+
+  @ApiPropertyOptional({ description: 'Bio link blocks/items' })
+  @IsOptional()
+  @IsArray()
+  blocks?: any[];
+
+  @ApiPropertyOptional({ description: 'Tracking pixels configuration' })
+  @IsOptional()
+  pixels?: any;
+
+  @ApiPropertyOptional({ description: 'A/B testing configuration' })
+  @IsOptional()
+  abTest?: any;
+
+  @ApiPropertyOptional({ description: 'Guestbook settings' })
+  @IsOptional()
+  guestbook?: any;
+
+  @ApiPropertyOptional({ description: 'Calendly integration settings' })
+  @IsOptional()
+  calendly?: any;
 }
 
 // Bio Link Item DTOs
