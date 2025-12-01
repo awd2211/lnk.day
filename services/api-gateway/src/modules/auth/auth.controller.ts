@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, Delete, Headers, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -67,12 +68,14 @@ export class AuthController {
 
   @Post('login')
   @ApiOperation({ summary: 'User login' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 每分钟最多5次登录尝试
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password);
   }
 
   @Post('register')
   @ApiOperation({ summary: 'User registration' })
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 每分钟最多3次注册
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -94,12 +97,14 @@ export class AuthController {
 
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset' })
+  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 每5分钟最多3次
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password with token' })
+  @Throttle({ default: { limit: 5, ttl: 300000 } }) // 每5分钟最多5次
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);
   }
@@ -128,6 +133,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify and activate 2FA' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 每分钟最多5次2FA验证
   verify2FA(@Headers('authorization') auth: string, @Body() dto: Verify2FADto) {
     const token = auth?.replace('Bearer ', '');
     return this.authService.verify2FA(token, dto.code);

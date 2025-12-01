@@ -72,12 +72,23 @@ export class ProxyController {
 
       // Set response headers
       if (result.headers) {
-        const allowedHeaders = ['content-type', 'x-total-count', 'x-page', 'x-limit'];
+        const allowedHeaders = ['content-type', 'x-total-count', 'x-page', 'x-limit', 'content-disposition', 'cache-control'];
         for (const header of allowedHeaders) {
           if (result.headers[header]) {
             res.setHeader(header, result.headers[header]);
           }
         }
+      }
+
+      // Handle binary responses (images, PDFs, etc.)
+      const contentType = result.headers?.['content-type'] || '';
+      const isBinaryResponse = contentType.startsWith('image/') ||
+        contentType.startsWith('application/pdf') ||
+        contentType.startsWith('application/postscript') ||
+        contentType.startsWith('application/octet-stream');
+
+      if (isBinaryResponse && Buffer.isBuffer(result.data)) {
+        return res.status(result.statusCode).send(result.data);
       }
 
       return res.status(result.statusCode).json(result.data);

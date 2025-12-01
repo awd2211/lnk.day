@@ -435,6 +435,10 @@ export class ProxyService {
 
     this.logger.debug(`Proxying ${method} ${path} -> ${targetUrl}`);
 
+    // Check if this route might return binary data (QR codes, PDFs, images, etc.)
+    const binaryPaths = ['/api/qr/generate', '/api/qr/batch'];
+    const expectBinary = binaryPaths.some(bp => path.startsWith(bp));
+
     const config: AxiosRequestConfig = {
       method,
       url: targetUrl,
@@ -446,6 +450,7 @@ export class ProxyService {
       data: body,
       timeout: 30000,
       validateStatus: () => true, // Don't throw on error status
+      responseType: expectBinary ? 'arraybuffer' : 'json',
     };
 
     try {
