@@ -82,6 +82,24 @@ export class InboxController {
     return this.service.markAsRead(id, userId);
   }
 
+  @Post(':id/star')
+  @ApiOperation({ summary: '切换通知星标状态' })
+  toggleStar(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.toggleStar(id, userId);
+  }
+
+  @Post('read-batch')
+  @ApiOperation({ summary: '批量标记通知为已读' })
+  markMultipleAsRead(
+    @CurrentUser('sub') userId: string,
+    @Body('ids') ids: string[],
+  ) {
+    return this.service.markMultipleAsRead(ids, userId);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: '删除通知' })
   deleteNotification(

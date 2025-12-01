@@ -101,6 +101,20 @@ export class InboxService {
     return { affected: result.affected || 0 };
   }
 
+  async markMultipleAsRead(ids: string[], userId: string): Promise<{ affected: number }> {
+    const result = await this.notificationRepo.update(
+      { id: In(ids), userId },
+      { read: true },
+    );
+    return { affected: result.affected || 0 };
+  }
+
+  async toggleStar(id: string, userId: string): Promise<UserNotification> {
+    const notification = await this.getNotification(id, userId);
+    notification.starred = !notification.starred;
+    return this.notificationRepo.save(notification);
+  }
+
   async deleteNotification(id: string, userId: string): Promise<void> {
     const notification = await this.getNotification(id, userId);
     await this.notificationRepo.remove(notification);

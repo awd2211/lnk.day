@@ -34,6 +34,9 @@ export class UserNotification {
   @Column({ default: false })
   read: boolean;
 
+  @Column({ default: false })
+  starred: boolean;
+
   @Column({ nullable: true })
   link?: string;
 
