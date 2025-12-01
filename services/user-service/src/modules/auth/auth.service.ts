@@ -102,9 +102,9 @@ export class AuthService {
         teamId,
       };
     } else {
-      // 没有团队的用户作为个人工作区，给予 OWNER 角色和默认权限
+      // 没有团队的用户作为个人工作区，给予 OWNER 角色和权限
       teamRole = TeamRole.OWNER;
-      permissions = PRESET_ROLE_PERMISSIONS.MEMBER || [];
+      permissions = PRESET_ROLE_PERMISSIONS.OWNER || [];
       scope = {
         level: 'personal',
         teamId: userId, // 个人工作区使用 userId 作为隔离标识

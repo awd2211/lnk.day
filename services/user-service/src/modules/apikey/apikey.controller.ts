@@ -24,6 +24,7 @@ import {
   ScopedTeamId,
   AuthenticatedUser,
   isPlatformAdmin,
+  SkipScopeCheck,
 } from '@lnk/nestjs-common';
 
 class CreateApiKeyDto {
@@ -33,6 +34,7 @@ class CreateApiKeyDto {
   expiresAt?: string;
   rateLimit?: number;
   allowedIps?: string[];
+  ipWhitelist?: string[]; // 前端使用的字段名
 }
 
 class UpdateApiKeyDto {
@@ -41,12 +43,14 @@ class UpdateApiKeyDto {
   scopes?: ApiKeyScope[];
   rateLimit?: number;
   allowedIps?: string[];
+  ipWhitelist?: string[]; // 前端使用的字段名
 }
 
 @ApiTags('api-keys')
 @Controller('api-keys')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
+@SkipScopeCheck() // 允许个人工作区用户管理自己的 API 密钥
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
@@ -71,18 +75,15 @@ export class ApiKeyController {
         scopes: createDto.scopes,
         expiresAt: createDto.expiresAt ? new Date(createDto.expiresAt) : undefined,
         rateLimit: createDto.rateLimit,
-        allowedIps: createDto.allowedIps,
+        allowedIps: createDto.allowedIps || createDto.ipWhitelist, // 支持两个字段名
       },
     );
 
     return {
-      id: apiKey.id,
-      name: apiKey.name,
-      key: plainKey, // Only returned once!
-      keyPrefix: apiKey.keyPrefix,
-      scopes: apiKey.scopes,
-      expiresAt: apiKey.expiresAt,
-      createdAt: apiKey.createdAt,
+      data: {
+        ...this.transformApiKey(apiKey),
+        key: plainKey, // Only returned once!
+      },
       message: '请立即保存此密钥，它将不会再次显示',
     };
   }
@@ -90,8 +91,32 @@ export class ApiKeyController {
   @Get()
   @RequirePermissions(Permission.API_KEYS_VIEW)
   @ApiOperation({ summary: '获取 API 密钥列表' })
-  findAll(@ScopedTeamId() teamId: string) {
-    return this.apiKeyService.findAll(teamId);
+  async findAll(@ScopedTeamId() teamId: string) {
+    const keys = await this.apiKeyService.findAll(teamId);
+    // 转换为前端期望的格式
+    const transformedKeys = keys.map((key) => this.transformApiKey(key));
+    return { keys: transformedKeys };
+  }
+
+  private transformApiKey(key: any) {
+    let status: 'active' | 'revoked' | 'expired' = 'active';
+    if (!key.isActive) {
+      status = 'revoked';
+    } else if (key.expiresAt && new Date(key.expiresAt) < new Date()) {
+      status = 'expired';
+    }
+    return {
+      id: key.id,
+      name: key.name,
+      keyPrefix: key.keyPrefix,
+      scopes: key.scopes,
+      status,
+      lastUsedAt: key.lastUsedAt,
+      expiresAt: key.expiresAt,
+      ipWhitelist: key.allowedIps || [],
+      createdAt: key.createdAt,
+      updatedAt: key.updatedAt,
+    };
   }
 
   @Get('scopes/list')
@@ -100,10 +125,10 @@ export class ApiKeyController {
   getScopes() {
     return {
       scopes: [
-        { value: ApiKeyScope.READ, description: '读取数据' },
-        { value: ApiKeyScope.WRITE, description: '创建和修改数据' },
-        { value: ApiKeyScope.DELETE, description: '删除数据' },
-        { value: ApiKeyScope.ADMIN, description: '完全访问权限' },
+        { id: ApiKeyScope.READ, name: '读取', description: '读取数据', category: 'read' },
+        { id: ApiKeyScope.WRITE, name: '写入', description: '创建和修改数据', category: 'write' },
+        { id: ApiKeyScope.DELETE, name: '删除', description: '删除数据', category: 'delete' },
+        { id: ApiKeyScope.ADMIN, name: '管理员', description: '完全访问权限', category: 'admin' },
       ],
     };
   }
@@ -138,7 +163,13 @@ export class ApiKeyController {
     if (!isPlatformAdmin(user) && apiKey.teamId !== teamId) {
       throw new ForbiddenException('无权修改此 API 密钥');
     }
-    return this.apiKeyService.update(id, updateDto);
+    // 支持前端使用的 ipWhitelist 字段名
+    const updates = {
+      ...updateDto,
+      allowedIps: updateDto.allowedIps || updateDto.ipWhitelist,
+    };
+    delete (updates as any).ipWhitelist;
+    return this.apiKeyService.update(id, updates);
   }
 
   @Post(':id/revoke')

@@ -38,7 +38,7 @@ export class TwoFactorController {
   @ApiOperation({ summary: '获取 2FA 状态' })
   @ApiResponse({ status: 200, type: TwoFactorStatusDto })
   async getStatus(@CurrentUser() user: AuthenticatedUser): Promise<TwoFactorStatusDto> {
-    return this.twoFactorService.getStatus(user.sub);
+    return this.twoFactorService.getStatus(user.id);
   }
 
   @Post('enable')
@@ -47,7 +47,7 @@ export class TwoFactorController {
   async enable2FA(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<Enable2FAResponseDto> {
-    return this.twoFactorService.enable2FA(user.sub, user.email || `user-${user.sub}@lnk.day`);
+    return this.twoFactorService.enable2FA(user.id, user.email || `user-${user.id}@lnk.day`);
   }
 
   @Post('verify')
@@ -57,7 +57,7 @@ export class TwoFactorController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: Verify2FADto,
   ): Promise<{ success: boolean; message: string }> {
-    await this.twoFactorService.verify2FA(user.sub, dto.code);
+    await this.twoFactorService.verify2FA(user.id, dto.code);
     return { success: true, message: '2FA enabled successfully' };
   }
 
@@ -68,7 +68,7 @@ export class TwoFactorController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: Disable2FADto,
   ): Promise<{ success: boolean; message: string }> {
-    await this.twoFactorService.disable2FA(user.sub, dto.code);
+    await this.twoFactorService.disable2FA(user.id, dto.code);
     return { success: true, message: '2FA disabled successfully' };
   }
 
@@ -80,7 +80,7 @@ export class TwoFactorController {
     @Body() dto: RegenerateBackupCodesDto,
   ): Promise<{ backupCodes: string[] }> {
     const backupCodes = await this.twoFactorService.regenerateBackupCodes(
-      user.sub,
+      user.id,
       dto.code,
     );
     return { backupCodes };

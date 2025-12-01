@@ -38,15 +38,50 @@ export class TeamService {
   }
 
   async findAll(): Promise<Team[]> {
-    return this.teamRepository.find();
+    const teams = await this.teamRepository.find({
+      order: { createdAt: 'DESC' },
+    });
+
+    // 手动加载 owner 信息 (因为 ownerId 是 varchar 而 users.id 是 uuid)
+    const ownerIds = [...new Set(teams.map((t) => t.ownerId))];
+    const owners = await Promise.all(
+      ownerIds.map((id) => this.userService.findOne(id).catch(() => null)),
+    );
+    const ownerMap = new Map(
+      owners.filter(Boolean).map((u) => [u!.id, this.sanitizeOwner(u!)]),
+    );
+
+    return teams.map((team) => {
+      (team as any).owner = ownerMap.get(team.ownerId) || null;
+      return team;
+    });
   }
 
   async findOne(id: string): Promise<Team> {
-    const team = await this.teamRepository.findOne({ where: { id } });
+    const team = await this.teamRepository.findOne({
+      where: { id },
+    });
     if (!team) {
       throw new NotFoundException(`Team with ID ${id} not found`);
     }
+
+    // 手动加载 owner 信息
+    try {
+      const owner = await this.userService.findOne(team.ownerId);
+      (team as any).owner = this.sanitizeOwner(owner);
+    } catch {
+      (team as any).owner = null;
+    }
+
     return team;
+  }
+
+  private sanitizeOwner(user: any): { id: string; name: string; email: string } {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    };
   }
 
   async remove(id: string): Promise<void> {
@@ -195,6 +230,39 @@ export class TeamService {
       where: { userId },
       relations: ['team'],
     });
+  }
+
+  /**
+   * 获取当前用户的团队
+   * 对于个人工作区（无团队），返回虚拟的个人团队信息
+   */
+  async getCurrentTeam(userId: string, teamId?: string): Promise<any> {
+    // 如果用户有团队，返回团队信息
+    if (teamId && teamId !== userId) {
+      try {
+        return await this.findOne(teamId);
+      } catch {
+        // 团队不存在，继续返回个人工作区
+      }
+    }
+
+    // 返回个人工作区的虚拟团队信息
+    const user = await this.userService.findOne(userId);
+    return {
+      id: userId,
+      name: `${user.name}的工作区`,
+      slug: user.email.split('@')[0],
+      plan: 'free',
+      memberCount: 1,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      isPersonal: true,
+      owner: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    };
   }
 
   // ========== 辅助方法 ==========

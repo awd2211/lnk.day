@@ -7,6 +7,7 @@ import {
   DeleteDateColumn,
   Index,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 export enum UserRole {
   ADMIN = 'ADMIN',
@@ -35,6 +36,7 @@ export class User {
   name: string;
 
   @Column()
+  @Exclude()
   password: string;
 
   @Column({ nullable: true })

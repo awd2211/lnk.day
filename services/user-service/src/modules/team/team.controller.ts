@@ -22,6 +22,7 @@ import {
   RequirePermissions,
   CurrentUser,
   AuthenticatedUser,
+  SkipScopeCheck,
 } from '@lnk/nestjs-common';
 
 @ApiTags('teams')
@@ -41,6 +42,13 @@ export class TeamController {
   @ApiOperation({ summary: '获取所有团队' })
   findAll() {
     return this.teamService.findAll();
+  }
+
+  @Get('current')
+  @SkipScopeCheck()
+  @ApiOperation({ summary: '获取当前用户的团队' })
+  getCurrentTeam(@CurrentUser() user: AuthenticatedUser) {
+    return this.teamService.getCurrentTeam(user.sub, user.scope?.teamId);
   }
 
   @Get(':id')

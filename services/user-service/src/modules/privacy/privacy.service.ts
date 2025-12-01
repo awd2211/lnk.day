@@ -4,12 +4,15 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import * as crypto from 'crypto';
+
+const EVERY_DAY = 24 * 60 * 60 * 1000;
 
 import { UserConsent, ConsentType } from './entities/user-consent.entity';
 import { DataRequest, DataRequestType, DataRequestStatus } from './entities/data-request.entity';
@@ -26,8 +29,10 @@ import {
 import { EmailService } from '../email/email.service';
 
 @Injectable()
-export class PrivacyService {
+export class PrivacyService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrivacyService.name);
+  private deletionInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly deletionCoolingPeriodDays = 30;
   private readonly exportRetentionDays = 7;
 
@@ -43,6 +48,34 @@ export class PrivacyService {
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
   ) {}
+
+  onModuleInit() {
+    this.deletionInterval = setInterval(() => {
+      this.processPendingDeletions().catch((err) => {
+        this.logger.error(`处理删除请求失败: ${err.message}`);
+      });
+    }, EVERY_DAY);
+
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredExports().catch((err) => {
+        this.logger.error(`清理过期导出失败: ${err.message}`);
+      });
+    }, EVERY_DAY);
+
+    this.logger.log('隐私服务定时任务已启动 (删除请求处理/过期导出清理)');
+  }
+
+  onModuleDestroy() {
+    if (this.deletionInterval) {
+      clearInterval(this.deletionInterval);
+      this.deletionInterval = null;
+    }
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.logger.log('隐私服务定时任务已停止');
+  }
 
   // ========== 同意管理 ==========
 
@@ -407,7 +440,6 @@ export class PrivacyService {
   // ========== 定时任务 ==========
 
   // 每天检查需要执行的删除请求
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async processPendingDeletions(): Promise<void> {
     this.logger.log('Processing pending deletion requests...');
 
@@ -431,7 +463,6 @@ export class PrivacyService {
   }
 
   // 清理过期的导出文件
-  @Cron(CronExpression.EVERY_DAY_AT_1AM)
   async cleanupExpiredExports(): Promise<void> {
     const expiredExports = await this.dataRequestRepository.find({
       where: {

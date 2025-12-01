@@ -33,9 +33,12 @@ export class Team {
   @Index()
   slug: string;
 
-  @Column()
+  @Column({ type: 'varchar' })
   @Index()
   ownerId: string;
+
+  // owner 信息在 service 层手动加载 (因为 ownerId 是 varchar 而 users.id 是 uuid)
+  owner?: any;
 
   @Column({ type: 'enum', enum: TeamPlan, default: TeamPlan.FREE })
   @Index()

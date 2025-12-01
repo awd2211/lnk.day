@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+// ScheduleModule 暂时禁用，与多个 @Global() 模块存在冲突
+// import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import * as Joi from 'joi';
 import {
@@ -47,7 +48,7 @@ import { UserSagaModule } from './saga/saga.module';
         abortEarly: false,
       },
     }),
-    ScheduleModule.forRoot(),
+    // ScheduleModule.forRoot(), // 暂时禁用
     MetricsModule.forRoot({
       serviceName: 'user-service',
     }),
