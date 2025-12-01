@@ -43,6 +43,18 @@ const RealtimeAnalyticsPage = lazy(() => import('@/pages/RealtimeAnalyticsPage')
 const AnalyticsReportsPage = lazy(() => import('@/pages/AnalyticsReportsPage'));
 const ApiKeysPage = lazy(() => import('@/pages/ApiKeysPage'));
 const BioLinkPublicPage = lazy(() => import('@/pages/BioLinkPublicPage'));
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const TagsPage = lazy(() => import('@/pages/TagsPage'));
+const QuotaPage = lazy(() => import('@/pages/QuotaPage'));
+const UtmTemplatesPage = lazy(() => import('@/pages/UtmTemplatesPage'));
+const SecurityScanPage = lazy(() => import('@/pages/SecurityScanPage'));
+const OpenApiDocsPage = lazy(() => import('@/pages/OpenApiDocsPage'));
+const SecuritySettingsPage = lazy(() => import('@/pages/SecuritySettingsPage'));
+const TenantSettingsPage = lazy(() => import('@/pages/TenantSettingsPage'));
+const CommentsPage = lazy(() => import('@/pages/CommentsPage'));
+const SeoManagerPage = lazy(() => import('@/pages/SeoManagerPage'));
+const NotificationIntegrationsPage = lazy(() => import('@/pages/NotificationIntegrationsPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -364,6 +376,102 @@ function App() {
             element={
               <ProtectedRoute>
                 <ApiKeysPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tags"
+            element={
+              <ProtectedRoute>
+                <TagsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quota"
+            element={
+              <ProtectedRoute>
+                <QuotaPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/utm-templates"
+            element={
+              <ProtectedRoute>
+                <UtmTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/security-scan"
+            element={
+              <ProtectedRoute>
+                <SecurityScanPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/api-docs"
+            element={
+              <ProtectedRoute>
+                <OpenApiDocsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/security-settings"
+            element={
+              <ProtectedRoute>
+                <SecuritySettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tenant-settings"
+            element={
+              <ProtectedRoute>
+                <TenantSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comments"
+            element={
+              <ProtectedRoute>
+                <CommentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/seo"
+            element={
+              <ProtectedRoute>
+                <SeoManagerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notification-integrations"
+            element={
+              <ProtectedRoute>
+                <NotificationIntegrationsPage />
               </ProtectedRoute>
             }
           />

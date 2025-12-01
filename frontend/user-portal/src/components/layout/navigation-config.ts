@@ -17,6 +17,17 @@ import {
   Users,
   Settings,
   CreditCard,
+  Bell,
+  User,
+  Tags,
+  Gauge,
+  Shield,
+  LinkIcon,
+  BookOpen,
+  ShieldCheck,
+  Building2,
+  MessageSquare,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -65,6 +76,8 @@ export const navigationGroups: NavGroup[] = [
       { title: 'QR 码', href: '/qr-codes', icon: QrCode },
       { title: '落地页', href: '/pages', icon: FileImage },
       { title: '深度链接', href: '/deeplinks', icon: Smartphone },
+      { title: '留言管理', href: '/comments', icon: MessageSquare },
+      { title: 'SEO 优化', href: '/seo', icon: Search },
     ],
   },
   {
@@ -75,7 +88,20 @@ export const navigationGroups: NavGroup[] = [
       { title: 'Webhook', href: '/webhooks', icon: Webhook },
       { title: '集成', href: '/integrations', icon: Plug },
       { title: 'API 密钥', href: '/api-keys', icon: Key },
+      { title: 'API 文档', href: '/api-docs', icon: BookOpen },
       { title: '模板', href: '/templates', icon: FileCode },
+      { title: 'UTM 模板', href: '/utm-templates', icon: LinkIcon },
+      { title: '安全检查', href: '/security-scan', icon: Shield },
+      { title: '通知集成', href: '/notification-integrations', icon: Bell },
+    ],
+  },
+  {
+    id: 'organize',
+    title: '组织管理',
+    icon: Tags,
+    items: [
+      { title: '标签管理', href: '/tags', icon: Tags },
+      { title: '租户设置', href: '/tenant-settings', icon: Building2 },
     ],
   },
   {
@@ -83,6 +109,10 @@ export const navigationGroups: NavGroup[] = [
     title: '账户',
     icon: Users,
     items: [
+      { title: '个人资料', href: '/profile', icon: User },
+      { title: '通知中心', href: '/notifications', icon: Bell },
+      { title: '配额管理', href: '/quota', icon: Gauge },
+      { title: '安全设置', href: '/security-settings', icon: ShieldCheck },
       { title: '团队', href: '/team', icon: Users },
       { title: '设置', href: '/settings', icon: Settings },
       { title: '套餐', href: '/billing', icon: CreditCard },
