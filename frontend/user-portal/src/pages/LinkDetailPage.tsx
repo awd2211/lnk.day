@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -48,16 +48,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { useLink, useDeleteLink } from '@/hooks/useLinks';
+import { useLink, useDeleteLink, useUpdateLink } from '@/hooks/useLinks';
 import { useLinkAnalytics, useRealtimeAnalytics } from '@/hooks/useAnalytics';
 import { RedirectRulesManager } from '@/components/links/RedirectRulesManager';
 import { SecurityBadge } from '@/components/links/SecurityBadge';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { LinkEditDialog } from '@/components/LinkEditDialog';
 import { cn } from '@/lib/utils';
 
 type DateRange = '7d' | '14d' | '30d' | '90d';
 
-export default function LinkDetailPage() {
+interface LinkDetailPageProps {
+  editMode?: boolean;
+}
+
+export default function LinkDetailPage({ editMode = false }: LinkDetailPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -66,10 +71,19 @@ export default function LinkDetailPage() {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [activeTab, setActiveTab] = useState('analytics');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditing, setIsEditing] = useState(editMode);
+
+  // 当 editMode 变化或从 /edit URL 进入时自动打开编辑对话框
+  useEffect(() => {
+    if (editMode) {
+      setIsEditing(true);
+    }
+  }, [editMode]);
 
   // Queries
   const { data: link, isLoading: isLoadingLink } = useLink(id || '');
   const deleteLink = useDeleteLink();
+  const updateLink = useUpdateLink();
 
   // Calculate date range
   const dateParams = useMemo(() => {
@@ -309,7 +323,7 @@ export default function LinkDetailPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate(`/links/${id}/edit`)}>
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
                   <Edit className="mr-2 h-4 w-4" />
                   编辑链接
                 </DropdownMenuItem>
@@ -639,6 +653,32 @@ export default function LinkDetailPage() {
           onConfirm={handleDelete}
           isLoading={deleteLink.isPending}
           variant="destructive"
+        />
+
+        {/* Edit Link Dialog */}
+        <LinkEditDialog
+          link={link || null}
+          open={isEditing}
+          onOpenChange={(open) => {
+            setIsEditing(open);
+            // 如果是从 /edit URL 进入并关闭对话框，导航到详情页
+            if (!open && editMode) {
+              navigate(`/links/${id}`, { replace: true });
+            }
+          }}
+          onSave={async (data) => {
+            if (!link) return;
+            await updateLink.mutateAsync({ id: link.id, data });
+            toast({
+              title: '更新成功',
+              description: '链接已更新',
+            });
+            // 保存后也导航到详情页
+            if (editMode) {
+              navigate(`/links/${id}`, { replace: true });
+            }
+          }}
+          saving={updateLink.isPending}
         />
       </div>
     </Layout>

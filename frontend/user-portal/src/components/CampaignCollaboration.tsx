@@ -540,6 +540,7 @@ function CollaboratorsPanel({ campaignId }: { campaignId: string }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<'editor' | 'viewer'>('viewer');
+  const [removingCollaboratorId, setRemovingCollaboratorId] = useState<string | null>(null);
 
   const handleAdd = async () => {
     if (!selectedUserId) return;
@@ -563,11 +564,12 @@ function CollaboratorsPanel({ campaignId }: { campaignId: string }) {
     }
   };
 
-  const handleRemove = async (collaboratorId: string) => {
-    if (!confirm('确定要移除此协作者吗？')) return;
+  const handleRemove = async () => {
+    if (!removingCollaboratorId) return;
 
     try {
-      await removeCollaborator.mutateAsync(collaboratorId);
+      await removeCollaborator.mutateAsync(removingCollaboratorId);
+      setRemovingCollaboratorId(null);
       toast({ title: '协作者已移除' });
     } catch {
       toast({ title: '移除失败', variant: 'destructive' });
@@ -660,7 +662,7 @@ function CollaboratorsPanel({ campaignId }: { campaignId: string }) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => handleRemove(collaborator.id)}
+                        onClick={() => setRemovingCollaboratorId(collaborator.id)}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
@@ -741,6 +743,18 @@ function CollaboratorsPanel({ campaignId }: { campaignId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove Collaborator Confirm Dialog */}
+      <ConfirmDialog
+        open={!!removingCollaboratorId}
+        onOpenChange={(open) => !open && setRemovingCollaboratorId(null)}
+        title="移除协作者"
+        description="确定要移除此协作者吗？移除后将无法再访问此活动。"
+        confirmText="移除"
+        onConfirm={handleRemove}
+        isLoading={removeCollaborator.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -42,6 +42,7 @@ const AutomationPage = lazy(() => import('@/pages/AutomationPage'));
 const RealtimeAnalyticsPage = lazy(() => import('@/pages/RealtimeAnalyticsPage'));
 const AnalyticsReportsPage = lazy(() => import('@/pages/AnalyticsReportsPage'));
 const ApiKeysPage = lazy(() => import('@/pages/ApiKeysPage'));
+const BioLinkPublicPage = lazy(() => import('@/pages/BioLinkPublicPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -76,6 +77,8 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          {/* Public Bio Link page - no auth required */}
+          <Route path="/u/:username" element={<BioLinkPublicPage />} />
           <Route
             path="/dashboard"
             element={
@@ -97,6 +100,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <LinkDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/links/:id/edit"
+            element={
+              <ProtectedRoute>
+                <LinkDetailPage editMode />
               </ProtectedRoute>
             }
           />

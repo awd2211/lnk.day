@@ -59,6 +59,7 @@ import {
   BioLink,
 } from '@/hooks/useBioLinks';
 import { cn } from '@/lib/utils';
+import { getBioLinkPublicUrl } from '@/lib/api';
 
 export default function BioLinksPage() {
   const navigate = useNavigate();
@@ -132,7 +133,7 @@ export default function BioLinksPage() {
 
   const handleTogglePublish = async (bioLink: BioLink) => {
     try {
-      await togglePublish.mutateAsync(bioLink.id);
+      await togglePublish.mutateAsync({ id: bioLink.id, isPublished: bioLink.isPublished });
       toast({
         title: bioLink.isPublished ? '已取消发布' : '已发布',
         description: bioLink.isPublished
@@ -145,7 +146,7 @@ export default function BioLinksPage() {
   };
 
   const copyLink = async (username: string) => {
-    const url = `https://lnk.day/u/${username}`;
+    const url = getBioLinkPublicUrl(username);
     await navigator.clipboard.writeText(url);
     setCopiedSlug(username);
     setTimeout(() => setCopiedSlug(null), 2000);
@@ -270,7 +271,7 @@ export default function BioLinksPage() {
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                         <a
-                          href={`https://lnk.day/u/${bioLink.username}`}
+                          href={getBioLinkPublicUrl(bioLink.username)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 hover:text-primary"
@@ -319,7 +320,7 @@ export default function BioLinksPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
-                            window.open(`https://lnk.day/u/${bioLink.username}`, '_blank')
+                            window.open(getBioLinkPublicUrl(bioLink.username, true), '_blank')
                           }
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />

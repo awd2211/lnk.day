@@ -567,16 +567,49 @@ export function useDeleteBioLink() {
   });
 }
 
-// Mutation: Publish/Unpublish bio link
-export function useToggleBioLinkPublish() {
+// Mutation: Publish bio link
+export function usePublishBioLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await linkApi.post(`/api/v1/bio-links/${id}/toggle-publish`);
+      const response = await linkApi.post(`/api/v1/bio-links/${id}/publish`);
       return response.data as BioLink;
     },
     onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['bio-links'] });
+      queryClient.invalidateQueries({ queryKey: ['bio-links', id] });
+    },
+  });
+}
+
+// Mutation: Unpublish bio link
+export function useUnpublishBioLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await linkApi.post(`/api/v1/bio-links/${id}/unpublish`);
+      return response.data as BioLink;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['bio-links'] });
+      queryClient.invalidateQueries({ queryKey: ['bio-links', id] });
+    },
+  });
+}
+
+// Legacy: Toggle Publish/Unpublish - now uses separate publish/unpublish calls
+export function useToggleBioLinkPublish() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, isPublished }: { id: string; isPublished: boolean }) => {
+      const endpoint = isPublished ? 'unpublish' : 'publish';
+      const response = await linkApi.post(`/api/v1/bio-links/${id}/${endpoint}`);
+      return response.data as BioLink;
+    },
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['bio-links'] });
       queryClient.invalidateQueries({ queryKey: ['bio-links', id] });
     },

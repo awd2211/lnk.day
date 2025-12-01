@@ -3,6 +3,16 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 // All API calls go through api-gateway
 const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:60000';
 
+// Page service URL for bio link preview
+export const PAGE_SERVICE_URL = import.meta.env.VITE_PAGE_SERVICE_URL || 'http://localhost:60007';
+
+// Bio link public URL
+export const getBioLinkPublicUrl = (username: string, preview = false): string => {
+  const previewParam = preview ? '?preview=true' : '';
+  // 生产环境使用 app.lnk.day 域名
+  return `https://app.lnk.day/u/${username}${previewParam}`;
+};
+
 // Retry configuration
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -198,7 +208,7 @@ export const authService = {
 
 // Link API
 export const linkService = {
-  getAll: (params?: { page?: number; limit?: number; status?: string; search?: string; folderId?: string }) =>
+  getAll: (params?: { page?: number; limit?: number; status?: string; search?: string; folderId?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     linkApi.get('/api/v1/links', { params }),
   getOne: (id: string) => linkApi.get(`/api/v1/links/${id}`),
   create: (data: { originalUrl: string; customCode?: string; title?: string; tags?: string[] }) =>

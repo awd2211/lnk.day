@@ -57,7 +57,25 @@ export function useLinkAnalytics(linkId: string, params?: { startDate?: string; 
     queryKey: ['analytics', 'link', linkId, params],
     queryFn: async () => {
       const { data } = await analyticsService.getLinkAnalytics(linkId, params);
-      return data as LinkAnalytics;
+      // 映射后端返回的字段名到前端期望的格式
+      return {
+        linkId,
+        totalClicks: data.totalClicks || 0,
+        uniqueClicks: data.uniqueClicks || 0,
+        clicksByDay: (data.timeSeries || []).map((item: { timestamp: string; clicks: number }) => ({
+          date: item.timestamp?.split('T')[0] || item.timestamp,
+          clicks: item.clicks,
+        })),
+        clicksByHour: [],
+        countries: data.geoDistribution || [],
+        devices: data.deviceDistribution || [],
+        browsers: data.browserDistribution || [],
+        referrers: (data.topReferers || []).map((item: { referrer?: string; referer?: string; clicks: number; percentage?: number }) => ({
+          referrer: item.referrer || item.referer || 'Direct',
+          clicks: item.clicks,
+          percentage: item.percentage || 0,
+        })),
+      } as LinkAnalytics;
     },
     enabled: !!linkId,
   });

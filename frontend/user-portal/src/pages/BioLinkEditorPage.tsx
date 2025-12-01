@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -26,6 +26,15 @@ import {
   Monitor,
   ChevronUp,
   ChevronDown,
+  Clock,
+  ShoppingBag,
+  MessageSquare,
+  Grid,
+  ImagePlus,
+  Code,
+  Mic,
+  Hexagon,
+  X,
 } from 'lucide-react';
 
 import Layout from '@/components/Layout';
@@ -52,6 +61,12 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useBioLink,
@@ -65,6 +80,9 @@ import {
   CalendlySettings,
   BlockType,
   BLOCK_TYPE_LABELS,
+  BLOCK_CATEGORIES,
+  getBlocksByCategory,
+  createDefaultBlockContent,
   DEFAULT_THEMES,
   SOCIAL_PLATFORMS,
 } from '@/hooks/useBioLinks';
@@ -73,6 +91,7 @@ import ABTestConfig from '@/components/bio-link/ABTestConfig';
 import GuestbookConfig from '@/components/bio-link/GuestbookConfig';
 import CalendlyConfig from '@/components/bio-link/CalendlyConfig';
 import { cn } from '@/lib/utils';
+import { getBioLinkPublicUrl } from '@/lib/api';
 
 const BlockIcon = ({ type }: { type: BlockType }) => {
   const iconClass = 'h-4 w-4';
@@ -91,15 +110,33 @@ const BlockIcon = ({ type }: { type: BlockType }) => {
     case 'divider':
       return <Minus className={iconClass} />;
     case 'email':
+    case 'subscribe':
       return <Mail className={iconClass} />;
     case 'contact':
       return <Phone className={iconClass} />;
     case 'map':
       return <MapPin className={iconClass} />;
     case 'spotify':
+    case 'music':
       return <Music className={iconClass} />;
     case 'youtube':
       return <Youtube className={iconClass} />;
+    case 'countdown':
+      return <Clock className={iconClass} />;
+    case 'product':
+      return <ShoppingBag className={iconClass} />;
+    case 'contact_form':
+      return <MessageSquare className={iconClass} />;
+    case 'carousel':
+      return <ImagePlus className={iconClass} />;
+    case 'embed':
+      return <Code className={iconClass} />;
+    case 'podcast':
+      return <Mic className={iconClass} />;
+    case 'nft':
+      return <Hexagon className={iconClass} />;
+    case 'collection':
+      return <Grid className={iconClass} />;
     default:
       return <Settings className={iconClass} />;
   }
@@ -112,35 +149,77 @@ export default function BioLinkEditorPage() {
 
   // State
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
-  const [editingBlock, setEditingBlock] = useState<BioLinkBlock | null>(null);
+  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [isBlockSheetOpen, setIsBlockSheetOpen] = useState(false);
   const [isThemeSheetOpen, setIsThemeSheetOpen] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // 实时预览弹窗状态
+  const [isLivePreviewOpen, setIsLivePreviewOpen] = useState(false);
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
+
   // Local state for editing
   const [localBioLink, setLocalBioLink] = useState<BioLink | null>(null);
+
+  // Derive editingBlock from localBioLink.blocks to ensure synchronization
+  const editingBlock = editingBlockId
+    ? localBioLink?.blocks?.find(b => b.id === editingBlockId) || null
+    : null;
 
   // Queries
   const { data: bioLink, isLoading } = useBioLink(id || null);
 
-  // Initialize local state
-  useState(() => {
-    if (bioLink && !localBioLink) {
-      setLocalBioLink(bioLink);
-    }
-  });
-
   // Mutation
   const updateBioLink = useUpdateBioLink();
 
-  // Update local state when data loads
-  if (bioLink && !localBioLink) {
-    // Ensure blocks is always an array
-    setLocalBioLink({
-      ...bioLink,
-      blocks: bioLink.blocks || [],
-    });
-  }
+  // Initialize local state when data loads
+  useEffect(() => {
+    if (bioLink && !localBioLink) {
+      // Ensure blocks is always an array
+      setLocalBioLink({
+        ...bioLink,
+        blocks: bioLink.blocks || [],
+      });
+    }
+  }, [bioLink, localBioLink]);
+
+  // 发送预览数据到 iframe
+  const sendPreviewData = useCallback(() => {
+    if (previewIframeRef.current?.contentWindow && localBioLink) {
+      console.log('Sending preview data:', localBioLink);
+      previewIframeRef.current.contentWindow.postMessage({
+        type: 'BIO_LINK_PREVIEW_UPDATE',
+        payload: {
+          bioLink: localBioLink,
+        },
+      }, '*');
+    }
+  }, [localBioLink]);
+
+  // 监听 iframe 准备好的消息
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'BIO_LINK_PREVIEW_READY') {
+        console.log('Preview iframe is ready');
+        setIsPreviewReady(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // 当 isPreviewReady 变为 true 或 localBioLink 变化时，发送更新到预览 iframe
+  useEffect(() => {
+    if (isLivePreviewOpen && isPreviewReady && localBioLink) {
+      // 使用 setTimeout 确保 iframe 完全准备好
+      const timer = setTimeout(() => {
+        sendPreviewData();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [localBioLink, isLivePreviewOpen, isPreviewReady, sendPreviewData]);
 
   const updateLocalBioLink = useCallback((updates: Partial<BioLink>) => {
     setLocalBioLink((prev) => (prev ? { ...prev, ...updates } : null));
@@ -173,23 +252,30 @@ export default function BioLinkEditorPage() {
     }
   };
 
+  // State for block picker dialog
+  const [isBlockPickerOpen, setIsBlockPickerOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('basic');
+
   const addBlock = (type: BlockType) => {
     if (!localBioLink) return;
 
+    const defaultContent = createDefaultBlockContent(type);
     const newBlock: BioLinkBlock = {
       id: `block-${Date.now()}`,
       type,
-      content: getDefaultContent(type),
       isVisible: true,
       sortOrder: localBioLink.blocks.length,
+      content: getDefaultContent(type),
+      ...defaultContent,
     };
 
     updateLocalBioLink({
       blocks: [...localBioLink.blocks, newBlock],
     });
 
-    setEditingBlock(newBlock);
+    setEditingBlockId(newBlock.id);
     setIsBlockSheetOpen(true);
+    setIsBlockPickerOpen(false);
   };
 
   const getDefaultContent = (type: BlockType): Record<string, any> => {
@@ -209,6 +295,7 @@ export default function BioLinkEditorPage() {
       case 'divider':
         return { style: 'line' };
       case 'email':
+      case 'subscribe':
         return { placeholder: '输入邮箱订阅', buttonText: '订阅' };
       case 'contact':
         return { phone: '', email: '', address: '' };
@@ -218,6 +305,28 @@ export default function BioLinkEditorPage() {
         return { embedUrl: '' };
       case 'youtube':
         return { videoId: '' };
+      case 'countdown':
+        return { targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+      case 'carousel':
+        return { images: [] };
+      case 'product':
+        return { price: 0, currency: 'CNY', name: '产品名称' };
+      case 'contact_form':
+        return {
+          fields: [
+            { name: 'name', type: 'text', label: '姓名', required: true },
+            { name: 'email', type: 'email', label: '邮箱', required: true },
+            { name: 'message', type: 'textarea', label: '留言', required: true },
+          ],
+        };
+      case 'embed':
+        return { type: 'youtube', embedId: '' };
+      case 'music':
+        return { provider: 'spotify', trackUrl: '' };
+      case 'podcast':
+        return { provider: 'spotify', showUrl: '' };
+      case 'nft':
+        return { platform: 'opensea' };
       default:
         return {};
     }
@@ -226,11 +335,17 @@ export default function BioLinkEditorPage() {
   const updateBlock = (blockId: string, updates: Partial<BioLinkBlock>) => {
     if (!localBioLink) return;
 
+    const updatedBlocks = localBioLink.blocks.map((b) =>
+      b.id === blockId ? { ...b, ...updates } : b
+    );
+
+    // Debug log to verify updates
+    console.log('updateBlock called:', { blockId, updates, updatedBlocks });
+
     updateLocalBioLink({
-      blocks: localBioLink.blocks.map((b) =>
-        b.id === blockId ? { ...b, ...updates } : b
-      ),
+      blocks: updatedBlocks,
     });
+    // editingBlock is now derived from localBioLink.blocks, so no separate update needed
   };
 
   const deleteBlock = (blockId: string) => {
@@ -240,8 +355,8 @@ export default function BioLinkEditorPage() {
       blocks: localBioLink.blocks.filter((b) => b.id !== blockId),
     });
 
-    if (editingBlock?.id === blockId) {
-      setEditingBlock(null);
+    if (editingBlockId === blockId) {
+      setEditingBlockId(null);
       setIsBlockSheetOpen(false);
     }
   };
@@ -333,17 +448,28 @@ export default function BioLinkEditorPage() {
 
             {/* Blocks Tab */}
             <TabsContent value="blocks" className="m-0 flex-1 overflow-y-auto p-4">
-              {/* Add block buttons */}
-              <div className="mb-4 grid grid-cols-3 gap-2">
-                {(['link', 'header', 'text', 'image', 'social', 'divider'] as BlockType[]).map(
+              {/* Add block button */}
+              <Button
+                variant="outline"
+                className="mb-4 w-full"
+                onClick={() => setIsBlockPickerOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                添加区块
+              </Button>
+
+              {/* Quick add - common blocks */}
+              <div className="mb-4 grid grid-cols-4 gap-1">
+                {(['link', 'header', 'text', 'image', 'social', 'divider', 'subscribe', 'contact_form'] as BlockType[]).map(
                   (type) => (
                     <button
                       key={type}
                       onClick={() => addBlock(type)}
                       className="flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors hover:border-primary hover:bg-primary/5"
+                      title={BLOCK_TYPE_LABELS[type]?.description || ''}
                     >
                       <BlockIcon type={type} />
-                      {BLOCK_TYPE_LABELS[type].label}
+                      <span className="truncate w-full text-center">{BLOCK_TYPE_LABELS[type]?.label || type}</span>
                     </button>
                   )
                 )}
@@ -356,7 +482,7 @@ export default function BioLinkEditorPage() {
                     key={block.id}
                     className={cn(
                       'group flex items-center gap-2 rounded-lg border bg-background p-2 transition-colors',
-                      editingBlock?.id === block.id && 'border-primary',
+                      editingBlockId === block.id && 'border-primary',
                       !block.isVisible && 'opacity-50'
                     )}
                   >
@@ -401,7 +527,7 @@ export default function BioLinkEditorPage() {
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => {
-                          setEditingBlock(block);
+                          setEditingBlockId(block.id);
                           setIsBlockSheetOpen(true);
                         }}
                       >
@@ -716,12 +842,22 @@ export default function BioLinkEditorPage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => {
+                  setIsPreviewReady(false);
+                  setIsLivePreviewOpen(true);
+                }}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                实时预览
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() =>
-                  window.open(`https://lnk.day/u/${localBioLink.username}`, '_blank')
+                  window.open(getBioLinkPublicUrl(localBioLink.username, true), '_blank')
                 }
               >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                预览
+                <ExternalLink className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -780,8 +916,10 @@ export default function BioLinkEditorPage() {
                 <div className="space-y-3">
                   {localBioLink.blocks
                     .filter((b) => b.isVisible)
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
                     .map((block) => (
                       <div key={block.id}>
+                        {/* Link block */}
                         {block.type === 'link' && (
                           <button
                             className={cn(
@@ -816,24 +954,27 @@ export default function BioLinkEditorPage() {
                           </button>
                         )}
 
+                        {/* Header block */}
                         {block.type === 'header' && (
                           <h2
                             className="text-center text-lg font-bold"
                             style={{ color: localBioLink.theme.textColor }}
                           >
-                            {block.content?.text}
+                            {block.content?.text || '标题'}
                           </h2>
                         )}
 
+                        {/* Text block */}
                         {block.type === 'text' && (
                           <p
                             className="text-center text-sm"
                             style={{ color: localBioLink.theme.textColor }}
                           >
-                            {block.content?.text}
+                            {block.content?.text || block.text?.content || '描述文字'}
                           </p>
                         )}
 
+                        {/* Divider block */}
                         {block.type === 'divider' && (
                           <hr
                             className="my-4 opacity-30"
@@ -841,9 +982,15 @@ export default function BioLinkEditorPage() {
                           />
                         )}
 
+                        {/* Social block */}
                         {block.type === 'social' && (
                           <div className="flex justify-center gap-3">
-                            {SOCIAL_PLATFORMS.slice(0, 5).map((platform) => (
+                            {(block.content?.platforms?.length > 0
+                              ? SOCIAL_PLATFORMS.filter((p) =>
+                                  block.content?.platforms?.includes(p.id)
+                                )
+                              : SOCIAL_PLATFORMS.slice(0, 5)
+                            ).map((platform) => (
                               <div
                                 key={platform.id}
                                 className="flex h-10 w-10 items-center justify-center rounded-full"
@@ -857,6 +1004,297 @@ export default function BioLinkEditorPage() {
                                 />
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Image block */}
+                        {block.type === 'image' && (
+                          <div className="rounded-lg overflow-hidden">
+                            {(block.content?.url || block.image?.url) ? (
+                              <img
+                                src={block.content?.url || block.image?.url}
+                                alt={block.content?.alt || block.image?.alt || ''}
+                                className="w-full h-auto object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-32 flex items-center justify-center bg-gray-200"
+                                style={{ opacity: 0.5 }}
+                              >
+                                <Image className="h-8 w-8 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Video/YouTube block */}
+                        {(block.type === 'video' || block.type === 'youtube') && (
+                          <div className="rounded-lg overflow-hidden aspect-video bg-black flex items-center justify-center">
+                            {block.content?.videoId ? (
+                              <iframe
+                                className="w-full h-full"
+                                src={`https://www.youtube.com/embed/${block.content.videoId}`}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                            ) : (
+                              <div className="text-white/50 flex flex-col items-center gap-2">
+                                <Video className="h-8 w-8" />
+                                <span className="text-sm">视频预览</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Subscribe/Email block */}
+                        {(block.type === 'subscribe' || block.type === 'email') && (
+                          <div className="rounded-lg p-4" style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}>
+                            <div className="flex gap-2">
+                              <input
+                                type="email"
+                                placeholder={block.content?.placeholder || block.subscribe?.placeholder || '请输入邮箱'}
+                                className="flex-1 px-3 py-2 rounded-md border text-sm"
+                                style={{ borderColor: localBioLink.theme.buttonColor }}
+                                disabled
+                              />
+                              <button
+                                className="px-4 py-2 rounded-md text-sm font-medium"
+                                style={{
+                                  backgroundColor: localBioLink.theme.buttonColor,
+                                  color: localBioLink.theme.buttonTextColor,
+                                }}
+                              >
+                                {block.content?.buttonText || block.subscribe?.buttonText || '订阅'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Contact Form block */}
+                        {block.type === 'contact_form' && (
+                          <div className="rounded-lg p-4 space-y-3" style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}>
+                            <div className="text-sm font-medium" style={{ color: localBioLink.theme.textColor }}>
+                              联系表单
+                            </div>
+                            {(block.contactForm?.fields || [
+                              { label: '姓名', type: 'text' },
+                              { label: '邮箱', type: 'email' },
+                              { label: '留言', type: 'textarea' },
+                            ]).map((field: any, i: number) => (
+                              <div key={i}>
+                                {field.type === 'textarea' ? (
+                                  <textarea
+                                    placeholder={field.label}
+                                    className="w-full px-3 py-2 rounded-md border text-sm resize-none"
+                                    style={{ borderColor: localBioLink.theme.buttonColor }}
+                                    rows={3}
+                                    disabled
+                                  />
+                                ) : (
+                                  <input
+                                    type={field.type}
+                                    placeholder={field.label}
+                                    className="w-full px-3 py-2 rounded-md border text-sm"
+                                    style={{ borderColor: localBioLink.theme.buttonColor }}
+                                    disabled
+                                  />
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              className="w-full px-4 py-2 rounded-md text-sm font-medium"
+                              style={{
+                                backgroundColor: localBioLink.theme.buttonColor,
+                                color: localBioLink.theme.buttonTextColor,
+                              }}
+                            >
+                              {block.contactForm?.submitButtonText || '发送消息'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Countdown block */}
+                        {block.type === 'countdown' && (
+                          <div
+                            className="rounded-lg p-4 text-center"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            <div className="flex justify-center gap-4">
+                              {(block.countdown?.showDays !== false) && (
+                                <div>
+                                  <div className="text-2xl font-bold" style={{ color: localBioLink.theme.textColor }}>00</div>
+                                  <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>天</div>
+                                </div>
+                              )}
+                              {(block.countdown?.showHours !== false) && (
+                                <div>
+                                  <div className="text-2xl font-bold" style={{ color: localBioLink.theme.textColor }}>00</div>
+                                  <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>时</div>
+                                </div>
+                              )}
+                              {(block.countdown?.showMinutes !== false) && (
+                                <div>
+                                  <div className="text-2xl font-bold" style={{ color: localBioLink.theme.textColor }}>00</div>
+                                  <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>分</div>
+                                </div>
+                              )}
+                              {(block.countdown?.showSeconds !== false) && (
+                                <div>
+                                  <div className="text-2xl font-bold" style={{ color: localBioLink.theme.textColor }}>00</div>
+                                  <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>秒</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Product block */}
+                        {block.type === 'product' && (
+                          <div
+                            className="rounded-lg p-4"
+                            style={{
+                              backgroundColor: localBioLink.theme.buttonStyle === 'soft'
+                                ? `${localBioLink.theme.buttonColor}20`
+                                : 'white',
+                              border: `1px solid ${localBioLink.theme.buttonColor}30`,
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium" style={{ color: localBioLink.theme.textColor }}>
+                                  {block.title || block.content?.name || '产品名称'}
+                                </div>
+                                {block.product?.badge && (
+                                  <span
+                                    className="text-xs px-2 py-0.5 rounded-full"
+                                    style={{
+                                      backgroundColor: localBioLink.theme.buttonColor,
+                                      color: localBioLink.theme.buttonTextColor,
+                                    }}
+                                  >
+                                    {block.product.badge}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold" style={{ color: localBioLink.theme.buttonColor }}>
+                                  {block.product?.currency === 'USD' ? '$' : block.product?.currency === 'EUR' ? '€' : '¥'}
+                                  {block.product?.price || block.content?.price || 0}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              className="w-full mt-3 px-4 py-2 rounded-md text-sm font-medium"
+                              style={{
+                                backgroundColor: localBioLink.theme.buttonColor,
+                                color: localBioLink.theme.buttonTextColor,
+                              }}
+                            >
+                              立即购买
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Map block */}
+                        {block.type === 'map' && (
+                          <div
+                            className="rounded-lg h-40 flex items-center justify-center"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            <div className="text-center">
+                              <MapPin className="h-8 w-8 mx-auto mb-2" style={{ color: localBioLink.theme.buttonColor }} />
+                              <p className="text-sm" style={{ color: localBioLink.theme.textColor }}>
+                                {block.map?.address || block.content?.address || '地图位置'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Embed block */}
+                        {block.type === 'embed' && (
+                          <div
+                            className="rounded-lg aspect-video flex items-center justify-center"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            <div className="text-center">
+                              <Code className="h-8 w-8 mx-auto mb-2" style={{ color: localBioLink.theme.buttonColor }} />
+                              <p className="text-sm" style={{ color: localBioLink.theme.textColor }}>
+                                {block.embed?.type || '嵌入内容'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Music/Spotify block */}
+                        {(block.type === 'music' || block.type === 'spotify') && (
+                          <div
+                            className="rounded-lg p-4 flex items-center gap-3"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            <div
+                              className="h-12 w-12 rounded-md flex items-center justify-center"
+                              style={{ backgroundColor: localBioLink.theme.buttonColor }}
+                            >
+                              <Music className="h-6 w-6" style={{ color: localBioLink.theme.buttonTextColor }} />
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium" style={{ color: localBioLink.theme.textColor }}>
+                                {block.music?.provider || 'Spotify'}
+                              </div>
+                              <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>
+                                音乐播放器
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Podcast block */}
+                        {block.type === 'podcast' && (
+                          <div
+                            className="rounded-lg p-4 flex items-center gap-3"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            <div
+                              className="h-12 w-12 rounded-md flex items-center justify-center"
+                              style={{ backgroundColor: localBioLink.theme.buttonColor }}
+                            >
+                              <Mic className="h-6 w-6" style={{ color: localBioLink.theme.buttonTextColor }} />
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium" style={{ color: localBioLink.theme.textColor }}>
+                                {block.podcast?.showName || '播客节目'}
+                              </div>
+                              <div className="text-xs opacity-70" style={{ color: localBioLink.theme.textColor }}>
+                                {block.podcast?.provider || 'Spotify'}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Contact block */}
+                        {block.type === 'contact' && (
+                          <div
+                            className="rounded-lg p-4 space-y-2"
+                            style={{ backgroundColor: `${localBioLink.theme.buttonColor}15` }}
+                          >
+                            {block.content?.phone && (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: localBioLink.theme.textColor }}>
+                                <Phone className="h-4 w-4" />
+                                {block.content.phone}
+                              </div>
+                            )}
+                            {block.content?.email && (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: localBioLink.theme.textColor }}>
+                                <Mail className="h-4 w-4" />
+                                {block.content.email}
+                              </div>
+                            )}
+                            {block.content?.address && (
+                              <div className="flex items-center gap-2 text-sm" style={{ color: localBioLink.theme.textColor }}>
+                                <MapPin className="h-4 w-4" />
+                                {block.content.address}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -995,6 +1433,532 @@ export default function BioLinkEditorPage() {
                   </div>
                 )}
 
+                {/* Subscribe block */}
+                {(editingBlock.type === 'subscribe' || editingBlock.type === 'email') && (
+                  <>
+                    <div>
+                      <Label>占位符文本</Label>
+                      <Input
+                        value={editingBlock.content?.placeholder || editingBlock.subscribe?.placeholder || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            content: { ...(editingBlock.content || {}), placeholder: e.target.value },
+                            subscribe: { ...(editingBlock.subscribe || {}), placeholder: e.target.value },
+                          })
+                        }
+                        placeholder="请输入邮箱"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>按钮文字</Label>
+                      <Input
+                        value={editingBlock.content?.buttonText || editingBlock.subscribe?.buttonText || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            content: { ...(editingBlock.content || {}), buttonText: e.target.value },
+                            subscribe: { ...(editingBlock.subscribe || {}), buttonText: e.target.value },
+                          })
+                        }
+                        placeholder="订阅"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>成功提示</Label>
+                      <Input
+                        value={editingBlock.subscribe?.successMessage || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            subscribe: { ...(editingBlock.subscribe || {}), successMessage: e.target.value },
+                          })
+                        }
+                        placeholder="订阅成功！"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>收集姓名</Label>
+                      <Switch
+                        checked={editingBlock.subscribe?.collectName || false}
+                        onCheckedChange={(checked) =>
+                          updateBlock(editingBlock.id, {
+                            subscribe: { ...(editingBlock.subscribe || {}), collectName: checked },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>收集电话</Label>
+                      <Switch
+                        checked={editingBlock.subscribe?.collectPhone || false}
+                        onCheckedChange={(checked) =>
+                          updateBlock(editingBlock.id, {
+                            subscribe: { ...(editingBlock.subscribe || {}), collectPhone: checked },
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Contact Form block */}
+                {editingBlock.type === 'contact_form' && (
+                  <>
+                    <div>
+                      <Label>提交按钮文字</Label>
+                      <Input
+                        value={editingBlock.contactForm?.submitButtonText || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            contactForm: { ...(editingBlock.contactForm || { fields: [] }), submitButtonText: e.target.value },
+                          })
+                        }
+                        placeholder="发送消息"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>成功提示</Label>
+                      <Input
+                        value={editingBlock.contactForm?.successMessage || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            contactForm: { ...(editingBlock.contactForm || { fields: [] }), successMessage: e.target.value },
+                          })
+                        }
+                        placeholder="感谢您的留言！"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>通知邮箱</Label>
+                      <Input
+                        value={editingBlock.contactForm?.notificationEmail || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            contactForm: { ...(editingBlock.contactForm || { fields: [] }), notificationEmail: e.target.value },
+                          })
+                        }
+                        placeholder="收到表单后发送通知到此邮箱"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="border-t pt-3 mt-3">
+                      <Label className="text-sm font-medium">表单字段</Label>
+                      <p className="text-xs text-muted-foreground mt-1 mb-2">
+                        默认包含: 姓名、邮箱、留言字段
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Countdown block */}
+                {editingBlock.type === 'countdown' && (
+                  <>
+                    <div>
+                      <Label>目标日期时间</Label>
+                      <Input
+                        type="datetime-local"
+                        value={editingBlock.countdown?.targetDate?.slice(0, 16) || editingBlock.content?.targetDate?.slice(0, 16) || ''}
+                        onChange={(e) => {
+                          const targetDate = new Date(e.target.value).toISOString();
+                          updateBlock(editingBlock.id, {
+                            countdown: { targetDate, ...(editingBlock.countdown || {}) },
+                            content: { ...(editingBlock.content || {}), targetDate },
+                          });
+                        }}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">显示天</Label>
+                        <Switch
+                          checked={editingBlock.countdown?.showDays !== false}
+                          onCheckedChange={(checked) => {
+                            const currentCountdown = editingBlock.countdown || { targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+                            updateBlock(editingBlock.id, {
+                              countdown: { ...currentCountdown, showDays: checked },
+                            });
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">显示时</Label>
+                        <Switch
+                          checked={editingBlock.countdown?.showHours !== false}
+                          onCheckedChange={(checked) => {
+                            const currentCountdown = editingBlock.countdown || { targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+                            updateBlock(editingBlock.id, {
+                              countdown: { ...currentCountdown, showHours: checked },
+                            });
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">显示分</Label>
+                        <Switch
+                          checked={editingBlock.countdown?.showMinutes !== false}
+                          onCheckedChange={(checked) => {
+                            const currentCountdown = editingBlock.countdown || { targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+                            updateBlock(editingBlock.id, {
+                              countdown: { ...currentCountdown, showMinutes: checked },
+                            });
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">显示秒</Label>
+                        <Switch
+                          checked={editingBlock.countdown?.showSeconds !== false}
+                          onCheckedChange={(checked) => {
+                            const currentCountdown = editingBlock.countdown || { targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
+                            updateBlock(editingBlock.id, {
+                              countdown: { ...currentCountdown, showSeconds: checked },
+                            });
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Product block */}
+                {editingBlock.type === 'product' && (
+                  <>
+                    <div>
+                      <Label>产品名称</Label>
+                      <Input
+                        value={editingBlock.title || editingBlock.content?.name || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            title: e.target.value,
+                            content: { ...(editingBlock.content || {}), name: e.target.value },
+                          })
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>价格</Label>
+                        <Input
+                          type="number"
+                          value={editingBlock.product?.price || editingBlock.content?.price || 0}
+                          onChange={(e) =>
+                            updateBlock(editingBlock.id, {
+                              product: { ...(editingBlock.product || { price: 0, currency: 'CNY' }), price: parseFloat(e.target.value) },
+                              content: { ...(editingBlock.content || {}), price: parseFloat(e.target.value) },
+                            })
+                          }
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label>货币</Label>
+                        <Select
+                          value={editingBlock.product?.currency || 'CNY'}
+                          onValueChange={(v) =>
+                            updateBlock(editingBlock.id, {
+                              product: { ...(editingBlock.product || { price: 0, currency: 'CNY' }), currency: v },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CNY">¥ CNY</SelectItem>
+                            <SelectItem value="USD">$ USD</SelectItem>
+                            <SelectItem value="EUR">€ EUR</SelectItem>
+                            <SelectItem value="GBP">£ GBP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>购买链接</Label>
+                      <Input
+                        value={editingBlock.product?.paymentUrl || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            product: { ...(editingBlock.product || { price: 0, currency: 'CNY' }), paymentUrl: e.target.value },
+                          })
+                        }
+                        placeholder="https://..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>徽章文字</Label>
+                      <Input
+                        value={editingBlock.product?.badge || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            product: { ...(editingBlock.product || { price: 0, currency: 'CNY' }), badge: e.target.value },
+                          })
+                        }
+                        placeholder="例如: 热卖、限时优惠"
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Map block */}
+                {editingBlock.type === 'map' && (
+                  <>
+                    <div>
+                      <Label>地址</Label>
+                      <Input
+                        value={editingBlock.map?.address || editingBlock.content?.address || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            map: { ...(editingBlock.map || { provider: 'google', latitude: 0, longitude: 0 }), address: e.target.value },
+                            content: { ...(editingBlock.content || {}), address: e.target.value },
+                          })
+                        }
+                        placeholder="输入完整地址"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>地图缩放级别</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={editingBlock.map?.zoom || editingBlock.content?.zoom || 14}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            map: { ...(editingBlock.map || { provider: 'google', latitude: 0, longitude: 0 }), zoom: parseInt(e.target.value) },
+                            content: { ...(editingBlock.content || {}), zoom: parseInt(e.target.value) },
+                          })
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>显示导航链接</Label>
+                      <Switch
+                        checked={editingBlock.map?.showDirectionsLink || false}
+                        onCheckedChange={(checked) =>
+                          updateBlock(editingBlock.id, {
+                            map: { ...(editingBlock.map || { provider: 'google', latitude: 0, longitude: 0 }), showDirectionsLink: checked },
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Embed block */}
+                {editingBlock.type === 'embed' && (
+                  <>
+                    <div>
+                      <Label>嵌入类型</Label>
+                      <Select
+                        value={editingBlock.embed?.type || 'youtube'}
+                        onValueChange={(v: any) =>
+                          updateBlock(editingBlock.id, {
+                            embed: { ...(editingBlock.embed || { type: 'youtube', embedId: '' }), type: v },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="youtube">YouTube</SelectItem>
+                          <SelectItem value="spotify">Spotify</SelectItem>
+                          <SelectItem value="soundcloud">SoundCloud</SelectItem>
+                          <SelectItem value="tiktok">TikTok</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="twitter">Twitter</SelectItem>
+                          <SelectItem value="vimeo">Vimeo</SelectItem>
+                          <SelectItem value="bilibili">Bilibili</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>嵌入 ID / URL</Label>
+                      <Input
+                        value={editingBlock.embed?.embedId || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            embed: { ...(editingBlock.embed || { type: 'youtube', embedId: '' }), embedId: e.target.value },
+                          })
+                        }
+                        placeholder="视频ID或完整URL"
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Music block */}
+                {(editingBlock.type === 'music' || editingBlock.type === 'spotify') && (
+                  <>
+                    <div>
+                      <Label>音乐平台</Label>
+                      <Select
+                        value={editingBlock.music?.provider || 'spotify'}
+                        onValueChange={(v: any) =>
+                          updateBlock(editingBlock.id, {
+                            music: { ...(editingBlock.music || { provider: 'spotify' }), provider: v },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spotify">Spotify</SelectItem>
+                          <SelectItem value="apple_music">Apple Music</SelectItem>
+                          <SelectItem value="soundcloud">SoundCloud</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>曲目/专辑链接</Label>
+                      <Input
+                        value={editingBlock.music?.trackUrl || editingBlock.content?.embedUrl || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            music: { ...(editingBlock.music || { provider: 'spotify' }), trackUrl: e.target.value },
+                            content: { ...(editingBlock.content || {}), embedUrl: e.target.value },
+                          })
+                        }
+                        placeholder="https://open.spotify.com/..."
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Podcast block */}
+                {editingBlock.type === 'podcast' && (
+                  <>
+                    <div>
+                      <Label>播客平台</Label>
+                      <Select
+                        value={editingBlock.podcast?.provider || 'spotify'}
+                        onValueChange={(v: any) =>
+                          updateBlock(editingBlock.id, {
+                            podcast: { ...(editingBlock.podcast || { provider: 'spotify' }), provider: v },
+                          })
+                        }
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spotify">Spotify</SelectItem>
+                          <SelectItem value="apple_podcasts">Apple Podcasts</SelectItem>
+                          <SelectItem value="google_podcasts">Google Podcasts</SelectItem>
+                          <SelectItem value="anchor">Anchor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>播客链接</Label>
+                      <Input
+                        value={editingBlock.podcast?.showUrl || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            podcast: { ...(editingBlock.podcast || { provider: 'spotify' }), showUrl: e.target.value },
+                          })
+                        }
+                        placeholder="https://..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>节目名称</Label>
+                      <Input
+                        value={editingBlock.podcast?.showName || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            podcast: { ...(editingBlock.podcast || { provider: 'spotify' }), showName: e.target.value },
+                          })
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Social block */}
+                {editingBlock.type === 'social' && (
+                  <div className="space-y-2">
+                    <Label>选择要显示的社交平台</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {SOCIAL_PLATFORMS.slice(0, 10).map((platform) => (
+                        <div key={platform.id} className="flex items-center gap-2">
+                          <Switch
+                            id={`social-${platform.id}`}
+                            checked={(editingBlock.content?.platforms || []).includes(platform.id)}
+                            onCheckedChange={(checked) => {
+                              const current = editingBlock.content?.platforms || [];
+                              const updated = checked
+                                ? [...current, platform.id]
+                                : current.filter((p: string) => p !== platform.id);
+                              updateBlock(editingBlock.id, {
+                                content: { ...(editingBlock.content || {}), platforms: updated },
+                              });
+                            }}
+                          />
+                          <Label htmlFor={`social-${platform.id}`} className="text-xs">{platform.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Video block */}
+                {editingBlock.type === 'video' && (
+                  <>
+                    <div>
+                      <Label>视频 URL</Label>
+                      <Input
+                        value={editingBlock.video?.url || editingBlock.content?.url || ''}
+                        onChange={(e) =>
+                          updateBlock(editingBlock.id, {
+                            video: { ...(editingBlock.video || { url: '' }), url: e.target.value },
+                            content: { ...(editingBlock.content || {}), url: e.target.value },
+                          })
+                        }
+                        placeholder="https://..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>自动播放</Label>
+                      <Switch
+                        checked={editingBlock.video?.autoplay || editingBlock.content?.autoplay || false}
+                        onCheckedChange={(checked) =>
+                          updateBlock(editingBlock.id, {
+                            video: { ...(editingBlock.video || { url: '' }), autoplay: checked },
+                            content: { ...(editingBlock.content || {}), autoplay: checked },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>循环播放</Label>
+                      <Switch
+                        checked={editingBlock.video?.loop || false}
+                        onCheckedChange={(checked) =>
+                          updateBlock(editingBlock.id, {
+                            video: { ...(editingBlock.video || { url: '' }), loop: checked },
+                          })
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+
                 <Button
                   variant="destructive"
                   className="mt-6 w-full"
@@ -1009,6 +1973,123 @@ export default function BioLinkEditorPage() {
             )}
           </SheetContent>
         </Sheet>
+
+        {/* Block Picker Sheet */}
+        <Sheet open={isBlockPickerOpen} onOpenChange={setIsBlockPickerOpen}>
+          <SheetContent side="left" className="w-[400px] sm:w-[540px]">
+            <SheetHeader>
+              <SheetTitle>添加区块</SheetTitle>
+              <SheetDescription>
+                选择要添加到页面的区块类型
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-6">
+              {/* Category tabs */}
+              <div className="flex gap-2 flex-wrap mb-4">
+                {BLOCK_CATEGORIES.map((cat) => (
+                  <Button
+                    key={cat.id}
+                    variant={selectedCategory === cat.id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedCategory(cat.id)}
+                  >
+                    {cat.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Blocks grid */}
+              <div className="grid grid-cols-2 gap-2">
+                {getBlocksByCategory(selectedCategory).map((type) => {
+                  const blockInfo = BLOCK_TYPE_LABELS[type];
+                  if (!blockInfo) return null;
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => addBlock(type)}
+                      className="flex items-start gap-3 rounded-lg border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                    >
+                      <div className="mt-0.5">
+                        <BlockIcon type={type} />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">{blockInfo.label}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2">
+                          {blockInfo.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Live Preview Dialog */}
+        <Dialog open={isLivePreviewOpen} onOpenChange={setIsLivePreviewOpen}>
+          <DialogContent className="max-w-4xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="px-6 py-4 border-b shrink-0">
+              <DialogTitle className="flex items-center justify-between">
+                <span>实时预览</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={previewDevice === 'mobile' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setPreviewDevice('mobile')}
+                  >
+                    <Smartphone className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={previewDevice === 'desktop' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setPreviewDevice('desktop')}
+                  >
+                    <Monitor className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      window.open(getBioLinkPublicUrl(localBioLink.username, true), '_blank')
+                    }
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto bg-gray-100 flex items-start justify-center p-4">
+              <div
+                className={cn(
+                  'bg-white rounded-2xl shadow-lg overflow-hidden transition-all',
+                  previewDevice === 'mobile' ? 'w-[375px]' : 'w-full max-w-2xl'
+                )}
+                style={{ minHeight: previewDevice === 'mobile' ? 667 : 'auto' }}
+              >
+                {!isPreviewReady && (
+                  <div className="flex items-center justify-center h-[500px]">
+                    <div className="text-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">加载预览中...</p>
+                    </div>
+                  </div>
+                )}
+                <iframe
+                  ref={previewIframeRef}
+                  src={`/u/${localBioLink.username}?live=true`}
+                  className={cn(
+                    'w-full border-0',
+                    !isPreviewReady && 'hidden'
+                  )}
+                  style={{ height: previewDevice === 'mobile' ? 667 : 800 }}
+                  title="Bio Link 实时预览"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
