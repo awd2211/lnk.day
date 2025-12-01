@@ -319,7 +319,7 @@ export interface CalendlySettings {
 
 export interface BioLink {
   id: string;
-  slug: string;
+  username: string;
   title: string;
   description?: string;
   avatarUrl?: string;
@@ -345,9 +345,13 @@ export interface BioLink {
 }
 
 export interface CreateBioLinkData {
-  slug: string;
-  title: string;
-  description?: string;
+  username: string;
+  title?: string;
+  profile: {
+    name: string;
+    bio?: string;
+    avatarUrl?: string;
+  };
 }
 
 export interface UpdateBioLinkData {
@@ -369,15 +373,116 @@ export interface UpdateBioLinkData {
   calendly?: CalendlySettings;
 }
 
-// Query: Get all bio links
-export function useBioLinks() {
+export interface BioLinkQueryParams {
+  page?: number;
+  limit?: number;
+  status?: 'draft' | 'published';
+  search?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'totalViews' | 'totalClicks';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+// Query: Get all bio links with pagination and sorting
+export function useBioLinks(params?: BioLinkQueryParams) {
   return useQuery({
-    queryKey: ['bio-links'],
+    queryKey: ['bio-links', params],
     queryFn: async () => {
-      const { data } = await linkApi.get('/api/v1/bio-links');
-      return data as BioLink[];
+      const urlParams = new URLSearchParams();
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.search) urlParams.append('search', params.search);
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      const { data } = await linkApi.get(`/api/v1/bio-links?${urlParams}`);
+      // Handle both array format and { items, total } format
+      if (Array.isArray(data)) {
+        const items = data.map(transformBackendBioLink);
+        return { items, total: items.length, page: 1, limit: items.length };
+      }
+      const items = (data.items || []).map(transformBackendBioLink);
+      return { items, total: data.total || 0, page: data.page || 1, limit: data.limit || 20 };
     },
   });
+}
+
+// Helper to transform backend BioLinkItem to frontend BioLinkBlock
+function transformBackendBlock(item: any): BioLinkBlock {
+  return {
+    id: item.id,
+    type: item.type,
+    title: item.title,
+    url: item.url,
+    description: item.description,
+    thumbnailUrl: item.thumbnailUrl,
+    style: item.style,
+    settings: item.settings,
+    isVisible: item.visible ?? true,
+    sortOrder: item.order ?? 0,
+    clicks: item.clicks,
+    content: item.content,
+    embed: item.embed,
+    product: item.product,
+    carousel: item.carousel,
+    countdown: item.countdown,
+    music: item.music,
+    map: item.map,
+    subscribe: item.subscribe,
+    nft: item.nft,
+    podcast: item.podcast,
+    text: item.text,
+    image: item.image,
+    video: item.video,
+    contactForm: item.contactForm,
+  };
+}
+
+// Helper to transform backend BioLink response to frontend BioLink
+function transformBackendBioLink(data: any): BioLink {
+  const blocks = (data.blocks || []).map(transformBackendBlock);
+  return {
+    id: data.id,
+    username: data.username,
+    title: data.title || data.profile?.name || '',
+    description: data.profile?.bio,
+    avatarUrl: data.profile?.avatarUrl,
+    isPublished: data.status === 'published',
+    blocks,
+    theme: {
+      backgroundColor: data.theme?.backgroundColor || '#ffffff',
+      backgroundGradient: data.theme?.backgroundGradient
+        ? `linear-gradient(${data.theme.backgroundGradient.angle || 135}deg, ${data.theme.backgroundGradient.colors?.join(', ') || '#667eea, #764ba2'})`
+        : undefined,
+      backgroundImage: data.theme?.backgroundImage,
+      textColor: data.theme?.textColor || '#1f2937',
+      buttonStyle: data.theme?.buttonStyle === 'filled' ? 'solid' : (data.theme?.buttonStyle || 'solid'),
+      buttonColor: data.theme?.buttonColor || '#1f2937',
+      buttonTextColor: data.theme?.buttonTextColor || '#ffffff',
+      buttonRadius: mapButtonRadius(data.theme?.buttonBorderRadius),
+      fontFamily: data.theme?.fontFamily || 'Inter',
+      customCSS: data.settings?.customCss,
+    },
+    seo: data.seo,
+    analytics: data.analytics || {
+      views: data.totalViews || 0,
+      clicks: data.totalClicks || 0,
+    },
+    teamId: data.teamId,
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  };
+}
+
+// Map backend button radius to frontend format
+function mapButtonRadius(radius?: string): 'none' | 'sm' | 'md' | 'lg' | 'full' {
+  switch (radius) {
+    case 'none': return 'none';
+    case 'small': return 'sm';
+    case 'medium': return 'md';
+    case 'large': return 'lg';
+    case 'full': return 'full';
+    default: return 'lg';
+  }
 }
 
 // Query: Get single bio link
@@ -387,7 +492,7 @@ export function useBioLink(id: string | null) {
     queryFn: async () => {
       if (!id) return null;
       const { data } = await linkApi.get(`/api/v1/bio-links/${id}`);
-      return data as BioLink;
+      return transformBackendBioLink(data);
     },
     enabled: !!id,
   });

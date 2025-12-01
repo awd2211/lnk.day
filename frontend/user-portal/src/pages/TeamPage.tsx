@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TeamMemberList, InviteMemberDialog, PendingInvitations } from '@/components/team';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useCurrentTeam,
@@ -42,6 +43,7 @@ export default function TeamPage() {
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -117,11 +119,11 @@ export default function TeamPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!team) return;
-    if (!confirm('确定要移除该成员吗？')) return;
+  const handleRemoveMember = async () => {
+    if (!team || !removingMemberId) return;
     try {
-      await removeMember.mutateAsync({ teamId: team.id, memberId });
+      await removeMember.mutateAsync({ teamId: team.id, memberId: removingMemberId });
+      setRemovingMemberId(null);
       toast({ title: '成员已移除' });
     } catch {
       toast({ title: '移除失败', variant: 'destructive' });
@@ -298,7 +300,7 @@ export default function TeamPage() {
                     currentUserId={currentUserId}
                     isAdmin={isAdmin}
                     onUpdateRole={handleUpdateRole}
-                    onRemove={handleRemoveMember}
+                    onRemove={(memberId) => setRemovingMemberId(memberId)}
                   />
                 </CardContent>
               </Card>
@@ -430,6 +432,18 @@ export default function TeamPage() {
         onOpenChange={setShowInviteDialog}
         onInvite={handleInvite}
         inviting={inviteMember.isPending}
+      />
+
+      {/* Remove Member Confirm Dialog */}
+      <ConfirmDialog
+        open={!!removingMemberId}
+        onOpenChange={(open) => !open && setRemovingMemberId(null)}
+        title="移除成员"
+        description="确定要移除此成员吗？移除后该成员将无法访问团队资源。"
+        confirmText="移除"
+        onConfirm={handleRemoveMember}
+        isLoading={removeMember.isPending}
+        variant="destructive"
       />
     </Layout>
   );

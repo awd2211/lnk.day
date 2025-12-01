@@ -57,7 +57,7 @@ export function useReports(params?: { page?: number; limit?: number; type?: Repo
   return useQuery({
     queryKey: ['reports', params],
     queryFn: async () => {
-      const { data } = await analyticsApi.get('/api/reports', { params });
+      const { data } = await analyticsApi.get('/api/v1/reports', { params });
       return data as { items: Report[]; total: number };
     },
   });
@@ -69,7 +69,7 @@ export function useReport(id: string | null) {
     queryKey: ['reports', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await analyticsApi.get(`/api/reports/${id}`);
+      const { data } = await analyticsApi.get(`/api/v1/reports/${id}`);
       return data as Report;
     },
     enabled: !!id,
@@ -86,7 +86,7 @@ export function useScheduledReports() {
   return useQuery({
     queryKey: ['reports', 'scheduled'],
     queryFn: async () => {
-      const { data } = await analyticsApi.get('/api/reports/scheduled');
+      const { data } = await analyticsApi.get('/api/v1/schedules');
       return data as ScheduledReport[];
     },
   });
@@ -98,7 +98,7 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (config: Omit<ReportConfig, 'schedule'>) => {
-      const { data } = await analyticsApi.post('/api/reports/generate', config);
+      const { data } = await analyticsApi.post('/api/v1/reports/generate', config);
       return data as Report;
     },
     onSuccess: () => {
@@ -113,7 +113,7 @@ export function useScheduleReport() {
 
   return useMutation({
     mutationFn: async (config: ReportConfig) => {
-      const { data } = await analyticsApi.post('/api/reports/schedule', config);
+      const { data } = await analyticsApi.post('/api/v1/schedules', config);
       return data as ScheduledReport;
     },
     onSuccess: () => {
@@ -128,7 +128,7 @@ export function useDeleteReport() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await analyticsApi.delete(`/api/reports/${id}`);
+      await analyticsApi.delete(`/api/v1/reports/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports'] });
@@ -142,7 +142,7 @@ export function useToggleScheduledReport() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await analyticsApi.post(`/api/reports/scheduled/${id}/toggle`);
+      const { data } = await analyticsApi.post(`/api/v1/schedules/${id}/toggle`);
       return data as ScheduledReport;
     },
     onSuccess: () => {
@@ -157,7 +157,7 @@ export function useDeleteScheduledReport() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await analyticsApi.delete(`/api/reports/scheduled/${id}`);
+      await analyticsApi.delete(`/api/v1/schedules/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', 'scheduled'] });

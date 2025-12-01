@@ -76,34 +76,62 @@ export default function DashboardPage() {
         { name: 'Tablet', value: 0, color: '#f59e0b' },
       ];
 
+  // 从趋势数据计算变化率
+  const calculateChange = () => {
+    if (!trends?.data || !Array.isArray(trends.data) || trends.data.length < 2) {
+      return { clicksChange: null, todayChange: null };
+    }
+
+    const data = trends.data;
+    // 计算本周与上周的变化
+    const halfLength = Math.floor(data.length / 2);
+    const recentClicks = data.slice(halfLength).reduce((sum: number, d: { clicks: number }) => sum + d.clicks, 0);
+    const previousClicks = data.slice(0, halfLength).reduce((sum: number, d: { clicks: number }) => sum + d.clicks, 0);
+
+    const clicksChange = previousClicks > 0
+      ? Math.round((recentClicks - previousClicks) / previousClicks * 100)
+      : null;
+
+    // 今日与昨日对比
+    const todayClicks = data[data.length - 1]?.clicks || 0;
+    const yesterdayClicks = data[data.length - 2]?.clicks || 0;
+    const todayChange = yesterdayClicks > 0
+      ? Math.round((todayClicks - yesterdayClicks) / yesterdayClicks * 100)
+      : null;
+
+    return { clicksChange, todayChange };
+  };
+
+  const { clicksChange, todayChange } = calculateChange();
+
   const stats = [
     {
       label: '总链接数',
       value: linksData?.total || 0,
       icon: Link2,
       color: 'bg-blue-500',
-      change: 12,
+      change: null as number | null, // 链接数暂无变化率
     },
     {
       label: '总点击数',
       value: analytics?.totalClicks || 0,
       icon: MousePointerClick,
       color: 'bg-green-500',
-      change: 8,
+      change: clicksChange,
     },
     {
       label: '今日点击',
       value: analytics?.todayClicks || 0,
       icon: TrendingUp,
       color: 'bg-purple-500',
-      change: 15,
+      change: todayChange,
     },
     {
       label: '独立访客',
       value: analytics?.uniqueVisitors || 0,
       icon: Globe,
       color: 'bg-orange-500',
-      change: -3,
+      change: null as number | null, // 访客数暂无变化率
     },
   ];
 
@@ -115,7 +143,7 @@ export default function DashboardPage() {
 
   const quickActions = [
     { label: '创建链接', icon: Plus, to: '/links', color: 'bg-blue-500 hover:bg-blue-600' },
-    { label: '生成二维码', icon: QrCode, to: '/qr', color: 'bg-purple-500 hover:bg-purple-600' },
+    { label: '生成二维码', icon: QrCode, to: '/qr-codes', color: 'bg-purple-500 hover:bg-purple-600' },
     { label: '查看分析', icon: BarChart3, to: '/analytics', color: 'bg-green-500 hover:bg-green-600' },
   ];
 
@@ -147,7 +175,8 @@ export default function DashboardPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
-            const isPositive = stat.change >= 0;
+            const hasChange = stat.change !== null && stat.change !== undefined;
+            const isPositive = hasChange && (stat.change ?? 0) >= 0;
             return (
               <Card key={stat.label}>
                 <CardContent className="p-6">
@@ -155,10 +184,12 @@ export default function DashboardPage() {
                     <div className={`rounded-lg ${stat.color} p-3`}>
                       <Icon className="h-5 w-5 text-white" />
                     </div>
-                    <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                      {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                      {Math.abs(stat.change)}%
-                    </div>
+                    {hasChange && (
+                      <div className={`flex items-center gap-1 text-sm ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                        {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
+                        {Math.abs(stat.change!)}%
+                      </div>
+                    )}
                   </div>
                   <p className="mt-4 text-2xl font-bold">
                     {linksLoading || analyticsLoading ? '...' : stat.value.toLocaleString()}
@@ -392,7 +423,7 @@ export default function DashboardPage() {
                       添加 UTM 参数
                     </Button>
                   </Link>
-                  <Link to="/qr">
+                  <Link to="/qr-codes">
                     <Button variant="outline" size="sm">
                       生成二维码
                     </Button>

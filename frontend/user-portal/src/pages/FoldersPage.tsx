@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -21,20 +20,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useFolders, useCreateFolder, useUpdateFolder, useDeleteFolder, Folder } from '@/hooks/useFolders';
+import { useFolders, useCreateFolder, useUpdateFolder, Folder } from '@/hooks/useFolders';
 import { EmptyState } from '@/components/EmptyState';
+import { FolderDeleteDialog } from '@/components/links/FolderDeleteDialog';
 import {
   Folder as FolderIcon,
   FolderPlus,
@@ -42,11 +32,9 @@ import {
   Pencil,
   Trash2,
   Link,
-  ExternalLink,
   Loader2,
   Search,
   FolderOpen,
-  ChevronRight,
   Star,
   StarOff,
 } from 'lucide-react';
@@ -160,7 +148,6 @@ export default function FoldersPage() {
   const { data: folders, isLoading } = useFolders();
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
-  const deleteFolder = useDeleteFolder();
 
   const filteredFolders = folders?.filter(folder =>
     folder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -196,17 +183,6 @@ export default function FoldersPage() {
         toast({ title: '文件夹已更新' });
         setEditingFolder(null);
         setFormData({ name: '', description: '', color: 'gray' });
-      },
-    });
-  };
-
-  const handleDelete = () => {
-    if (!deletingFolder) return;
-
-    deleteFolder.mutate(deletingFolder.id, {
-      onSuccess: () => {
-        toast({ title: '文件夹已删除' });
-        setDeletingFolder(null);
       },
     });
   };
@@ -443,23 +419,12 @@ export default function FoldersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 删除确认 */}
-      <AlertDialog open={!!deletingFolder} onOpenChange={() => setDeletingFolder(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除文件夹？</AlertDialogTitle>
-            <AlertDialogDescription>
-              删除文件夹 "{deletingFolder?.name}" 后，其中的链接不会被删除，但会移出该文件夹。此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* 删除确认对话框 */}
+      <FolderDeleteDialog
+        folder={deletingFolder}
+        open={!!deletingFolder}
+        onOpenChange={(open) => !open && setDeletingFolder(null)}
+      />
     </Layout>
   );
 }

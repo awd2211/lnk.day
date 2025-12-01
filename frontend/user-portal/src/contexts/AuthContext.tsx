@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
 interface User {
@@ -8,6 +9,7 @@ interface User {
   avatar?: string;
   teamId: string;
   role?: 'owner' | 'admin' | 'member' | 'viewer';
+  emailVerifiedAt?: string | null;
 }
 
 interface AuthContextType {
@@ -24,6 +26,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
@@ -39,16 +42,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUser = async () => {
     try {
       const { data } = await api.get('/api/v1/users/me');
+      // 检查缓存中的用户ID与新获取的是否一致
+      const cachedUserId = localStorage.getItem('cachedUserId');
+      if (cachedUserId && cachedUserId !== data.id) {
+        // 用户ID不同，说明切换了账户，清除缓存
+        queryClient.clear();
+      }
+      // 保存当前用户ID到 localStorage
+      localStorage.setItem('cachedUserId', data.id);
       setUser(data);
     } catch {
       localStorage.removeItem('token');
+      localStorage.removeItem('cachedUserId');
       setToken(null);
+      queryClient.clear();
     } finally {
       setIsLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
+    // 登录前清除旧的缓存数据，确保不会看到其他账户的数据
+    queryClient.clear();
+
     const { data } = await api.post('/api/v1/auth/login', { email, password });
     localStorage.setItem('token', data.accessToken);
     if (data.refreshToken) {
@@ -71,8 +87,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('cachedUserId');
     setToken(null);
     setUser(null);
+    // 清除所有 React Query 缓存，确保切换账户时不会看到旧数据
+    queryClient.clear();
   };
 
   const updateUser = (data: Partial<User>) => {

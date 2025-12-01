@@ -52,6 +52,7 @@ import { useLink, useDeleteLink } from '@/hooks/useLinks';
 import { useLinkAnalytics, useRealtimeAnalytics } from '@/hooks/useAnalytics';
 import { RedirectRulesManager } from '@/components/links/RedirectRulesManager';
 import { SecurityBadge } from '@/components/links/SecurityBadge';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { cn } from '@/lib/utils';
 
 type DateRange = '7d' | '14d' | '30d' | '90d';
@@ -64,6 +65,7 @@ export default function LinkDetailPage() {
   const [dateRange, setDateRange] = useState<DateRange>('7d');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [activeTab, setActiveTab] = useState('analytics');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Queries
   const { data: link, isLoading: isLoadingLink } = useLink(id || '');
@@ -97,11 +99,12 @@ export default function LinkDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!link || !confirm('确定要删除这个链接吗？此操作不可撤销。')) return;
+    if (!link) return;
 
     try {
       await deleteLink.mutateAsync(link.id);
       toast({ title: '链接已删除' });
+      setShowDeleteConfirm(false);
       navigate('/links');
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -316,7 +319,7 @@ export default function LinkDetailPage() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -621,10 +624,22 @@ export default function LinkDetailPage() {
             </div>
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              <span>累计 {link.clicks.toLocaleString()} 次点击</span>
+              <span>累计 {(link.totalClicks ?? link.clicks ?? 0).toLocaleString()} 次点击</span>
             </div>
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          onOpenChange={setShowDeleteConfirm}
+          title="删除链接"
+          description="确定要删除这个链接吗？此操作不可撤销。"
+          confirmText="删除"
+          onConfirm={handleDelete}
+          isLoading={deleteLink.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

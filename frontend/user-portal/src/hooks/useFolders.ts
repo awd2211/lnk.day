@@ -104,11 +104,12 @@ export function useDeleteFolder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      await folderService.delete(id);
+    mutationFn: async ({ id, transferToFolderId }: { id: string; transferToFolderId?: string | null }) => {
+      await folderService.delete(id, transferToFolderId !== undefined ? { transferToFolderId } : undefined);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['folders'] });
+      queryClient.invalidateQueries({ queryKey: ['links'] });
     },
   });
 }

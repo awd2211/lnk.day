@@ -13,6 +13,7 @@ import {
   Loader2,
   Check,
 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,6 +79,11 @@ export function ApiKeyManager() {
   const [expiresIn, setExpiresIn] = useState<string>('never');
   const [ipWhitelist, setIpWhitelist] = useState('');
 
+  // Confirm dialog state
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
+  const [revokingKeyId, setRevokingKeyId] = useState<string | null>(null);
+  const [regeneratingKeyId, setRegeneratingKeyId] = useState<string | null>(null);
+
   // Queries
   const { data: keysData, isLoading: keysLoading } = useApiKeys();
   const { data: scopesData } = useApiKeyScopes();
@@ -138,13 +144,12 @@ export function ApiKeyManager() {
     }
   };
 
-  const handleDeleteKey = async (id: string) => {
-    if (!confirm('确定要删除此密钥吗？此操作无法撤销。')) {
-      return;
-    }
+  const handleDeleteKey = async () => {
+    if (!deletingKeyId) return;
 
     try {
-      await deleteKey.mutateAsync(id);
+      await deleteKey.mutateAsync(deletingKeyId);
+      setDeletingKeyId(null);
       toast({ title: '密钥已删除' });
     } catch (error: any) {
       toast({
@@ -155,13 +160,12 @@ export function ApiKeyManager() {
     }
   };
 
-  const handleRevokeKey = async (id: string) => {
-    if (!confirm('确定要撤销此密钥吗？撤销后密钥将无法使用。')) {
-      return;
-    }
+  const handleRevokeKey = async () => {
+    if (!revokingKeyId) return;
 
     try {
-      await revokeKey.mutateAsync(id);
+      await revokeKey.mutateAsync(revokingKeyId);
+      setRevokingKeyId(null);
       toast({ title: '密钥已撤销' });
     } catch (error: any) {
       toast({
@@ -172,13 +176,12 @@ export function ApiKeyManager() {
     }
   };
 
-  const handleRegenerateKey = async (id: string) => {
-    if (!confirm('确定要重新生成此密钥吗？原密钥将立即失效。')) {
-      return;
-    }
+  const handleRegenerateKey = async () => {
+    if (!regeneratingKeyId) return;
 
     try {
-      const response = await regenerateKey.mutateAsync(id);
+      const response = await regenerateKey.mutateAsync(regeneratingKeyId);
+      setRegeneratingKeyId(null);
       setNewKeyData(response.data as ApiKeyWithSecret);
       setShowKeyDialog(true);
       toast({ title: '密钥已重新生成' });
@@ -315,18 +318,18 @@ export function ApiKeyManager() {
                 <DropdownMenuContent align="end">
                   {key.status === 'active' && (
                     <>
-                      <DropdownMenuItem onClick={() => handleRegenerateKey(key.id)}>
+                      <DropdownMenuItem onClick={() => setRegeneratingKeyId(key.id)}>
                         <RefreshCw className="mr-2 h-4 w-4" />
                         重新生成
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleRevokeKey(key.id)}>
+                      <DropdownMenuItem onClick={() => setRevokingKeyId(key.id)}>
                         <Shield className="mr-2 h-4 w-4" />
                         撤销
                       </DropdownMenuItem>
                     </>
                   )}
                   <DropdownMenuItem
-                    onClick={() => handleDeleteKey(key.id)}
+                    onClick={() => setDeletingKeyId(key.id)}
                     className="text-red-600"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
@@ -504,6 +507,42 @@ export function ApiKeyManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Key Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingKeyId}
+        onOpenChange={(open) => !open && setDeletingKeyId(null)}
+        title="删除密钥"
+        description="确定要删除此密钥吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDeleteKey}
+        isLoading={deleteKey.isPending}
+        variant="destructive"
+      />
+
+      {/* Revoke Key Confirm Dialog */}
+      <ConfirmDialog
+        open={!!revokingKeyId}
+        onOpenChange={(open) => !open && setRevokingKeyId(null)}
+        title="撤销密钥"
+        description="确定要撤销此密钥吗？撤销后密钥将无法使用。"
+        confirmText="撤销"
+        onConfirm={handleRevokeKey}
+        isLoading={revokeKey.isPending}
+        variant="destructive"
+      />
+
+      {/* Regenerate Key Confirm Dialog */}
+      <ConfirmDialog
+        open={!!regeneratingKeyId}
+        onOpenChange={(open) => !open && setRegeneratingKeyId(null)}
+        title="重新生成密钥"
+        description="确定要重新生成此密钥吗？原密钥将立即失效。"
+        confirmText="重新生成"
+        onConfirm={handleRegenerateKey}
+        isLoading={regenerateKey.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

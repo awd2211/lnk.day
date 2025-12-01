@@ -52,7 +52,7 @@ import {
   useResumeGoal,
   Goal,
 } from '@/hooks/useGoals';
-import { useCampaigns } from '@/hooks/useCampaigns';
+import { useCampaigns, Campaign } from '@/hooks/useCampaigns';
 import { EmptyState } from '@/components/EmptyState';
 import {
   Target,
@@ -75,6 +75,9 @@ import {
   AlertTriangle,
   Calendar,
   BarChart3,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 const goalTypes = [
@@ -242,7 +245,25 @@ export default function GoalsPage() {
     milestones: [25, 50, 75, 100],
   });
 
-  const { data: goals, isLoading } = useGoals();
+  // Pagination & sorting state
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'target' | 'current' | 'deadline'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'reached' | 'failed' | 'paused'>('all');
+
+  const { data: goalsData, isLoading } = useGoals({
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    status: statusFilter === 'all' ? undefined : statusFilter as any,
+  });
+  const goals = goalsData?.items || [];
+  const totalPages = goalsData ? Math.ceil(goalsData.total / limit) : 1;
+
   const { data: stats } = useGoalStats();
   const { data: campaigns } = useCampaigns();
   const createGoal = useCreateGoal();
@@ -355,9 +376,10 @@ export default function GoalsPage() {
     setEditingGoal(goal);
   };
 
-  const activeGoals = goals?.filter(g => g.status === 'active');
-  const completedGoals = goals?.filter(g => g.status === 'completed');
-  const otherGoals = goals?.filter(g => g.status !== 'active' && g.status !== 'completed');
+  // 当有状态筛选时不分组，直接显示所有
+  const activeGoals = statusFilter === 'all' ? goals.filter(g => g.status === 'active') : [];
+  const completedGoals = statusFilter === 'all' ? goals.filter(g => g.status === 'completed' || g.status === 'reached') : [];
+  const otherGoals = statusFilter === 'all' ? goals.filter(g => g.status !== 'active' && g.status !== 'completed' && g.status !== 'reached') : [];
 
   if (isLoading) {
     return (
@@ -456,7 +478,7 @@ export default function GoalsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">不关联</SelectItem>
-                      {campaigns?.map((campaign) => (
+                      {campaigns?.items?.map((campaign: Campaign) => (
                         <SelectItem key={campaign.id} value={campaign.id}>
                           {campaign.name}
                         </SelectItem>
@@ -581,7 +603,60 @@ export default function GoalsPage() {
           </div>
         )}
 
-        {goals?.length === 0 ? (
+        {/* 搜索和筛选 */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索目标名称..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              className="pl-9"
+            />
+          </div>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => { setStatusFilter(value as typeof statusFilter); setPage(1); }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="状态" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="active">进行中</SelectItem>
+              <SelectItem value="reached">已达成</SelectItem>
+              <SelectItem value="failed">未达成</SelectItem>
+              <SelectItem value="paused">已暂停</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={`${sortBy}-${sortOrder}`}
+            onValueChange={(value) => {
+              const [field, order] = value.split('-');
+              setSortBy(field as typeof sortBy);
+              setSortOrder(order as 'ASC' | 'DESC');
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="排序方式" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt-DESC">最新创建</SelectItem>
+              <SelectItem value="createdAt-ASC">最早创建</SelectItem>
+              <SelectItem value="name-ASC">名称 A-Z</SelectItem>
+              <SelectItem value="name-DESC">名称 Z-A</SelectItem>
+              <SelectItem value="target-DESC">目标值（高→低）</SelectItem>
+              <SelectItem value="target-ASC">目标值（低→高）</SelectItem>
+              <SelectItem value="current-DESC">当前进度（高→低）</SelectItem>
+              <SelectItem value="current-ASC">当前进度（低→高）</SelectItem>
+              <SelectItem value="deadline-ASC">截止日期（近→远）</SelectItem>
+              <SelectItem value="deadline-DESC">截止日期（远→近）</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {goals.length === 0 ? (
           <EmptyState
             icon={Target}
             title="还没有目标"
@@ -592,6 +667,25 @@ export default function GoalsPage() {
               icon: Plus,
             }}
           />
+        ) : statusFilter !== 'all' || search ? (
+          // 有筛选/搜索条件时，不分组显示
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>共 {goalsData?.total || 0} 个结果</span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {goals.map((goal) => (
+                <GoalCard
+                  key={goal.id}
+                  goal={goal}
+                  onEdit={() => openEditDialog(goal)}
+                  onDelete={() => setDeletingGoal(goal)}
+                  onPause={() => handlePause(goal)}
+                  onResume={() => handleResume(goal)}
+                />
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="space-y-8">
             {/* 进行中的目标 */}
@@ -656,6 +750,31 @@ export default function GoalsPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 分页 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              第 {page} / {totalPages} 页
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         )}
       </div>

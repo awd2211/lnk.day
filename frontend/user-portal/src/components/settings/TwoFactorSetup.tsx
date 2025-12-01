@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { authService } from '@/lib/api';
@@ -60,6 +61,7 @@ export function TwoFactorSetup() {
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const [showBackupCodesDialog, setShowBackupCodesDialog] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
+  const [showCancelSetupConfirm, setShowCancelSetupConfirm] = useState(false);
 
   const [verifyCode, setVerifyCode] = useState('');
   const [disableCode, setDisableCode] = useState('');
@@ -184,14 +186,17 @@ export function TwoFactorSetup() {
       setStep('qr');
       toast({ title: '双因素认证已启用' });
     } else {
-      // Confirm before closing during setup
-      if (confirm('确定要取消设置吗？您需要重新开始。')) {
-        setShowEnableDialog(false);
-        setEnableData(null);
-        setVerifyCode('');
-        setStep('qr');
-      }
+      // Show confirm dialog before closing during setup
+      setShowCancelSetupConfirm(true);
     }
+  };
+
+  const handleConfirmCancelSetup = () => {
+    setShowCancelSetupConfirm(false);
+    setShowEnableDialog(false);
+    setEnableData(null);
+    setVerifyCode('');
+    setStep('qr');
   };
 
   const handleCopyBackupCodes = () => {
@@ -539,6 +544,17 @@ export function TwoFactorSetup() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Setup Confirm Dialog */}
+      <ConfirmDialog
+        open={showCancelSetupConfirm}
+        onOpenChange={setShowCancelSetupConfirm}
+        title="取消设置"
+        description="确定要取消设置吗？您需要重新开始。"
+        confirmText="取消设置"
+        onConfirm={handleConfirmCancelSetup}
+        variant="destructive"
+      />
     </div>
   );
 }

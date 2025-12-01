@@ -56,6 +56,7 @@ import {
   CONDITION_TYPE_LABELS,
 } from '@/hooks/useRedirectRules';
 import { RuleConditionEditor } from '@/components/redirect-rules/RuleConditionEditor';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 const conditionIcons: Record<string, React.ReactNode> = {
   country: <Globe className="h-4 w-4" />,
@@ -70,6 +71,7 @@ export default function RedirectRulesPage() {
   const [selectedLinkId, setSelectedLinkId] = useState<string>('');
   const [showDialog, setShowDialog] = useState(false);
   const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -117,6 +119,7 @@ export default function RedirectRulesPage() {
     try {
       if (editingRule) {
         await updateRule.mutateAsync({
+          linkId: selectedLinkId,
           id: editingRule.id,
           data: ruleData,
         });
@@ -161,13 +164,12 @@ export default function RedirectRulesPage() {
     resetForm();
   };
 
-  const handleDelete = async (rule: RedirectRule) => {
-    if (!confirm(`确定要删除规则"${rule.name}"吗？`)) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!deletingRuleId) return;
 
     try {
-      await deleteRule.mutateAsync({ id: rule.id, linkId: selectedLinkId });
+      await deleteRule.mutateAsync({ id: deletingRuleId, linkId: selectedLinkId });
+      setDeletingRuleId(null);
       toast({ title: '规则已删除' });
     } catch (error: any) {
       toast({
@@ -371,7 +373,7 @@ export default function RedirectRulesPage() {
                         </>
                       )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDelete(rule)} className="text-red-600">
+                    <DropdownMenuItem onClick={() => setDeletingRuleId(rule.id)} className="text-red-600">
                       <Trash2 className="mr-2 h-4 w-4" />
                       删除
                     </DropdownMenuItem>
@@ -495,6 +497,18 @@ export default function RedirectRulesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Rule Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingRuleId}
+        onOpenChange={(open) => !open && setDeletingRuleId(null)}
+        title="删除规则"
+        description="确定要删除此重定向规则吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteRule.isPending}
+        variant="destructive"
+      />
     </Layout>
   );
 }

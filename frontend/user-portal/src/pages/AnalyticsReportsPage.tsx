@@ -36,7 +36,7 @@ export default function AnalyticsReportsPage() {
   const generateReport = useGenerateReport();
   const deleteReport = useDeleteReport();
 
-  const getDateRange = () => {
+  const getDateRange = (): { start: string; end: string } => {
     const end = new Date();
     const start = new Date();
     switch (dateRange) {
@@ -53,8 +53,8 @@ export default function AnalyticsReportsPage() {
         start.setDate(end.getDate() - 30);
     }
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: start.toISOString().split('T')[0]!,
+      end: end.toISOString().split('T')[0]!,
     };
   };
 

@@ -17,6 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { PricingCard } from '@/components/billing/PricingCard';
 import { InvoiceList } from '@/components/billing/InvoiceList';
 import { PaymentMethods } from '@/components/billing/PaymentMethods';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useSubscription,
@@ -37,6 +38,8 @@ export default function BillingPage() {
   const [activeTab, setActiveTab] = useState<Tab>('plans');
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
   const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Queries
@@ -93,12 +96,9 @@ export default function BillingPage() {
   };
 
   const handleCancelSubscription = async () => {
-    if (!confirm('确定要取消订阅吗？您的服务将在当前周期结束后停止。')) {
-      return;
-    }
-
     try {
       await cancelSubscription.mutateAsync();
+      setShowCancelConfirm(false);
       toast({ title: '订阅已取消', description: '您的服务将在当前周期结束后停止' });
     } catch (error: any) {
       toast({
@@ -122,13 +122,12 @@ export default function BillingPage() {
     }
   };
 
-  const handleDeletePayment = async (id: string) => {
-    if (!confirm('确定要删除此支付方式吗？')) {
-      return;
-    }
+  const handleDeletePayment = async () => {
+    if (!deletingPaymentId) return;
 
     try {
-      await deletePayment.mutateAsync(id);
+      await deletePayment.mutateAsync(deletingPaymentId);
+      setDeletingPaymentId(null);
       toast({ title: '支付方式已删除' });
     } catch (error: any) {
       toast({
@@ -224,8 +223,7 @@ export default function BillingPage() {
               {subscription.status === 'active' && !subscription.cancelAtPeriodEnd && (
                 <Button
                   variant="ghost"
-                  onClick={handleCancelSubscription}
-                  disabled={cancelSubscription.isPending}
+                  onClick={() => setShowCancelConfirm(true)}
                   className="text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
                   取消订阅
@@ -366,7 +364,7 @@ export default function BillingPage() {
                 paymentMethods={paymentMethodsData?.paymentMethods || []}
                 isLoading={paymentMethodsLoading}
                 onSetDefault={handleSetDefaultPayment}
-                onDelete={handleDeletePayment}
+                onDelete={(id) => setDeletingPaymentId(id)}
                 onAddNew={handleAddPaymentMethod}
                 settingDefaultId={setDefaultPayment.isPending ? undefined : undefined}
                 deletingId={deletePayment.isPending ? undefined : undefined}
@@ -375,6 +373,30 @@ export default function BillingPage() {
           )}
         </div>
       </div>
+
+      {/* Cancel Subscription Confirm Dialog */}
+      <ConfirmDialog
+        open={showCancelConfirm}
+        onOpenChange={setShowCancelConfirm}
+        title="取消订阅"
+        description="确定要取消订阅吗？您的服务将在当前周期结束后停止。"
+        confirmText="取消订阅"
+        onConfirm={handleCancelSubscription}
+        isLoading={cancelSubscription.isPending}
+        variant="destructive"
+      />
+
+      {/* Delete Payment Method Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingPaymentId}
+        onOpenChange={(open) => !open && setDeletingPaymentId(null)}
+        title="删除支付方式"
+        description="确定要删除此支付方式吗？"
+        confirmText="删除"
+        onConfirm={handleDeletePayment}
+        isLoading={deletePayment.isPending}
+        variant="destructive"
+      />
     </Layout>
   );
 }

@@ -66,6 +66,7 @@ import {
 } from '@/hooks/useReports';
 import { cn } from '@/lib/utils';
 import ScheduleReportDialog from '@/components/reports/ScheduleReportDialog';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 type DateRangePreset = '7d' | '14d' | '30d' | '90d' | 'custom';
 
@@ -77,6 +78,8 @@ export default function ReportsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
+  const [deletingScheduledId, setDeletingScheduledId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -142,11 +145,12 @@ export default function ReportsPage() {
     }
   };
 
-  const handleDeleteReport = async (report: Report) => {
-    if (!confirm(`确定要删除报告 "${report.name}" 吗？`)) return;
+  const handleDeleteReport = async () => {
+    if (!deletingReportId) return;
 
     try {
-      await deleteReport.mutateAsync(report.id);
+      await deleteReport.mutateAsync(deletingReportId);
+      setDeletingReportId(null);
       toast({ title: '报告已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -164,11 +168,12 @@ export default function ReportsPage() {
     }
   };
 
-  const handleDeleteScheduled = async (scheduled: ScheduledReport) => {
-    if (!confirm(`确定要删除定时报告 "${scheduled.name}" 吗？`)) return;
+  const handleDeleteScheduled = async () => {
+    if (!deletingScheduledId) return;
 
     try {
-      await deleteScheduled.mutateAsync(scheduled.id);
+      await deleteScheduled.mutateAsync(deletingScheduledId);
+      setDeletingScheduledId(null);
       toast({ title: '定时报告已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -345,7 +350,7 @@ export default function ReportsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteReport(report)}
+                          onClick={() => setDeletingReportId(report.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -450,7 +455,7 @@ export default function ReportsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteScheduled(scheduled)}
+                          onClick={() => setDeletingScheduledId(scheduled.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -644,6 +649,30 @@ export default function ReportsPage() {
         <ScheduleReportDialog
           open={isScheduleDialogOpen}
           onOpenChange={setIsScheduleDialogOpen}
+        />
+
+        {/* Delete Report Confirm Dialog */}
+        <ConfirmDialog
+          open={!!deletingReportId}
+          onOpenChange={(open) => !open && setDeletingReportId(null)}
+          title="删除报告"
+          description="确定要删除此报告吗？此操作无法撤销。"
+          confirmText="删除"
+          onConfirm={handleDeleteReport}
+          isLoading={deleteReport.isPending}
+          variant="destructive"
+        />
+
+        {/* Delete Scheduled Report Confirm Dialog */}
+        <ConfirmDialog
+          open={!!deletingScheduledId}
+          onOpenChange={(open) => !open && setDeletingScheduledId(null)}
+          title="删除定时报告"
+          description="确定要删除此定时报告吗？此操作无法撤销。"
+          confirmText="删除"
+          onConfirm={handleDeleteScheduled}
+          isLoading={deleteScheduled.isPending}
+          variant="destructive"
         />
       </div>
     </Layout>

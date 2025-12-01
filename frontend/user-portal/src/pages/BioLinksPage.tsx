@@ -13,6 +13,9 @@ import {
   BarChart3,
   Check,
   Palette,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -39,6 +42,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useBioLinks,
@@ -55,11 +66,27 @@ export default function BioLinksPage() {
 
   // State
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [deletingBioLink, setDeletingBioLink] = useState<BioLink | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ slug: '', title: '', description: '' });
+  const [formData, setFormData] = useState({ username: '', name: '', bio: '' });
+
+  // Pagination & sorting state
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'totalViews' | 'totalClicks' | 'title'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   // Queries
-  const { data: bioLinks, isLoading } = useBioLinks();
+  const { data: bioLinksData, isLoading } = useBioLinks({
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
+  const bioLinks = bioLinksData?.items || [];
+  const totalPages = bioLinksData ? Math.ceil(bioLinksData.total / limit) : 1;
 
   // Mutations
   const createBioLink = useCreateBioLink();
@@ -67,16 +94,19 @@ export default function BioLinksPage() {
   const togglePublish = useToggleBioLinkPublish();
 
   const handleCreate = async () => {
-    if (!formData.slug.trim() || !formData.title.trim()) return;
+    if (!formData.username.trim() || !formData.name.trim()) return;
 
     try {
       const bioLink = await createBioLink.mutateAsync({
-        slug: formData.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        title: formData.title.trim(),
-        description: formData.description.trim() || undefined,
+        username: formData.username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
+        title: formData.name.trim(),
+        profile: {
+          name: formData.name.trim(),
+          bio: formData.bio.trim() || undefined,
+        },
       });
       setIsCreateDialogOpen(false);
-      setFormData({ slug: '', title: '', description: '' });
+      setFormData({ username: '', name: '', bio: '' });
       toast({ title: 'Bio Link 创建成功' });
       navigate(`/bio-links/${bioLink.id}/edit`);
     } catch (error: any) {
@@ -88,11 +118,12 @@ export default function BioLinksPage() {
     }
   };
 
-  const handleDelete = async (bioLink: BioLink) => {
-    if (!confirm(`确定要删除 "${bioLink.title}" 吗？此操作不可撤销。`)) return;
+  const handleDelete = async () => {
+    if (!deletingBioLink) return;
 
     try {
-      await deleteBioLink.mutateAsync(bioLink.id);
+      await deleteBioLink.mutateAsync(deletingBioLink.id);
+      setDeletingBioLink(null);
       toast({ title: 'Bio Link 已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -113,10 +144,10 @@ export default function BioLinksPage() {
     }
   };
 
-  const copyLink = async (slug: string) => {
-    const url = `https://lnk.day/b/${slug}`;
+  const copyLink = async (username: string) => {
+    const url = `https://lnk.day/u/${username}`;
     await navigator.clipboard.writeText(url);
-    setCopiedSlug(slug);
+    setCopiedSlug(username);
     setTimeout(() => setCopiedSlug(null), 2000);
     toast({ title: '链接已复制' });
   };
@@ -136,6 +167,43 @@ export default function BioLinksPage() {
           </Button>
         </div>
 
+        {/* Search & Sort */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="搜索页面..."
+              className="w-full sm:w-64 pl-9"
+            />
+          </div>
+          <Select
+            value={`${sortBy}-${sortOrder}`}
+            onValueChange={(v) => {
+              const [field, order] = v.split('-') as [typeof sortBy, 'ASC' | 'DESC'];
+              setSortBy(field);
+              setSortOrder(order);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt-DESC">最新创建</SelectItem>
+              <SelectItem value="createdAt-ASC">最早创建</SelectItem>
+              <SelectItem value="totalViews-DESC">浏览最多</SelectItem>
+              <SelectItem value="totalClicks-DESC">点击最多</SelectItem>
+              <SelectItem value="title-ASC">名称 A-Z</SelectItem>
+              <SelectItem value="title-DESC">名称 Z-A</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Bio Links Grid */}
         {isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -149,7 +217,7 @@ export default function BioLinksPage() {
           </div>
         ) : bioLinks && bioLinks.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {bioLinks.map((bioLink) => (
+            {bioLinks.map((bioLink: BioLink) => (
               <Card
                 key={bioLink.id}
                 className="group relative overflow-hidden transition-shadow hover:shadow-md"
@@ -202,19 +270,19 @@ export default function BioLinksPage() {
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                         <a
-                          href={`https://lnk.day/b/${bioLink.slug}`}
+                          href={`https://lnk.day/u/${bioLink.username}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-1 hover:text-primary"
                         >
-                          lnk.day/b/{bioLink.slug}
+                          lnk.day/u/{bioLink.username}
                           <ExternalLink className="h-3 w-3" />
                         </a>
                         <button
-                          onClick={() => copyLink(bioLink.slug)}
+                          onClick={() => copyLink(bioLink.username)}
                           className="rounded p-0.5 hover:bg-muted"
                         >
-                          {copiedSlug === bioLink.slug ? (
+                          {copiedSlug === bioLink.username ? (
                             <Check className="h-3 w-3 text-green-500" />
                           ) : (
                             <Copy className="h-3 w-3" />
@@ -251,7 +319,7 @@ export default function BioLinksPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
-                            window.open(`https://lnk.day/b/${bioLink.slug}`, '_blank')
+                            window.open(`https://lnk.day/u/${bioLink.username}`, '_blank')
                           }
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
@@ -259,7 +327,7 @@ export default function BioLinksPage() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          onClick={() => handleDelete(bioLink)}
+                          onClick={() => setDeletingBioLink(bioLink)}
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -308,6 +376,50 @@ export default function BioLinksPage() {
           </Card>
         )}
 
+        {/* Pagination */}
+        {bioLinksData && bioLinksData.total > 0 && (
+          <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                共 {bioLinksData.total} 个页面
+              </span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded border px-2 py-1 text-sm dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value={12}>每页 12 个</option>
+                <option value={24}>每页 24 个</option>
+                <option value={48}>每页 48 个</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                第 {page} / {totalPages} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Create Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="sm:max-w-md">
@@ -318,47 +430,47 @@ export default function BioLinksPage() {
 
             <div className="space-y-4 py-4">
               <div>
-                <Label htmlFor="slug">页面地址 *</Label>
+                <Label htmlFor="username">页面地址 *</Label>
                 <div className="mt-1 flex items-center">
                   <span className="rounded-l border border-r-0 bg-muted px-3 py-2 text-sm text-muted-foreground">
-                    lnk.day/b/
+                    lnk.day/u/
                   </span>
                   <Input
-                    id="slug"
-                    value={formData.slug}
+                    id="username"
+                    value={formData.username}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+                        username: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''),
                       })
                     }
-                    placeholder="my-page"
+                    placeholder="mypage"
                     className="rounded-l-none"
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  只能包含小写字母、数字和连字符
+                  只能包含小写字母、数字、下划线和连字符
                 </p>
               </div>
 
               <div>
-                <Label htmlFor="title">页面标题 *</Label>
+                <Label htmlFor="name">显示名称 *</Label>
                 <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="我的主页"
                   className="mt-1"
                 />
               </div>
 
               <div>
-                <Label htmlFor="description">简介</Label>
+                <Label htmlFor="bio">简介</Label>
                 <Input
-                  id="description"
-                  value={formData.description}
+                  id="bio"
+                  value={formData.bio}
                   onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
+                    setFormData({ ...formData, bio: e.target.value })
                   }
                   placeholder="一句话介绍"
                   className="mt-1"
@@ -373,8 +485,8 @@ export default function BioLinksPage() {
               <Button
                 onClick={handleCreate}
                 disabled={
-                  !formData.slug.trim() ||
-                  !formData.title.trim() ||
+                  !formData.username.trim() ||
+                  !formData.name.trim() ||
                   createBioLink.isPending
                 }
               >
@@ -383,6 +495,18 @@ export default function BioLinksPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deletingBioLink}
+          onOpenChange={(open) => !open && setDeletingBioLink(null)}
+          title="删除 Bio Link"
+          description={`确定要删除 "${deletingBioLink?.title}" 吗？此操作不可撤销。`}
+          confirmText="删除"
+          onConfirm={handleDelete}
+          isLoading={deleteBioLink.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

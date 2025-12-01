@@ -8,8 +8,11 @@ export interface Link {
   title?: string;
   tags: string[];
   clicks: number;
-  status: 'active' | 'inactive' | 'archived';
+  totalClicks?: number;
+  uniqueClicks?: number;
+  status: 'active' | 'inactive' | 'archived' | 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
   folderId?: string;
+  domain?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +23,8 @@ export interface LinkQueryParams {
   status?: string;
   search?: string;
   folderId?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'clicks' | 'title' | 'shortCode';
+  sortOrder?: 'ASC' | 'DESC';
 }
 
 export function useLinks(params?: LinkQueryParams) {
@@ -27,7 +32,21 @@ export function useLinks(params?: LinkQueryParams) {
     queryKey: ['links', params],
     queryFn: async () => {
       const { data } = await linkService.getAll(params);
-      return data as { items: Link[]; total: number; page: number; limit: number };
+      // 后端返回 { links: [...], total: N }，需要映射为前端期望的格式
+      const rawLinks = data.links || data.items || [];
+      const items = rawLinks.map((link: any) => ({
+        ...link,
+        // 映射 totalClicks -> clicks (如果 clicks 不存在)
+        clicks: link.clicks ?? link.totalClicks ?? 0,
+        // 统一状态为小写
+        status: (link.status || 'active').toLowerCase(),
+      }));
+      return {
+        items,
+        total: data.total || 0,
+        page: data.page || params?.page || 1,
+        limit: data.limit || params?.limit || 10,
+      } as { items: Link[]; total: number; page: number; limit: number };
     },
   });
 }
@@ -58,10 +77,11 @@ export function useCreateLink() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { originalUrl: string; customCode?: string; title?: string; tags?: string[] }) =>
+    mutationFn: (data: { originalUrl: string; customCode?: string; title?: string; tags?: string[]; folderId?: string }) =>
       linkService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['links'] });
+      queryClient.invalidateQueries({ queryKey: ['folders'] });
     },
   });
 }

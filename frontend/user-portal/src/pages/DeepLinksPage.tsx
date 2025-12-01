@@ -9,6 +9,10 @@ import {
   Play,
   ExternalLink,
   AlertCircle,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
 } from 'lucide-react';
 
 import Layout from '@/components/Layout';
@@ -31,9 +35,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useLinks } from '@/hooks/useLinks';
 import {
+  useDeepLinks,
   useDeepLink,
   useCreateDeepLink,
   useUpdateDeepLink,
@@ -41,11 +47,23 @@ import {
   useResolveDeepLink,
   type DeepLinkIosConfig,
   type DeepLinkAndroidConfig,
+  type DeepLinkConfig,
 } from '@/hooks/useDeepLinks';
 
 export default function DeepLinksPage() {
   const { toast } = useToast();
+
+  // View state: 'list' or 'config'
+  const [view, setView] = useState<'list' | 'config'>('list');
   const [selectedLinkId, setSelectedLinkId] = useState<string>('');
+
+  // Pagination and sorting state for list view
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name' | 'enabled' | 'clicks' | 'installs'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
 
   // Form state
   const [iosConfig, setIosConfig] = useState<DeepLinkIosConfig>({});
@@ -55,12 +73,25 @@ export default function DeepLinksPage() {
     'redirect'
   );
   const [testUserAgent, setTestUserAgent] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Queries
   const { data: linksData, isLoading: linksLoading } = useLinks({ limit: 100 });
+  const { data: deepLinksData, isLoading: deepLinksLoading } = useDeepLinks({
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+  });
   const { data: deepLinkConfig, isLoading: configLoading } = useDeepLink(
     selectedLinkId || null
   );
+
+  const deepLinksList = deepLinksData?.items || [];
+  const total = deepLinksData?.total || 0;
+  const totalPages = Math.ceil(total / limit);
 
   // Mutations
   const createDeepLink = useCreateDeepLink();
@@ -118,16 +149,13 @@ export default function DeepLinksPage() {
   const handleDelete = async () => {
     if (!selectedLinkId || !deepLinkConfig) return;
 
-    if (!confirm('确定要删除此深度链接配置吗？')) {
-      return;
-    }
-
     try {
       await deleteDeepLink.mutateAsync(selectedLinkId);
       setIosConfig({});
       setAndroidConfig({});
       setFallbackUrl('');
       setFallbackBehavior('redirect');
+      setShowDeleteConfirm(false);
       toast({ title: '配置已删除' });
     } catch (error: any) {
       toast({
@@ -170,52 +198,233 @@ export default function DeepLinksPage() {
   const selectedLink = links.find((l) => l.id === selectedLinkId);
   const isSaving = createDeepLink.isPending || updateDeepLink.isPending;
 
+  // Handle select from existing deeplink in list
+  const handleSelectDeepLink = (dlinkId: string) => {
+    // Find link ID from deeplink and switch to config view
+    const dl = deepLinksList.find((d: any) => d.id === dlinkId);
+    if (dl?.linkId) {
+      setSelectedLinkId(dl.linkId);
+      setView('config');
+    }
+  };
+
   return (
     <Layout>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold dark:text-white">深度链接</h1>
-        <p className="text-gray-500 dark:text-gray-400">
-          配置移动应用深度链接，实现从短链接直接打开 App
-        </p>
-      </div>
-
-      {/* Link Selector */}
-      <div className="mb-6 rounded-lg border bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-        <Label>选择链接</Label>
-        <Select value={selectedLinkId} onValueChange={handleLinkChange}>
-          <SelectTrigger className="mt-2 w-full md:w-96">
-            <SelectValue placeholder="选择要配置深度链接的链接" />
-          </SelectTrigger>
-          <SelectContent>
-            {links.map((link) => (
-              <SelectItem key={link.id} value={link.id}>
-                <div className="flex items-center gap-2">
-                  <Link2 className="h-4 w-4" />
-                  <span>/{link.shortCode}</span>
-                  {link.title && <span className="text-gray-500">- {link.title}</span>}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {!selectedLinkId ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center dark:border-gray-700">
-          <Smartphone className="h-12 w-12 text-gray-300 dark:text-gray-600" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-            选择一个链接
-          </h3>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            选择链接后可以配置其深度链接行为
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold dark:text-white">深度链接</h1>
+          <p className="text-gray-500 dark:text-gray-400">
+            配置移动应用深度链接，实现从短链接直接打开 App
           </p>
         </div>
-      ) : configLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        <div className="flex gap-2">
+          <Button
+            variant={view === 'list' ? 'default' : 'outline'}
+            onClick={() => setView('list')}
+          >
+            已配置列表
+          </Button>
+          <Button
+            variant={view === 'config' ? 'default' : 'outline'}
+            onClick={() => setView('config')}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            配置
+          </Button>
         </div>
+      </div>
+
+      {view === 'list' ? (
+        <>
+          {/* Search and Filter for List View */}
+          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="搜索深度链接..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Select
+                value={statusFilter}
+                onValueChange={(value: 'all' | 'enabled' | 'disabled') => {
+                  setStatusFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部状态</SelectItem>
+                  <SelectItem value="enabled">已启用</SelectItem>
+                  <SelectItem value="disabled">已禁用</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={`${sortBy}-${sortOrder}`}
+                onValueChange={(value) => {
+                  const [newSortBy, newSortOrder] = value.split('-') as [typeof sortBy, 'ASC' | 'DESC'];
+                  setSortBy(newSortBy);
+                  setSortOrder(newSortOrder);
+                }}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="排序" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="createdAt-DESC">创建时间（新→旧）</SelectItem>
+                  <SelectItem value="createdAt-ASC">创建时间（旧→新）</SelectItem>
+                  <SelectItem value="clicks-DESC">点击数（高→低）</SelectItem>
+                  <SelectItem value="clicks-ASC">点击数（低→高）</SelectItem>
+                  <SelectItem value="installs-DESC">安装数（高→低）</SelectItem>
+                  <SelectItem value="name-ASC">名称（A→Z）</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Deep Links List */}
+          {deepLinksLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : deepLinksList.length > 0 ? (
+            <div className="space-y-4">
+              {deepLinksList.map((dl: any) => (
+                <Card
+                  key={dl.id}
+                  className="cursor-pointer hover:border-primary/50"
+                  onClick={() => handleSelectDeepLink(dl.id)}
+                >
+                  <CardContent className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900">
+                        <Smartphone className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{dl.name || `深度链接 #${dl.id.slice(0, 8)}`}</span>
+                          <Badge variant={dl.enabled ? 'default' : 'secondary'}>
+                            {dl.enabled ? '已启用' : '已禁用'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {dl.iosConfig && (
+                            <span className="flex items-center gap-1">
+                              <Apple className="h-3 w-3" /> iOS
+                            </span>
+                          )}
+                          {dl.androidConfig && (
+                            <span className="flex items-center gap-1">
+                              <Smartphone className="h-3 w-3" /> Android
+                            </span>
+                          )}
+                          <span>点击: {dl.clicks || 0}</span>
+                          <span>安装: {dl.installs || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* Pagination */}
+              {total > 0 && (
+                <div className="flex items-center justify-between pt-4">
+                  <div className="text-sm text-muted-foreground">
+                    显示 {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} 共 {total} 条
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      上一页
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      {page} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      下一页
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center dark:border-gray-700">
+              <Smartphone className="h-12 w-12 text-gray-300 dark:text-gray-600" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+                暂无深度链接配置
+              </h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                切换到配置视图为链接创建深度链接
+              </p>
+              <Button className="mt-4" onClick={() => setView('config')}>
+                <Settings className="mr-2 h-4 w-4" />
+                开始配置
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <>
+          {/* Config View - Link Selector */}
+          <div className="mb-6 rounded-lg border bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <Label>选择链接</Label>
+            <Select value={selectedLinkId} onValueChange={handleLinkChange}>
+              <SelectTrigger className="mt-2 w-full md:w-96">
+                <SelectValue placeholder="选择要配置深度链接的链接" />
+              </SelectTrigger>
+              <SelectContent>
+                {links.map((link) => (
+                  <SelectItem key={link.id} value={link.id}>
+                    <div className="flex items-center gap-2">
+                      <Link2 className="h-4 w-4" />
+                      <span>/{link.shortCode}</span>
+                      {link.title && <span className="text-gray-500">- {link.title}</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!selectedLinkId ? (
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center dark:border-gray-700">
+              <Smartphone className="h-12 w-12 text-gray-300 dark:text-gray-600" />
+              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+                选择一个链接
+              </h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                选择链接后可以配置其深度链接行为
+              </p>
+            </div>
+          ) : configLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-2">
           {/* iOS Config */}
           <Card>
             <CardHeader>
@@ -476,7 +685,7 @@ export default function DeepLinksPage() {
               {deepLinkConfig && (
                 <Button
                   variant="outline"
-                  onClick={handleDelete}
+                  onClick={() => setShowDeleteConfirm(true)}
                   disabled={deleteDeepLink.isPending}
                   className="text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
@@ -499,8 +708,22 @@ export default function DeepLinksPage() {
               </Button>
             </div>
           </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="删除深度链接配置"
+        description="确定要删除此深度链接配置吗？此操作不可撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteDeepLink.isPending}
+        variant="destructive"
+      />
     </Layout>
   );
 }

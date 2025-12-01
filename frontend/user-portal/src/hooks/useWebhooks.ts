@@ -107,13 +107,56 @@ export interface UpdateWebhookData {
   filters?: WebhookFilters;
 }
 
+export interface WebhookQueryParams {
+  platform?: string;
+  enabled?: boolean;
+  page?: number;
+  limit?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'successCount' | 'failureCount' | 'lastTriggeredAt';
+  sortOrder?: 'ASC' | 'DESC';
+  search?: string;
+}
+
+export interface WebhookListResponse {
+  webhooks: Webhook[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // Query: Get all webhooks
-export function useWebhooks() {
+export function useWebhooks(params?: WebhookQueryParams) {
   return useQuery({
-    queryKey: ['webhooks'],
+    queryKey: ['webhooks', params],
     queryFn: async () => {
-      const { data } = await api.get('/api/v1/webhooks');
-      return data as { data: Webhook[]; total: number; page: number; limit: number };
+      const urlParams = new URLSearchParams();
+      if (params?.platform) urlParams.append('platform', params.platform);
+      if (params?.enabled !== undefined) urlParams.append('enabled', String(params.enabled));
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      if (params?.search) urlParams.append('search', params.search);
+
+      const queryString = urlParams.toString();
+      const { data } = await api.get<WebhookListResponse | { data: Webhook[]; total: number; page: number; limit: number }>(`/api/v1/webhooks${queryString ? `?${queryString}` : ''}`);
+
+      // Handle both response formats for backwards compatibility
+      if ('webhooks' in data) {
+        return {
+          items: data.webhooks,
+          total: data.total,
+          page: data.page,
+          limit: data.limit,
+        };
+      }
+      // Legacy format
+      return {
+        items: data.data || [],
+        total: data.total || 0,
+        page: data.page || 1,
+        limit: data.limit || 20,
+      };
     },
   });
 }

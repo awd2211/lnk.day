@@ -36,7 +36,7 @@ export function useSavedSearches() {
   return useQuery({
     queryKey: ['saved-searches'],
     queryFn: async () => {
-      const response = await api.get<SavedSearch[]>('/api/v1/search/saved');
+      const response = await api.get<SavedSearch[]>('/api/v1/saved-searches');
       return response.data;
     },
   });
@@ -46,7 +46,7 @@ export function useSavedSearch(id: string) {
   return useQuery({
     queryKey: ['saved-searches', id],
     queryFn: async () => {
-      const response = await api.get<SavedSearch>(`/api/v1/search/saved/${id}`);
+      const response = await api.get<SavedSearch>(`/api/v1/saved-searches/${id}`);
       return response.data;
     },
     enabled: !!id,
@@ -58,7 +58,7 @@ export function useCreateSavedSearch() {
 
   return useMutation({
     mutationFn: async (data: CreateSavedSearchDto) => {
-      const response = await api.post<SavedSearch>('/api/v1/search/saved', data);
+      const response = await api.post<SavedSearch>('/api/v1/saved-searches', data);
       return response.data;
     },
     onSuccess: () => {
@@ -72,7 +72,7 @@ export function useUpdateSavedSearch() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateSavedSearchDto> }) => {
-      const response = await api.patch<SavedSearch>(`/api/v1/search/saved/${id}`, data);
+      const response = await api.put<SavedSearch>(`/api/v1/saved-searches/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -86,7 +86,7 @@ export function useDeleteSavedSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/search/saved/${id}`);
+      await api.delete(`/api/v1/saved-searches/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['saved-searches'] });
@@ -99,7 +99,7 @@ export function useApplySavedSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<{ results: any[] }>(`/api/v1/search/saved/${id}/apply`);
+      const response = await api.post<{ results: any[] }>(`/api/v1/saved-searches/${id}/execute`);
       return response.data;
     },
     onSuccess: (_, id) => {
@@ -113,7 +113,7 @@ export function useSetDefaultSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<SavedSearch>(`/api/v1/search/saved/${id}/set-default`);
+      const response = await api.post<SavedSearch>(`/api/v1/saved-searches/${id}/set-default`);
       return response.data;
     },
     onSuccess: () => {
@@ -127,7 +127,7 @@ export function useDuplicateSavedSearch() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post<SavedSearch>(`/api/v1/search/saved/${id}/duplicate`);
+      const response = await api.post<SavedSearch>(`/api/v1/saved-searches/${id}/duplicate`);
       return response.data;
     },
     onSuccess: () => {

@@ -15,7 +15,9 @@ import {
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
   useABTest,
   useABTestStats,
@@ -53,6 +55,8 @@ export default function ABTestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Queries
   const { data: test, isLoading: testLoading } = useABTest(id!);
@@ -91,7 +95,8 @@ export default function ABTestDetailPage() {
   };
 
   const handleComplete = async (winnerId?: string) => {
-    if (!winnerId && !confirm('确定要在没有选择优胜者的情况下结束测试吗？')) {
+    if (!winnerId) {
+      setShowCompleteConfirm(true);
       return;
     }
 
@@ -107,13 +112,24 @@ export default function ABTestDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('确定要删除此测试吗？此操作无法撤销。')) {
-      return;
+  const handleCompleteWithoutWinner = async () => {
+    try {
+      await completeTest.mutateAsync({ id: id! });
+      setShowCompleteConfirm(false);
+      toast({ title: '测试已结束' });
+    } catch (error: any) {
+      toast({
+        title: '结束失败',
+        description: error.response?.data?.message || '请稍后重试',
+        variant: 'destructive',
+      });
     }
+  };
 
+  const handleDelete = async () => {
     try {
       await deleteTest.mutateAsync(id!);
+      setShowDeleteConfirm(false);
       toast({ title: '测试已删除' });
       navigate('/ab-tests');
     } catch (error: any) {
@@ -253,7 +269,7 @@ export default function ABTestDetailPage() {
             {test.status !== 'running' && (
               <Button
                 variant="outline"
-                onClick={handleDelete}
+                onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleteTest.isPending}
                 className="text-red-600 hover:bg-red-50 hover:text-red-700"
               >
@@ -342,6 +358,29 @@ export default function ABTestDetailPage() {
           </p>
         </div>
       )}
+
+      {/* Complete Without Winner Confirm Dialog */}
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        onOpenChange={setShowCompleteConfirm}
+        title="结束测试"
+        description="确定要在没有选择优胜者的情况下结束测试吗？"
+        confirmText="确定结束"
+        onConfirm={handleCompleteWithoutWinner}
+        isLoading={completeTest.isPending}
+      />
+
+      {/* Delete Test Confirm Dialog */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="删除测试"
+        description="确定要删除此测试吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteTest.isPending}
+        variant="destructive"
+      />
     </Layout>
   );
 }

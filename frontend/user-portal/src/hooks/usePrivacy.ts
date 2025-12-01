@@ -52,7 +52,7 @@ export function usePrivacySettings() {
   return useQuery({
     queryKey: ['privacy-settings'],
     queryFn: async () => {
-      const response = await api.get<PrivacySettings>('/api/v1/privacy/settings');
+      const response = await api.get<PrivacySettings>('/api/v1/privacy/overview');
       return response.data;
     },
   });
@@ -63,7 +63,14 @@ export function useUpdatePrivacySettings() {
 
   return useMutation({
     mutationFn: async (settings: Partial<PrivacySettings>) => {
-      const response = await api.patch<PrivacySettings>('/api/v1/privacy/settings', settings);
+      // 更新同意设置
+      const consents = [];
+      if (settings.consentSettings) {
+        for (const [key, value] of Object.entries(settings.consentSettings)) {
+          consents.push({ type: key, granted: value });
+        }
+      }
+      const response = await api.post('/api/v1/privacy/consents/bulk', { consents });
       return response.data;
     },
     onSuccess: () => {
@@ -76,8 +83,9 @@ export function useDataExportRequests() {
   return useQuery({
     queryKey: ['data-export-requests'],
     queryFn: async () => {
-      const response = await api.get<DataExportRequest[]>('/api/v1/privacy/exports');
-      return response.data;
+      const response = await api.get<{ requests: DataExportRequest[] }>('/api/v1/privacy/requests');
+      // 过滤出导出请求
+      return response.data.requests.filter((r: any) => r.type === 'export');
     },
   });
 }
@@ -86,9 +94,9 @@ export function useRequestDataExport() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (format: 'json' | 'csv') => {
-      const response = await api.post<DataExportRequest>('/api/v1/privacy/exports', { format });
-      return response.data;
+    mutationFn: async (_format: 'json' | 'csv') => {
+      const response = await api.post<{ request: DataExportRequest }>('/api/v1/privacy/export');
+      return response.data.request;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data-export-requests'] });
@@ -100,8 +108,9 @@ export function useDataDeletionRequests() {
   return useQuery({
     queryKey: ['data-deletion-requests'],
     queryFn: async () => {
-      const response = await api.get<DataDeletionRequest[]>('/api/v1/privacy/deletions');
-      return response.data;
+      const response = await api.get<{ requests: DataDeletionRequest[] }>('/api/v1/privacy/requests');
+      // 过滤出删除请求
+      return response.data.requests.filter((r: any) => r.type === 'delete');
     },
   });
 }
@@ -111,7 +120,9 @@ export function useRequestDataDeletion() {
 
   return useMutation({
     mutationFn: async (dataTypes: string[]) => {
-      const response = await api.post<DataDeletionRequest>('/api/v1/privacy/deletions', { dataTypes });
+      const response = await api.post<{ requestId: string }>('/api/v1/privacy/delete-account', {
+        reason: `Delete data types: ${dataTypes.join(', ')}`
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -125,7 +136,7 @@ export function useCancelDataDeletion() {
 
   return useMutation({
     mutationFn: async (requestId: string) => {
-      await api.delete(`/api/v1/privacy/deletions/${requestId}`);
+      await api.delete(`/api/v1/privacy/delete-account/${requestId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['data-deletion-requests'] });

@@ -86,9 +86,18 @@ export function useLoginHistory(userId?: string) {
   return useQuery({
     queryKey: ['audit-logs', 'logins', userId],
     queryFn: async () => {
-      const params = userId ? `?userId=${userId}` : '';
-      const response = await api.get<AuditLog[]>(`/api/v1/audit/logins${params}`);
-      return response.data;
+      // 使用审计日志查询接口过滤登录相关操作
+      const params = new URLSearchParams();
+      params.append('action', 'user.login');
+      if (userId) params.append('userId', userId);
+      params.append('limit', '50');
+      const response = await api.get<{
+        data: AuditLog[];
+        total: number;
+        page: number;
+        totalPages: number;
+      }>(`/api/v1/audit/logs?${params.toString()}`);
+      return response.data.data;
     },
   });
 }
@@ -97,8 +106,13 @@ export function useAuditLogActions() {
   return useQuery({
     queryKey: ['audit-logs', 'actions'],
     queryFn: async () => {
-      const response = await api.get<{ action: string; label: string; category: string }[]>('/api/v1/audit/actions');
-      return response.data;
+      const response = await api.get<{ actions: string[] }>('/api/v1/audit/action-types');
+      // 将后端返回的 action 字符串数组转换为前端期望的格式
+      return response.data.actions.map((action: string) => ({
+        action,
+        label: actionLabels[action] || action,
+        category: action.split('.')[0] || 'other',
+      }));
     },
   });
 }

@@ -65,15 +65,15 @@ export function useRedirectRules(linkId: string | null) {
 }
 
 // Query: Get single rule
-export function useRedirectRule(id: string | null) {
+export function useRedirectRule(linkId: string | null, id: string | null) {
   return useQuery({
-    queryKey: ['redirect-rules', 'detail', id],
+    queryKey: ['redirect-rules', 'detail', linkId, id],
     queryFn: async () => {
-      if (!id) return null;
-      const { data } = await redirectRulesService.getOne(id);
+      if (!linkId || !id) return null;
+      const { data } = await redirectRulesService.getOne(linkId, id);
       return data as RedirectRule;
     },
-    enabled: !!id,
+    enabled: !!linkId && !!id,
   });
 }
 
@@ -115,13 +115,13 @@ export function useUpdateRedirectRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateRedirectRuleData }) => {
-      const response = await redirectRulesService.update(id, data);
+    mutationFn: async ({ linkId, id, data }: { linkId: string; id: string; data: UpdateRedirectRuleData }) => {
+      const response = await redirectRulesService.update(linkId, id, data);
       return response.data as RedirectRule;
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['redirect-rules', result.linkId] });
-      queryClient.invalidateQueries({ queryKey: ['redirect-rules', 'detail', result.id] });
+      queryClient.invalidateQueries({ queryKey: ['redirect-rules', 'detail', result.linkId, result.id] });
     },
   });
 }
@@ -131,8 +131,8 @@ export function useDeleteRedirectRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, linkId }: { id: string; linkId: string }) => {
-      await redirectRulesService.delete(id);
+    mutationFn: async ({ linkId, id }: { linkId: string; id: string }) => {
+      await redirectRulesService.delete(linkId, id);
       return { linkId };
     },
     onSuccess: (result) => {
@@ -146,8 +146,8 @@ export function useToggleRedirectRule() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, linkId }: { id: string; linkId: string }) => {
-      const response = await redirectRulesService.toggle(id);
+    mutationFn: async ({ linkId, id }: { linkId: string; id: string }) => {
+      const response = await redirectRulesService.toggle(linkId, id);
       return { ...response.data, linkId } as RedirectRule & { linkId: string };
     },
     onSuccess: (result) => {

@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useLinkTemplates,
@@ -75,6 +76,7 @@ export default function TemplatesPage() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<LinkTemplate | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<LinkTemplate | null>(null);
   const [createFromTemplateData, setCreateFromTemplateData] = useState<{
     template: LinkTemplate;
     url: string;
@@ -156,11 +158,12 @@ export default function TemplatesPage() {
     }
   };
 
-  const handleDeleteTemplate = async (template: LinkTemplate) => {
-    if (!confirm(`确定要删除模板 "${template.name}" 吗？`)) return;
+  const handleDeleteTemplate = async () => {
+    if (!deletingTemplate) return;
 
     try {
-      await deleteTemplate.mutateAsync(template.id);
+      await deleteTemplate.mutateAsync(deletingTemplate.id);
+      setDeletingTemplate(null);
       toast({ title: '模板已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -258,7 +261,7 @@ export default function TemplatesPage() {
                 编辑
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => handleDeleteTemplate(template)}
+                onClick={() => setDeletingTemplate(template)}
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -898,6 +901,18 @@ export default function TemplatesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deletingTemplate}
+          onOpenChange={(open) => !open && setDeletingTemplate(null)}
+          title="删除模板"
+          description={`确定要删除模板 "${deletingTemplate?.name}" 吗？此操作不可撤销。`}
+          confirmText="删除"
+          onConfirm={handleDeleteTemplate}
+          isLoading={deleteTemplate.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

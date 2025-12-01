@@ -116,7 +116,7 @@ export function useUpdateIntegrationConfig() {
 
   return useMutation({
     mutationFn: async ({ id, config }: { id: string; config: Record<string, any> }) => {
-      const response = await api.patch<Integration>(`/api/v1/integrations/${id}`, { config });
+      const response = await api.put<Integration>(`/api/v1/integrations/${id}/config`, config);
       return response.data;
     },
     onSuccess: () => {

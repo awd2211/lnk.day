@@ -135,7 +135,11 @@ export default function BioLinkEditorPage() {
 
   // Update local state when data loads
   if (bioLink && !localBioLink) {
-    setLocalBioLink(bioLink);
+    // Ensure blocks is always an array
+    setLocalBioLink({
+      ...bioLink,
+      blocks: bioLink.blocks || [],
+    });
   }
 
   const updateLocalBioLink = useCallback((updates: Partial<BioLink>) => {
@@ -713,7 +717,7 @@ export default function BioLinkEditorPage() {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  window.open(`https://lnk.day/b/${localBioLink.slug}`, '_blank')
+                  window.open(`https://lnk.day/u/${localBioLink.username}`, '_blank')
                 }
               >
                 <ExternalLink className="mr-2 h-4 w-4" />

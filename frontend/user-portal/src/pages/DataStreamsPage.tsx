@@ -72,6 +72,7 @@ import {
   type BackfillRequest,
 } from '@/hooks/useDataStreams';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { format, formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -114,6 +115,7 @@ export default function DataStreamsPage() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [backfillDialogOpen, setBackfillDialogOpen] = useState(false);
   const [testingStreamId, setTestingStreamId] = useState<string | null>(null);
+  const [deletingStreamId, setDeletingStreamId] = useState<string | null>(null);
 
   // Create form state
   const [formData, setFormData] = useState<Partial<CreateDataStreamDto>>({
@@ -146,10 +148,11 @@ export default function DataStreamsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此数据流吗？')) return;
+  const handleDelete = async () => {
+    if (!deletingStreamId) return;
     try {
-      await deleteStream.mutateAsync(id);
+      await deleteStream.mutateAsync(deletingStreamId);
+      setDeletingStreamId(null);
       toast({ title: '数据流已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -880,7 +883,7 @@ export default function DataStreamsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDelete(stream.id)}
+                              onClick={() => setDeletingStreamId(stream.id)}
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
@@ -961,6 +964,18 @@ export default function DataStreamsPage() {
             onOpenChange={setDetailDialogOpen}
           />
         )}
+
+        {/* Delete Stream Confirm Dialog */}
+        <ConfirmDialog
+          open={!!deletingStreamId}
+          onOpenChange={(open) => !open && setDeletingStreamId(null)}
+          title="删除数据流"
+          description="确定要删除此数据流吗？删除后将停止数据导出。"
+          confirmText="删除"
+          onConfirm={handleDelete}
+          isLoading={deleteStream.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

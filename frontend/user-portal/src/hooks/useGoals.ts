@@ -176,12 +176,46 @@ export interface UpdateGoalDto {
   metadata?: Partial<GoalMetadata>;
 }
 
-export function useGoals(campaignId?: string) {
+export interface GoalQueryParams {
+  campaignId?: string;
+  status?: GoalStatus;
+  type?: GoalType;
+  page?: number;
+  limit?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'target' | 'current' | 'deadline';
+  sortOrder?: 'ASC' | 'DESC';
+  search?: string;
+}
+
+export interface GoalListResponse {
+  items: Goal[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function useGoals(params?: GoalQueryParams) {
   return useQuery({
-    queryKey: ['goals', { campaignId }],
+    queryKey: ['goals', params],
     queryFn: async () => {
-      const params = campaignId ? `?campaignId=${campaignId}` : '';
-      const response = await api.get<Goal[]>(`/api/v1/goals${params}`);
+      const urlParams = new URLSearchParams();
+      if (params?.campaignId) urlParams.append('campaignId', params.campaignId);
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.type) urlParams.append('type', params.type);
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      if (params?.search) urlParams.append('search', params.search);
+
+      const queryString = urlParams.toString();
+      const response = await api.get<GoalListResponse | Goal[]>(`/api/v1/goals${queryString ? `?${queryString}` : ''}`);
+
+      // Handle both array format and { items, total } format
+      if (Array.isArray(response.data)) {
+        const items = response.data;
+        return { items, total: items.length, page: 1, limit: items.length };
+      }
       return response.data;
     },
   });

@@ -1,5 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { deepLinkService } from '@/lib/api';
+import { deepLinkService, api } from '@/lib/api';
+
+// Query params interface
+export interface DeepLinkQueryParams {
+  status?: 'enabled' | 'disabled';
+  page?: number;
+  limit?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'enabled' | 'clicks' | 'installs';
+  sortOrder?: 'ASC' | 'DESC';
+  search?: string;
+}
+
+export interface DeepLinkListResponse {
+  items: DeepLinkConfig[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 // Types
 export interface DeepLinkIosConfig {
@@ -36,6 +53,33 @@ export interface DeepLinkResolveResult {
 }
 
 // Hooks
+
+// Get all deep links with pagination/sorting
+export function useDeepLinks(params?: DeepLinkQueryParams) {
+  return useQuery({
+    queryKey: ['deep-links', 'list', params],
+    queryFn: async () => {
+      const urlParams = new URLSearchParams();
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      if (params?.search) urlParams.append('search', params.search);
+
+      const queryString = urlParams.toString();
+      const { data } = await api.get<DeepLinkListResponse>(`/api/v1/deeplinks${queryString ? `?${queryString}` : ''}`);
+
+      return {
+        items: data.items,
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+      };
+    },
+  });
+}
+
 export function useDeepLink(linkId: string | null) {
   return useQuery({
     queryKey: ['deep-links', linkId],

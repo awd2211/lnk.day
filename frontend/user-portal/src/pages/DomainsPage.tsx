@@ -13,6 +13,9 @@ import {
   ExternalLink,
   Star,
   Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import Layout from '@/components/Layout';
@@ -37,6 +40,7 @@ import {
   AlertTitle,
 } from '@/components/ui/alert';
 import { EmptyState } from '@/components/EmptyState';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   useDomains,
@@ -46,21 +50,49 @@ import {
   useSetDefaultDomain,
   useUpdateDomain,
   CustomDomain,
+  DomainStatus,
   DOMAIN_STATUS_CONFIG,
 } from '@/hooks/useDomains';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 export default function DomainsPage() {
   const { toast } = useToast();
 
+  // Pagination and sorting state
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'domain' | 'status' | 'verifiedAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [statusFilter, setStatusFilter] = useState<'all' | DomainStatus>('all');
+
   // State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<CustomDomain | null>(null);
+  const [deletingDomain, setDeletingDomain] = useState<CustomDomain | null>(null);
   const [newDomain, setNewDomain] = useState('');
   const [copiedRecord, setCopiedRecord] = useState<string | null>(null);
 
   // Queries & Mutations
-  const { data: domains, isLoading } = useDomains();
+  const { data: domainsData, isLoading } = useDomains({
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+  });
+
+  const domains = domainsData?.items || [];
+  const total = domainsData?.total || 0;
+  const totalPages = Math.ceil(total / limit);
   const addDomain = useAddDomain();
   const removeDomain = useRemoveDomain();
   const verifyDomain = useVerifyDomain();
@@ -92,14 +124,15 @@ export default function DomainsPage() {
     }
   };
 
-  const handleRemoveDomain = async (domain: CustomDomain) => {
-    if (!confirm(`确定要删除域名 "${domain.domain}" 吗？`)) return;
+  const handleRemoveDomain = async () => {
+    if (!deletingDomain) return;
 
     try {
-      await removeDomain.mutateAsync(domain.id);
-      if (selectedDomain?.id === domain.id) {
+      await removeDomain.mutateAsync(deletingDomain.id);
+      if (selectedDomain?.id === deletingDomain.id) {
         setSelectedDomain(null);
       }
+      setDeletingDomain(null);
       toast({ title: '域名已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -180,6 +213,63 @@ export default function DomainsPage() {
           </AlertDescription>
         </Alert>
 
+        {/* Search and Filter */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="搜索域名..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={statusFilter}
+              onValueChange={(value: 'all' | DomainStatus) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部状态</SelectItem>
+                <SelectItem value="pending">待验证</SelectItem>
+                <SelectItem value="verifying">验证中</SelectItem>
+                <SelectItem value="active">已激活</SelectItem>
+                <SelectItem value="failed">验证失败</SelectItem>
+                <SelectItem value="expired">已过期</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(value) => {
+                const [newSortBy, newSortOrder] = value.split('-') as [typeof sortBy, 'ASC' | 'DESC'];
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+              }}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="排序" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-DESC">创建时间（新→旧）</SelectItem>
+                <SelectItem value="createdAt-ASC">创建时间（旧→新）</SelectItem>
+                <SelectItem value="domain-ASC">域名（A→Z）</SelectItem>
+                <SelectItem value="domain-DESC">域名（Z→A）</SelectItem>
+                <SelectItem value="status-ASC">状态</SelectItem>
+                <SelectItem value="verifiedAt-DESC">验证时间（新→旧）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Domains List */}
           <div className="space-y-4">
@@ -256,7 +346,7 @@ export default function DomainsPage() {
                         size="icon"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleRemoveDomain(domain);
+                          setDeletingDomain(domain);
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -280,6 +370,38 @@ export default function DomainsPage() {
                   />
                 </CardContent>
               </Card>
+            )}
+
+            {/* Pagination */}
+            {total > 0 && (
+              <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                  显示 {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} 共 {total} 条
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    上一页
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    下一页
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 
@@ -505,6 +627,18 @@ export default function DomainsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          open={!!deletingDomain}
+          onOpenChange={(open) => !open && setDeletingDomain(null)}
+          title="删除域名"
+          description={`确定要删除域名 "${deletingDomain?.domain}" 吗？此操作不可撤销。`}
+          confirmText="删除"
+          onConfirm={handleRemoveDomain}
+          isLoading={removeDomain.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

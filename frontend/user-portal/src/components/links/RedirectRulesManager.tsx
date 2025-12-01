@@ -71,6 +71,7 @@ import {
   COUNTRY_CODES,
 } from '@/hooks/useRedirectRules';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 interface RedirectRulesManagerProps {
   linkId: string;
@@ -147,6 +148,7 @@ export function RedirectRulesManager({ linkId, className }: RedirectRulesManager
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RedirectRule | null>(null);
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<CreateRedirectRuleData>({
@@ -191,6 +193,7 @@ export function RedirectRulesManager({ linkId, className }: RedirectRulesManager
     try {
       if (editingRule) {
         await updateRule.mutateAsync({
+          linkId,
           id: editingRule.id,
           data: formData,
         });
@@ -209,11 +212,12 @@ export function RedirectRulesManager({ linkId, className }: RedirectRulesManager
     }
   };
 
-  const handleDelete = async (rule: RedirectRule) => {
-    if (!confirm(`确定要删除规则 "${rule.name}" 吗？`)) return;
+  const handleDelete = async () => {
+    if (!deletingRuleId) return;
 
     try {
-      await deleteRule.mutateAsync({ id: rule.id, linkId });
+      await deleteRule.mutateAsync({ id: deletingRuleId, linkId });
+      setDeletingRuleId(null);
       toast({ title: '规则已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -558,7 +562,7 @@ export function RedirectRulesManager({ linkId, className }: RedirectRulesManager
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(rule)}
+                        onClick={() => setDeletingRuleId(rule.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -803,6 +807,18 @@ export function RedirectRulesManager({ linkId, className }: RedirectRulesManager
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Rule Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingRuleId}
+        onOpenChange={(open) => !open && setDeletingRuleId(null)}
+        title="删除规则"
+        description="确定要删除此重定向规则吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteRule.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

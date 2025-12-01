@@ -15,6 +15,9 @@ import {
   PanelLeftClose,
   PanelLeft,
   Folder,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -45,8 +48,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LinkEditDialog } from '@/components/LinkEditDialog';
 import { BulkOperationsBar } from '@/components/BulkOperationsBar';
 import { FolderSidebar } from '@/components/links/FolderSidebar';
+import { LinkQRDialog } from '@/components/links/LinkQRDialog';
 import { EmptyState, NoSearchResultsEmptyState } from '@/components/EmptyState';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Link2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -57,6 +62,7 @@ import {
   useBulkOperation,
   Link as LinkType,
 } from '@/hooks/useLinks';
+import { useBatchMoveToFolder } from '@/hooks/useBatchLinks';
 import { useFolders } from '@/hooks/useFolders';
 import { cn } from '@/lib/utils';
 
@@ -75,7 +81,11 @@ export default function LinksPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit, setLimit] = useState(10);
+
+  // Sort state
+  const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'clicks' | 'title' | 'shortCode'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
 
   // Folder state
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -88,6 +98,12 @@ export default function LinksPage() {
   const [editingLink, setEditingLink] = useState<LinkType | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // QR dialog state
+  const [qrLink, setQrLink] = useState<LinkType | null>(null);
+
+  // Delete confirmation state
+  const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null);
+
   const { toast } = useToast();
 
   // Queries
@@ -98,7 +114,11 @@ export default function LinksPage() {
     status: statusFilter === 'all' ? undefined : statusFilter,
     search: search || undefined,
     folderId: selectedFolderId || undefined,
+    sortBy,
+    sortOrder,
   });
+  // 单独获取所有链接的总数（用于侧边栏显示）
+  const { data: allLinksData } = useLinks({ page: 1, limit: 1 });
 
   // Get current folder name
   const currentFolderName = selectedFolderId
@@ -110,9 +130,41 @@ export default function LinksPage() {
   const updateLink = useUpdateLink();
   const deleteLink = useDeleteLink();
   const bulkOperation = useBulkOperation();
+  const batchMoveToFolder = useBatchMoveToFolder();
 
   const links = linksData?.items || [];
   const totalPages = linksData ? Math.ceil(linksData.total / limit) : 1;
+
+  // Sort handler
+  const handleSort = (field: typeof sortBy) => {
+    if (sortBy === field) {
+      // 切换排序方向
+      setSortOrder(sortOrder === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setSortBy(field);
+      setSortOrder('DESC');
+    }
+    setPage(1); // 排序时重置到第一页
+  };
+
+  // Sortable header component
+  const SortableHeader = ({ field, children }: { field: typeof sortBy; children: React.ReactNode }) => (
+    <button
+      onClick={() => handleSort(field)}
+      className="flex items-center gap-1 font-medium hover:text-foreground transition-colors"
+    >
+      {children}
+      {sortBy === field ? (
+        sortOrder === 'DESC' ? (
+          <ArrowDown className="h-4 w-4" />
+        ) : (
+          <ArrowUp className="h-4 w-4" />
+        )
+      ) : (
+        <ArrowUpDown className="h-4 w-4 opacity-50" />
+      )}
+    </button>
+  );
 
   // Selection helpers
   const allSelected = links.length > 0 && links.every((link) => selectedIds.has(link.id));
@@ -158,6 +210,7 @@ export default function LinksPage() {
         originalUrl: normalizedUrl,
         customCode: customCode || undefined,
         title: title || undefined,
+        folderId: selectedFolderId || undefined,
       });
       setUrl('');
       setCustomCode('');
@@ -181,11 +234,12 @@ export default function LinksPage() {
     toast({ title: '已复制', description: shortUrl });
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这个链接吗？')) return;
+  const handleDelete = async () => {
+    if (!deletingLinkId) return;
     try {
-      await deleteLink.mutateAsync(id);
+      await deleteLink.mutateAsync(deletingLinkId);
       toast({ title: '删除成功' });
+      setDeletingLinkId(null);
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
     }
@@ -255,6 +309,22 @@ export default function LinksPage() {
     toast({ title: '导出成功' });
   };
 
+  const handleBulkMoveToFolder = async (folderId: string | null) => {
+    try {
+      await batchMoveToFolder.mutateAsync({
+        linkIds: Array.from(selectedIds),
+        folderId,
+      });
+      setSelectedIds(new Set());
+      toast({
+        title: '移动成功',
+        description: `已将 ${selectedIds.size} 个链接移动到${folderId ? '指定文件夹' : '根目录'}`
+      });
+    } catch {
+      toast({ title: '移动失败', variant: 'destructive' });
+    }
+  };
+
   return (
     <Layout>
       <div className="flex h-full">
@@ -271,6 +341,7 @@ export default function LinksPage() {
               setSelectedFolderId(id);
               setPage(1);
             }}
+            totalLinksCount={allLinksData?.total}
             className="h-full"
           />
         </div>
@@ -414,8 +485,10 @@ export default function LinksPage() {
                 onClearSelection={() => setSelectedIds(new Set())}
                 onDelete={handleBulkDelete}
                 onAddTags={handleBulkAddTags}
+                onMoveToFolder={handleBulkMoveToFolder}
                 onExport={handleExport}
-                isOperating={bulkOperation.isPending}
+                isOperating={bulkOperation.isPending || batchMoveToFolder.isPending}
+                folders={folders?.map(f => ({ id: f.id, name: f.name })) || []}
               />
             )}
           </div>
@@ -433,10 +506,16 @@ export default function LinksPage() {
                       aria-label="全选"
                     />
                   </TableHead>
-                  <TableHead>短链接</TableHead>
+                  <TableHead>
+                    <SortableHeader field="shortCode">短链接</SortableHeader>
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">原链接</TableHead>
-                  <TableHead className="text-center">点击</TableHead>
-                  <TableHead className="hidden sm:table-cell">创建时间</TableHead>
+                  <TableHead className="text-center">
+                    <SortableHeader field="clicks">点击</SortableHeader>
+                  </TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    <SortableHeader field="createdAt">创建时间</SortableHeader>
+                  </TableHead>
                   <TableHead className="w-32">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -551,6 +630,7 @@ export default function LinksPage() {
                             size="icon"
                             className="h-8 w-8"
                             title="生成二维码"
+                            onClick={() => setQrLink(link)}
                           >
                             <QrCode className="h-4 w-4" />
                           </Button>
@@ -568,7 +648,7 @@ export default function LinksPage() {
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
                             title="删除"
-                            onClick={() => handleDelete(link.id)}
+                            onClick={() => setDeletingLinkId(link.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -602,28 +682,44 @@ export default function LinksPage() {
 
             {/* Pagination */}
             {linksData && linksData.total > 0 && (
-              <div className="flex items-center justify-between border-t px-4 py-3">
-                <p className="text-sm text-muted-foreground">
-                  共 {linksData.total} 条记录，第 {page} / {totalPages} 页
-                </p>
+              <div className="flex items-center justify-between border-t px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    共 {linksData.total} 条记录
+                  </span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="rounded border px-2 py-1 text-sm dark:bg-gray-700 dark:border-gray-600"
+                  >
+                    <option value={10}>每页 10 条</option>
+                    <option value={20}>每页 20 条</option>
+                    <option value={50}>每页 50 条</option>
+                    <option value={100}>每页 100 条</option>
+                  </select>
+                </div>
                 <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    第 {page} / {totalPages} 页
+                  </span>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
                   >
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    上一页
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
+                    disabled={page >= totalPages}
                   >
-                    下一页
-                    <ChevronRight className="ml-1 h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -637,6 +733,26 @@ export default function LinksPage() {
             onOpenChange={(open) => !open && setEditingLink(null)}
             onSave={handleEditSave}
             saving={updateLink.isPending}
+            folders={folders?.map(f => ({ id: f.id, name: f.name })) || []}
+          />
+
+          {/* QR Code Dialog */}
+          <LinkQRDialog
+            link={qrLink}
+            open={!!qrLink}
+            onOpenChange={(open) => !open && setQrLink(null)}
+          />
+
+          {/* Delete Confirmation Dialog */}
+          <ConfirmDialog
+            open={!!deletingLinkId}
+            onOpenChange={(open) => !open && setDeletingLinkId(null)}
+            title="删除链接"
+            description="确定要删除这个链接吗？此操作不可撤销。"
+            confirmText="删除"
+            onConfirm={handleDelete}
+            isLoading={deleteLink.isPending}
+            variant="destructive"
           />
         </div>
       </div>

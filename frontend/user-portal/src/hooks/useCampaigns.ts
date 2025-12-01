@@ -92,15 +92,33 @@ export interface CreateCampaignData {
 
 export interface UpdateCampaignData extends Partial<CreateCampaignData> {}
 
-// Query: Get all campaigns
-export function useCampaigns(status?: CampaignStatus) {
+export interface CampaignQueryParams {
+  page?: number;
+  limit?: number;
+  status?: CampaignStatus;
+  search?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'name' | 'startDate' | 'endDate' | 'status';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+// Query: Get all campaigns with pagination and sorting
+export function useCampaigns(params?: CampaignQueryParams) {
   return useQuery({
-    queryKey: ['campaigns', { status }],
+    queryKey: ['campaigns', params],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (status) params.append('status', status);
-      const { data } = await api.get(`/api/v1/campaigns?${params}`);
-      return data as Campaign[];
+      const urlParams = new URLSearchParams();
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.search) urlParams.append('search', params.search);
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      const { data } = await api.get(`/api/v1/campaigns?${urlParams}`);
+      // 支持两种返回格式：数组或分页对象
+      if (Array.isArray(data)) {
+        return { items: data as Campaign[], total: data.length, page: 1, limit: data.length };
+      }
+      return data as { items: Campaign[]; total: number; page: number; limit: number };
     },
   });
 }

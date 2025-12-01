@@ -67,6 +67,7 @@ import {
 } from '@/hooks/useCampaignTemplates';
 import { CampaignType, CAMPAIGN_TYPE_CONFIG, CHANNEL_OPTIONS } from '@/hooks/useCampaigns';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -96,6 +97,7 @@ export default function CampaignTemplatesPage() {
   const [editTemplate, setEditTemplate] = useState<CampaignTemplate | null>(null);
   const [useTemplateDialog, setUseTemplateDialog] = useState<CampaignTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<CreateCampaignTemplateDto>({
     name: '',
@@ -183,11 +185,12 @@ export default function CampaignTemplatesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此模板吗？')) return;
+  const handleDelete = async () => {
+    if (!deletingTemplateId) return;
 
     try {
-      await deleteTemplate.mutateAsync(id);
+      await deleteTemplate.mutateAsync(deletingTemplateId);
+      setDeletingTemplateId(null);
       toast({ title: '模板已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -350,7 +353,7 @@ export default function CampaignTemplatesPage() {
                     onUse={() => setUseTemplateDialog(template)}
                     onEdit={() => openEditDialog(template)}
                     onDuplicate={() => handleDuplicate(template.id)}
-                    onDelete={() => handleDelete(template.id)}
+                    onDelete={() => setDeletingTemplateId(template.id)}
                   />
                 ))}
               </div>
@@ -543,6 +546,18 @@ export default function CampaignTemplatesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Template Confirm Dialog */}
+        <ConfirmDialog
+          open={!!deletingTemplateId}
+          onOpenChange={(open) => !open && setDeletingTemplateId(null)}
+          title="删除模板"
+          description="确定要删除此模板吗？删除后无法恢复。"
+          confirmText="删除"
+          onConfirm={handleDelete}
+          isLoading={deleteTemplate.isPending}
+          variant="destructive"
+        />
       </div>
     </Layout>
   );

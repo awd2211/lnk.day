@@ -53,6 +53,7 @@ import {
 } from '@/hooks/useABTests';
 import { useLinks } from '@/hooks/useLinks';
 import { VariantEditor } from '@/components/abtest/VariantEditor';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 const statusConfig: Record<
   ABTest['status'],
@@ -85,6 +86,8 @@ export default function ABTestPage() {
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [deletingTestId, setDeletingTestId] = useState<string | null>(null);
+  const [completingTestId, setCompletingTestId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -142,13 +145,12 @@ export default function ABTestPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除此测试吗？此操作无法撤销。')) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!deletingTestId) return;
 
     try {
-      await deleteTest.mutateAsync(id);
+      await deleteTest.mutateAsync(deletingTestId);
+      setDeletingTestId(null);
       toast({ title: '测试已删除' });
     } catch (error: any) {
       toast({
@@ -185,13 +187,12 @@ export default function ABTestPage() {
     }
   };
 
-  const handleComplete = async (id: string) => {
-    if (!confirm('确定要结束此测试吗？')) {
-      return;
-    }
+  const handleComplete = async () => {
+    if (!completingTestId) return;
 
     try {
-      await completeTest.mutateAsync({ id });
+      await completeTest.mutateAsync({ id: completingTestId });
+      setCompletingTestId(null);
       toast({ title: '测试已结束' });
     } catch (error: any) {
       toast({
@@ -342,7 +343,7 @@ export default function ABTestPage() {
                             <Pause className="mr-2 h-4 w-4" />
                             暂停测试
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleComplete(test.id)}>
+                          <DropdownMenuItem onClick={() => setCompletingTestId(test.id)}>
                             <CheckCircle className="mr-2 h-4 w-4" />
                             结束测试
                           </DropdownMenuItem>
@@ -354,7 +355,7 @@ export default function ABTestPage() {
                             <Play className="mr-2 h-4 w-4" />
                             继续测试
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleComplete(test.id)}>
+                          <DropdownMenuItem onClick={() => setCompletingTestId(test.id)}>
                             <CheckCircle className="mr-2 h-4 w-4" />
                             结束测试
                           </DropdownMenuItem>
@@ -362,7 +363,7 @@ export default function ABTestPage() {
                       )}
                       {test.status !== 'running' && (
                         <DropdownMenuItem
-                          onClick={() => handleDelete(test.id)}
+                          onClick={() => setDeletingTestId(test.id)}
                           className="text-red-600"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -445,6 +446,29 @@ export default function ABTestPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Test Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingTestId}
+        onOpenChange={(open) => !open && setDeletingTestId(null)}
+        title="删除测试"
+        description="确定要删除此测试吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteTest.isPending}
+        variant="destructive"
+      />
+
+      {/* Complete Test Confirm Dialog */}
+      <ConfirmDialog
+        open={!!completingTestId}
+        onOpenChange={(open) => !open && setCompletingTestId(null)}
+        title="结束测试"
+        description="确定要结束此测试吗？"
+        confirmText="确定结束"
+        onConfirm={handleComplete}
+        isLoading={completeTest.isPending}
+      />
     </Layout>
   );
 }

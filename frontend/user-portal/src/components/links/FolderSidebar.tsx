@@ -3,7 +3,6 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
-  ChevronRight,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -26,41 +25,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
   useFolders,
   useCreateFolder,
   useUpdateFolder,
-  useDeleteFolder,
   Folder as FolderType,
   FOLDER_COLORS,
 } from '@/hooks/useFolders';
+import { FolderDeleteDialog } from './FolderDeleteDialog';
 
 interface FolderSidebarProps {
   selectedFolderId: string | null;
   onSelectFolder: (folderId: string | null) => void;
+  totalLinksCount?: number;
   className?: string;
 }
 
 export function FolderSidebar({
   selectedFolderId,
   onSelectFolder,
+  totalLinksCount,
   className,
 }: FolderSidebarProps) {
   const { toast } = useToast();
   const { data: folders, isLoading } = useFolders();
   const createFolder = useCreateFolder();
   const updateFolder = useUpdateFolder();
-  const deleteFolder = useDeleteFolder();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<FolderType | null>(null);
   const [formData, setFormData] = useState({ name: '', color: '#6b7280' });
 
   const handleCreateFolder = async () => {
@@ -97,19 +93,9 @@ export function FolderSidebar({
     }
   };
 
-  const handleDeleteFolder = async (folder: FolderType) => {
-    if (!confirm(`确定要删除文件夹 "${folder.name}" 吗？\n链接不会被删除，只会移出文件夹。`)) {
-      return;
-    }
-
-    try {
-      await deleteFolder.mutateAsync(folder.id);
-      if (selectedFolderId === folder.id) {
-        onSelectFolder(null);
-      }
-      toast({ title: '文件夹已删除' });
-    } catch {
-      toast({ title: '删除失败', variant: 'destructive' });
+  const handleDeleteSuccess = () => {
+    if (deletingFolder && selectedFolderId === deletingFolder.id) {
+      onSelectFolder(null);
     }
   };
 
@@ -118,7 +104,8 @@ export function FolderSidebar({
     setEditingFolder(folder);
   };
 
-  const totalLinks = folders?.reduce((sum, f) => sum + (f.linkCount || 0), 0) || 0;
+  // 如果传入了 totalLinksCount 则使用它，否则回退到文件夹内链接总和
+  const totalLinks = totalLinksCount ?? (folders?.reduce((sum, f) => sum + (f.linkCount || 0), 0) || 0);
 
   return (
     <div className={cn('flex h-full flex-col border-r bg-muted/30', className)}>
@@ -215,7 +202,7 @@ export function FolderSidebar({
                       编辑
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => handleDeleteFolder(folder)}
+                      onClick={() => setDeletingFolder(folder)}
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
@@ -334,6 +321,14 @@ export function FolderSidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Dialog */}
+      <FolderDeleteDialog
+        folder={deletingFolder}
+        open={!!deletingFolder}
+        onOpenChange={(open) => !open && setDeletingFolder(null)}
+        onSuccess={handleDeleteSuccess}
+      />
     </div>
   );
 }

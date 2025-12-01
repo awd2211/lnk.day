@@ -97,7 +97,7 @@ export function useAutomationWebhooks(platform?: AutomationPlatform) {
     queryKey: ['automation', 'webhooks', platform],
     queryFn: async () => {
       const params = platform ? { platform } : {};
-      const { data } = await api.get('/api/v1/automation/webhooks', { params });
+      const { data } = await api.get('/api/v1/webhooks', { params });
       return data.webhooks as AutomationWebhook[];
     },
   });
@@ -109,7 +109,7 @@ export function useAutomationWebhook(id: string | null) {
     queryKey: ['automation', 'webhooks', id],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/api/v1/automation/webhooks/${id}`);
+      const { data } = await api.get(`/api/v1/webhooks/${id}`);
       return data.webhook as AutomationWebhook;
     },
     enabled: !!id,
@@ -121,7 +121,7 @@ export function useAutomationPlatforms() {
   return useQuery({
     queryKey: ['automation', 'platforms'],
     queryFn: async () => {
-      const { data } = await api.get('/api/v1/automation/platforms');
+      const { data } = await api.get('/api/v1/webhooks/platforms');
       return data.platforms as PlatformInfo[];
     },
     staleTime: Infinity,
@@ -133,7 +133,7 @@ export function useAutomationEvents() {
   return useQuery({
     queryKey: ['automation', 'events'],
     queryFn: async () => {
-      const { data } = await api.get('/api/v1/automation/events');
+      const { data } = await api.get('/api/v1/webhooks/events');
       return data.events as EventInfo[];
     },
     staleTime: Infinity,
@@ -145,7 +145,7 @@ export function useAutomationStats() {
   return useQuery({
     queryKey: ['automation', 'stats'],
     queryFn: async () => {
-      const { data } = await api.get('/api/v1/automation/stats');
+      const { data } = await api.get('/api/v1/webhooks/stats');
       return data as AutomationStats;
     },
   });
@@ -157,7 +157,7 @@ export function useCreateWebhook() {
 
   return useMutation({
     mutationFn: async (dto: CreateWebhookDto) => {
-      const { data } = await api.post('/api/v1/automation/webhooks', dto);
+      const { data } = await api.post('/api/v1/webhooks', dto);
       return data.webhook as AutomationWebhook;
     },
     onSuccess: () => {
@@ -172,7 +172,7 @@ export function useUpdateWebhook() {
 
   return useMutation({
     mutationFn: async ({ id, dto }: { id: string; dto: UpdateWebhookDto }) => {
-      const { data } = await api.put(`/api/v1/automation/webhooks/${id}`, dto);
+      const { data } = await api.put(`/api/v1/webhooks/${id}`, dto);
       return data.webhook as AutomationWebhook;
     },
     onSuccess: () => {
@@ -187,7 +187,7 @@ export function useDeleteWebhook() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/automation/webhooks/${id}`);
+      await api.delete(`/api/v1/webhooks/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['automation'] });
@@ -201,7 +201,7 @@ export function useToggleWebhook() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/automation/webhooks/${id}/toggle`);
+      const { data } = await api.post(`/api/v1/webhooks/${id}/toggle`);
       return data.webhook as AutomationWebhook;
     },
     onSuccess: () => {
@@ -214,7 +214,7 @@ export function useToggleWebhook() {
 export function useTestWebhook() {
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/automation/webhooks/${id}/test`);
+      const { data } = await api.post(`/api/v1/webhooks/${id}/test`);
       return data as WebhookTestResult;
     },
   });

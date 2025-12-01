@@ -13,5 +13,6 @@ export default defineConfig({
   server: {
     port: 60010,
     host: true,
+    allowedHosts: ['app.lnk.day', 'localhost'],
   },
 });

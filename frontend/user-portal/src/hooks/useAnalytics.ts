@@ -5,9 +5,13 @@ export interface AnalyticsSummary {
   totalClicks: number;
   todayClicks: number;
   uniqueVisitors: number;
-  topCountries: Array<{ country: string; clicks: number }>;
-  topDevices: Array<{ device: string; clicks: number }>;
-  topBrowsers: Array<{ browser: string; clicks: number }>;
+  topCountries: Array<{ country: string; clicks: number; percentage?: number }>;
+  topDevices: Array<{ device: string; clicks: number; percentage?: number }>;
+  topBrowsers: Array<{ browser: string; clicks: number; percentage?: number }>;
+  clicksByDay?: Array<{ date: string; clicks: number }>;
+  // 变化率（与上一周期对比）
+  clicksChange?: number;
+  visitorsChange?: number;
 }
 
 export interface HourlyActivityData {
@@ -34,7 +38,16 @@ export function useAnalyticsSummary() {
     queryKey: ['analytics', 'summary'],
     queryFn: async () => {
       const { data } = await analyticsService.getSummary();
-      return data as AnalyticsSummary;
+      // 映射后端返回的字段名到前端期望的格式
+      return {
+        totalClicks: data.totalClicks || 0,
+        todayClicks: data.todayClicks || 0,
+        uniqueVisitors: data.uniqueVisitors || 0,
+        topCountries: data.countries || [],
+        topDevices: data.devices || [],
+        topBrowsers: data.browsers || [],
+        clicksByDay: data.clicksByDay || [],
+      } as AnalyticsSummary;
     },
   });
 }
@@ -96,11 +109,20 @@ export function useClickTrends(period: string = '7d') {
   return useQuery({
     queryKey: ['analytics', 'trends', period],
     queryFn: async () => {
-      const { data } = await analyticsService.getSummary();
-      // Return mock trend data structure based on summary
+      // Calculate date range based on period
+      const endDate = new Date();
+      const startDate = new Date();
+      const days = period === '30d' ? 30 : period === '90d' ? 90 : 7;
+      startDate.setDate(endDate.getDate() - days);
+
+      const { data } = await analyticsService.getTeamAnalytics({
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+      });
+
       return {
         period,
-        data: data?.topCountries?.slice(0, 5) || [],
+        data: data?.clicksByDay || [],
       };
     },
   });

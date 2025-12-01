@@ -80,12 +80,31 @@ import {
   History,
   RotateCcw,
   Pencil,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function WebhooksPage() {
   const { toast } = useToast();
-  const { data: webhooksData, isLoading } = useWebhooks();
   const { data: eventsData } = useWebhookEvents();
+
+  // Pagination and sorting state
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'successCount' | 'failureCount' | 'lastTriggeredAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [enabledFilter, setEnabledFilter] = useState<'all' | 'true' | 'false'>('all');
+
+  const { data: webhooksData, isLoading } = useWebhooks({
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+    enabled: enabledFilter === 'all' ? undefined : enabledFilter === 'true',
+  });
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editWebhook, setEditWebhook] = useState<Webhook | null>(null);
@@ -112,7 +131,9 @@ export default function WebhooksPage() {
     events: [] as WebhookEventType[],
   });
 
-  const webhooks = webhooksData?.data || [];
+  const webhooks = webhooksData?.items || [];
+  const total = webhooksData?.total || 0;
+  const totalPages = Math.ceil(total / limit);
 
   const resetForm = () => {
     setFormData({
@@ -314,6 +335,61 @@ export default function WebhooksPage() {
               />
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="搜索名称或 URL..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={enabledFilter}
+              onValueChange={(value: 'all' | 'true' | 'false') => {
+                setEnabledFilter(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[120px]">
+                <SelectValue placeholder="状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="true">已启用</SelectItem>
+                <SelectItem value="false">已禁用</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(value) => {
+                const [newSortBy, newSortOrder] = value.split('-') as [typeof sortBy, 'ASC' | 'DESC'];
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+              }}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="排序" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-DESC">创建时间（新→旧）</SelectItem>
+                <SelectItem value="createdAt-ASC">创建时间（旧→新）</SelectItem>
+                <SelectItem value="name-ASC">名称（A→Z）</SelectItem>
+                <SelectItem value="name-DESC">名称（Z→A）</SelectItem>
+                <SelectItem value="successCount-DESC">成功次数（高→低）</SelectItem>
+                <SelectItem value="failureCount-DESC">失败次数（高→低）</SelectItem>
+                <SelectItem value="lastTriggeredAt-DESC">最后触发（新→旧）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Webhooks List */}
@@ -532,6 +608,60 @@ export default function WebhooksPage() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              显示 {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} 共 {total} 条
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                上一页
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (page <= 3) {
+                    pageNum = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = page - 2 + i;
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={page === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      className="w-8 h-8 p-0"
+                      onClick={() => setPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                下一页
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
 

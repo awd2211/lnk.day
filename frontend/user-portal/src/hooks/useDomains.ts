@@ -38,13 +38,53 @@ export interface UpdateDomainData {
   sslEnabled?: boolean;
 }
 
+export interface DomainQueryParams {
+  status?: DomainStatus;
+  page?: number;
+  limit?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'domain' | 'status' | 'verifiedAt';
+  sortOrder?: 'ASC' | 'DESC';
+  search?: string;
+}
+
+export interface DomainListResponse {
+  domains: CustomDomain[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // Query: Get all domains
-export function useDomains() {
+export function useDomains(params?: DomainQueryParams) {
   return useQuery({
-    queryKey: ['domains'],
+    queryKey: ['domains', params],
     queryFn: async () => {
-      const { data } = await api.get('/api/v1/domains');
-      return data as CustomDomain[];
+      const urlParams = new URLSearchParams();
+      if (params?.status) urlParams.append('status', params.status);
+      if (params?.page) urlParams.append('page', String(params.page));
+      if (params?.limit) urlParams.append('limit', String(params.limit));
+      if (params?.sortBy) urlParams.append('sortBy', params.sortBy);
+      if (params?.sortOrder) urlParams.append('sortOrder', params.sortOrder);
+      if (params?.search) urlParams.append('search', params.search);
+
+      const queryString = urlParams.toString();
+      const { data } = await api.get<DomainListResponse | CustomDomain[]>(`/api/v1/domains${queryString ? `?${queryString}` : ''}`);
+
+      // Handle both response formats for backwards compatibility
+      if (Array.isArray(data)) {
+        return {
+          items: data,
+          total: data.length,
+          page: 1,
+          limit: data.length,
+        };
+      }
+      return {
+        items: data.domains,
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+      };
     },
   });
 }
@@ -65,10 +105,10 @@ export function useDomain(id: string | null) {
 // Query: Verify domain DNS
 export function useDomainVerification(id: string | null) {
   return useQuery({
-    queryKey: ['domains', id, 'verify'],
+    queryKey: ['domains', id, 'verification'],
     queryFn: async () => {
       if (!id) return null;
-      const { data } = await api.get(`/api/v1/domains/${id}/verify`);
+      const { data } = await api.get(`/api/v1/domains/${id}/verification`);
       return data as { isValid: boolean; errors: string[] };
     },
     enabled: !!id,
@@ -100,7 +140,7 @@ export function useUpdateDomain() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateDomainData }) => {
-      const response = await api.patch(`/api/v1/domains/${id}`, data);
+      const response = await api.put(`/api/v1/domains/${id}`, data);
       return response.data as CustomDomain;
     },
     onSuccess: (_, { id }) => {

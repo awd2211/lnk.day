@@ -18,7 +18,19 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Link } from '@/hooks/useLinks';
+
+export interface FolderOption {
+  id: string;
+  name: string;
+}
 
 interface LinkEditDialogProps {
   link: Link | null;
@@ -26,6 +38,7 @@ interface LinkEditDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (data: Partial<Link> & { settings?: LinkSettings }) => Promise<void>;
   saving?: boolean;
+  folders?: FolderOption[];
 }
 
 interface LinkSettings {
@@ -47,12 +60,14 @@ export function LinkEditDialog({
   onOpenChange,
   onSave,
   saving,
+  folders = [],
 }: LinkEditDialogProps) {
   const [originalUrl, setOriginalUrl] = useState('');
   const [shortCode, setShortCode] = useState('');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [folderId, setFolderId] = useState<string | null>(null);
 
   // Advanced settings
   const [passwordProtected, setPasswordProtected] = useState(false);
@@ -69,6 +84,7 @@ export function LinkEditDialog({
       setShortCode(link.shortCode);
       setTitle(link.title || '');
       setTags(link.tags || []);
+      setFolderId(link.folderId || null);
       // Reset advanced settings
       setPasswordProtected(false);
       setPassword('');
@@ -124,6 +140,7 @@ export function LinkEditDialog({
       originalUrl: ensureProtocol(originalUrl),
       title: title || undefined,
       tags,
+      folderId: folderId ?? undefined,
       settings: Object.keys(settings).length > 0 ? settings : undefined,
     });
   };
@@ -182,6 +199,26 @@ export function LinkEditDialog({
                   placeholder="链接标题（可选）"
                   className="mt-1"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="folder">文件夹</Label>
+                <Select
+                  value={folderId ?? 'root'}
+                  onValueChange={(value) => setFolderId(value === 'root' ? null : value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="选择文件夹" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="root">根目录（无文件夹）</SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

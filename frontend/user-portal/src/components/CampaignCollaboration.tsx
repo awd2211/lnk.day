@@ -67,6 +67,7 @@ import { useTeamMembers } from '@/hooks/useTeam';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 interface CampaignCollaborationProps {
   campaignId: string;
@@ -119,6 +120,7 @@ function CommentsPanel({ campaignId }: { campaignId: string }) {
   const [replyTo, setReplyTo] = useState<CampaignComment | null>(null);
   const [editingComment, setEditingComment] = useState<CampaignComment | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!newComment.trim()) return;
@@ -152,11 +154,12 @@ function CommentsPanel({ campaignId }: { campaignId: string }) {
     }
   };
 
-  const handleDelete = async (commentId: string) => {
-    if (!confirm('确定要删除这条评论吗？')) return;
+  const handleDelete = async () => {
+    if (!deletingCommentId) return;
 
     try {
-      await deleteComment.mutateAsync(commentId);
+      await deleteComment.mutateAsync(deletingCommentId);
+      setDeletingCommentId(null);
       toast({ title: '评论已删除' });
     } catch {
       toast({ title: '删除失败', variant: 'destructive' });
@@ -251,7 +254,7 @@ function CommentsPanel({ campaignId }: { campaignId: string }) {
                 setEditingComment(comment);
                 setEditContent(comment.content);
               }}
-              onDelete={() => handleDelete(comment.id)}
+              onDelete={() => setDeletingCommentId(comment.id)}
               onPin={() => handlePin(comment)}
               onReaction={handleReaction}
             />
@@ -271,7 +274,7 @@ function CommentsPanel({ campaignId }: { campaignId: string }) {
                 setEditingComment(comment);
                 setEditContent(comment.content);
               }}
-              onDelete={() => handleDelete(comment.id)}
+              onDelete={() => setDeletingCommentId(comment.id)}
               onPin={() => handlePin(comment)}
               onReaction={handleReaction}
             />
@@ -306,6 +309,18 @@ function CommentsPanel({ campaignId }: { campaignId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Comment Confirm Dialog */}
+      <ConfirmDialog
+        open={!!deletingCommentId}
+        onOpenChange={(open) => !open && setDeletingCommentId(null)}
+        title="删除评论"
+        description="确定要删除这条评论吗？此操作无法撤销。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+        isLoading={deleteComment.isPending}
+        variant="destructive"
+      />
     </div>
   );
 }

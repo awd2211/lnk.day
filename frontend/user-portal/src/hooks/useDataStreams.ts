@@ -156,7 +156,7 @@ export function useUpdateDataStream() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateDataStreamDto> }) => {
-      const response = await api.patch<DataStream>(`/api/v1/data-streams/${id}`, data);
+      const response = await api.put<DataStream>(`/api/v1/data-streams/${id}`, data);
       return response.data;
     },
     onSuccess: () => {

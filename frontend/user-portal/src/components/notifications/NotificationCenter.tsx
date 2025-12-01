@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, Check, ExternalLink, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bell, Check, ExternalLink, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,6 +10,7 @@ import {
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { notificationService } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -16,68 +18,82 @@ interface Notification {
   message: string;
   type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
-  createdAt: Date;
+  createdAt: string;
   link?: string;
 }
 
-// 模拟通知数据 - 实际应用中应该从 API 获取
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    title: '链接创建成功',
-    message: '您的短链接 /abc123 已成功创建',
-    type: 'success',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 5), // 5分钟前
-    link: '/links',
-  },
-  {
-    id: '2',
-    title: '流量提醒',
-    message: '您的链接 /promo 今日访问量已超过 1000',
-    type: 'info',
-    read: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30分钟前
-    link: '/analytics',
-  },
-  {
-    id: '3',
-    title: '域名验证成功',
-    message: '自定义域名 links.example.com 已验证通过',
-    type: 'success',
-    read: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2小时前
-    link: '/domains',
-  },
-];
-
 export function NotificationCenter() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // 获取通知列表
+  const { data: notificationsData, isLoading } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const { data } = await notificationService.getAll({ limit: 20 });
+      return data as { items: Notification[]; total: number };
+    },
+    refetchInterval: 60000, // 每分钟刷新
+  });
+
+  // 获取未读数量
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: async () => {
+      const { data } = await notificationService.getUnreadCount();
+      return data as { count: number };
+    },
+    refetchInterval: 30000, // 每30秒刷新
+  });
+
+  // 标记为已读
+  const markAsReadMutation = useMutation({
+    mutationFn: (id: string) => notificationService.markAsRead(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  // 标记全部已读
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () => notificationService.markAllAsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  // 删除通知
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => notificationService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const notifications = notificationsData?.items || [];
+  const unreadCount = unreadData?.count || 0;
 
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    markAsReadMutation.mutate(id);
   };
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    markAllAsReadMutation.mutate();
   };
 
   const removeNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    deleteMutation.mutate(id);
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const minutes = Math.floor(diff / 1000 / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
+    if (minutes < 1) return '刚刚';
     if (minutes < 60) return `${minutes}分钟前`;
     if (hours < 24) return `${hours}小时前`;
     return `${days}天前`;
@@ -129,7 +145,12 @@ export function NotificationCenter() {
         </div>
         <Separator />
         <div className="max-h-80 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <Loader2 className="mx-auto h-8 w-8 mb-2 animate-spin" />
+              <p>加载中...</p>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <Bell className="mx-auto h-8 w-8 mb-2 opacity-50" />
               <p>暂无通知</p>

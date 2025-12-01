@@ -87,15 +87,35 @@ import {
   AlertTriangle,
   Eye,
   MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Search,
 } from 'lucide-react';
 import { CampaignCollaboration } from '@/components/CampaignCollaboration';
 
 export default function CampaignsPage() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | 'all'>('all');
-  const { data: campaigns, isLoading } = useCampaigns(
-    statusFilter === 'all' ? undefined : statusFilter
-  );
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'startDate'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+
+  const { data: campaignsData, isLoading } = useCampaigns({
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    search: search || undefined,
+    page,
+    limit,
+    sortBy,
+    sortOrder,
+  });
+
+  const campaigns = campaignsData?.items || [];
+  const totalPages = campaignsData ? Math.ceil(campaignsData.total / limit) : 1;
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
@@ -339,10 +359,13 @@ export default function CampaignsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as CampaignStatus | 'all')}
+            onValueChange={(v) => {
+              setStatusFilter(v as CampaignStatus | 'all');
+              setPage(1);
+            }}
           >
             <TabsList>
               <TabsTrigger value="all">全部</TabsTrigger>
@@ -353,6 +376,41 @@ export default function CampaignsPage() {
               <TabsTrigger value={CampaignStatus.ARCHIVED}>已归档</TabsTrigger>
             </TabsList>
           </Tabs>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="搜索活动..."
+                className="w-48 pl-9"
+              />
+            </div>
+            <Select
+              value={`${sortBy}-${sortOrder}`}
+              onValueChange={(v) => {
+                const [field, order] = v.split('-') as [typeof sortBy, 'ASC' | 'DESC'];
+                setSortBy(field);
+                setSortOrder(order);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-DESC">最新创建</SelectItem>
+                <SelectItem value="createdAt-ASC">最早创建</SelectItem>
+                <SelectItem value="name-ASC">名称 A-Z</SelectItem>
+                <SelectItem value="name-DESC">名称 Z-A</SelectItem>
+                <SelectItem value="startDate-DESC">开始时间 ↓</SelectItem>
+                <SelectItem value="startDate-ASC">开始时间 ↑</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Campaigns List */}
@@ -570,6 +628,50 @@ export default function CampaignsPage() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {campaignsData && campaignsData.total > 0 && (
+          <div className="flex items-center justify-between rounded-lg border bg-gray-50 px-4 py-3 dark:bg-gray-800/50">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-muted-foreground">
+                共 {campaignsData.total} 个活动
+              </span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded border px-2 py-1 text-sm dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value={12}>每页 12 个</option>
+                <option value={24}>每页 24 个</option>
+                <option value={48}>每页 48 个</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                第 {page} / {totalPages} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
 

@@ -181,7 +181,11 @@ export const authService = {
   me: () => api.get('/api/v1/users/me'),
   updateProfile: (data: any) => api.put('/api/v1/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.post('/api/v1/users/me/password', data),
+    api.post('/api/v1/users/change-password', data),
+
+  // Email verification
+  sendVerificationEmail: () => api.post('/api/v1/users/send-verification-email'),
+  verifyEmail: (token: string) => api.get('/api/v1/users/verify-email', { params: { token } }),
 
   // 2FA
   get2FAStatus: () => api.get('/api/v1/auth/2fa/status'),
@@ -224,15 +228,16 @@ export const qrService = {
   generate: (data: {
     content: string;
     size?: number;
-    color?: string;
+    foregroundColor?: string;
     backgroundColor?: string;
-    logo?: File;
+    logoUrl?: string;
     logoSize?: number;
     margin?: number;
-    dotStyle?: string;
-    cornerStyle?: string;
-    errorCorrectionLevel?: string;
-  }) => qrApi.post('/api/v1/qr/generate', { url: data.content, options: data }, { responseType: 'blob' }),
+    errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+  }) => {
+    const { content, ...options } = data;
+    return qrApi.post('/api/v1/qr/generate', { url: content, options }, { responseType: 'blob' });
+  },
 
   // 多类型二维码生成
   generateTyped: (data: {
@@ -256,7 +261,7 @@ export const qrService = {
 export const deepLinkService = {
   getAll: (params?: { page?: number; limit?: number }) =>
     api.get('/api/v1/deeplinks', { params }),
-  get: (id: string) => api.get(`/api/v1/deeplinks/${id}`),
+  get: (linkId: string) => api.get(`/api/v1/deeplinks/link/${linkId}`),
   create: (data: {
     linkId?: string;
     iosConfig?: {
@@ -276,8 +281,8 @@ export const deepLinkService = {
   }) => api.post('/api/v1/deeplinks', data),
   update: (id: string, data: any) => api.put(`/api/v1/deeplinks/${id}`, data),
   delete: (id: string) => api.delete(`/api/v1/deeplinks/${id}`),
-  resolve: (id: string, userAgent?: string) =>
-    api.post(`/api/v1/deeplinks/${id}/resolve`, { userAgent }),
+  resolve: (linkId: string, _userAgent?: string) =>
+    api.get(`/api/v1/deeplinks/resolve/${linkId}`),
 };
 
 // A/B Test API
@@ -310,7 +315,8 @@ export const folderService = {
     linkApi.post('/api/v1/folders', data),
   update: (id: string, data: { name?: string; color?: string; icon?: string }) =>
     linkApi.put(`/api/v1/folders/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/v1/folders/${id}`),
+  delete: (id: string, options?: { transferToFolderId?: string | null }) =>
+    linkApi.delete(`/api/v1/folders/${id}`, { data: options }),
   reorder: (orderedIds: string[]) => linkApi.post('/api/v1/folders/reorder', { orderedIds }),
 };
 
@@ -333,17 +339,17 @@ export const linkTemplateService = {
   getRecentlyUsed: (limit?: number) => linkApi.get('/api/v1/link-templates/recently-used', { params: { limit } }),
 };
 
-// Redirect Rules API
+// Redirect Rules API - routes are /links/:linkId/redirect-rules
 export const redirectRulesService = {
-  getAll: (linkId: string) => linkApi.get(`/api/v1/redirect-rules/link/${linkId}`),
-  getOne: (id: string) => linkApi.get(`/api/v1/redirect-rules/${id}`),
-  create: (linkId: string, data: any) => linkApi.post(`/api/v1/redirect-rules/link/${linkId}`, data),
-  update: (id: string, data: any) => linkApi.put(`/api/v1/redirect-rules/${id}`, data),
-  delete: (id: string) => linkApi.delete(`/api/v1/redirect-rules/${id}`),
-  toggle: (id: string) => linkApi.post(`/api/v1/redirect-rules/${id}/toggle`),
+  getAll: (linkId: string) => linkApi.get(`/api/v1/links/${linkId}/redirect-rules`),
+  getOne: (linkId: string, id: string) => linkApi.get(`/api/v1/links/${linkId}/redirect-rules/${id}`),
+  create: (linkId: string, data: any) => linkApi.post(`/api/v1/links/${linkId}/redirect-rules`, data),
+  update: (linkId: string, id: string, data: any) => linkApi.put(`/api/v1/links/${linkId}/redirect-rules/${id}`, data),
+  delete: (linkId: string, id: string) => linkApi.delete(`/api/v1/links/${linkId}/redirect-rules/${id}`),
+  toggle: (linkId: string, id: string) => linkApi.post(`/api/v1/links/${linkId}/redirect-rules/${id}/toggle`),
   reorder: (linkId: string, ruleIds: string[]) =>
-    linkApi.post(`/api/v1/redirect-rules/link/${linkId}/reorder`, { ruleIds }),
-  getStats: (linkId: string) => linkApi.get(`/api/v1/redirect-rules/link/${linkId}/stats`),
+    linkApi.post(`/api/v1/links/${linkId}/redirect-rules/reorder`, { ruleIds }),
+  getStats: (linkId: string) => linkApi.get(`/api/v1/links/${linkId}/redirect-rules/stats`),
 };
 
 // Security API

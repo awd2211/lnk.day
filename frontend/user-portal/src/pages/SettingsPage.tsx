@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Lock, Key, Save } from 'lucide-react';
+import { User, Lock, Key, Save, CheckCircle, AlertCircle, Mail } from 'lucide-react';
 
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,12 +10,13 @@ import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/api';
 import { ApiKeyManager } from '@/components/settings/ApiKeyManager';
 import { TwoFactorSetup } from '@/components/settings/TwoFactorSetup';
+import { PasswordStrengthIndicator, calculatePasswordStrength } from '@/components/settings/PasswordStrengthIndicator';
 
 type Tab = 'profile' | 'security' | 'api';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const { toast } = useToast();
 
   const [profile, setProfile] = useState({
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingVerification, setIsSendingVerification] = useState(false);
 
   const tabs = [
     { id: 'profile' as Tab, label: '个人资料', icon: User },
@@ -54,14 +56,56 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSendVerificationEmail = async () => {
+    setIsSendingVerification(true);
+    try {
+      await authService.sendVerificationEmail();
+      toast({ title: '验证邮件已发送', description: '请检查您的邮箱' });
+    } catch (error: any) {
+      toast({
+        title: '发送失败',
+        description: error.response?.data?.message || '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingVerification(false);
+    }
+  };
+
   const handleChangePassword = async () => {
-    if (passwords.newPassword !== passwords.confirmPassword) {
-      toast({ title: '密码不匹配', variant: 'destructive' });
+    if (!passwords.currentPassword) {
+      toast({ title: '请输入当前密码', variant: 'destructive' });
       return;
     }
 
-    if (passwords.newPassword.length < 8) {
-      toast({ title: '新密码至少需要 8 个字符', variant: 'destructive' });
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast({ title: '两次输入的密码不匹配', variant: 'destructive' });
+      return;
+    }
+
+    // 使用密码强度检测验证
+    const strengthResult = calculatePasswordStrength(passwords.newPassword);
+
+    // 检查基本要求
+    const basicRequirements = strengthResult.requirements.slice(0, 4); // minLength, hasLower, hasUpper, hasDigit
+    const unmetRequirements = basicRequirements.filter(r => !r.met);
+
+    if (unmetRequirements.length > 0) {
+      toast({
+        title: '密码不符合要求',
+        description: unmetRequirements.map(r => r.label).join('；'),
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // 密码强度太弱
+    if (strengthResult.score < 30) {
+      toast({
+        title: '密码强度太弱',
+        description: '请创建一个更复杂的密码',
+        variant: 'destructive'
+      });
       return;
     }
 
@@ -71,8 +115,14 @@ export default function SettingsPage() {
         currentPassword: passwords.currentPassword,
         newPassword: passwords.newPassword,
       });
-      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      toast({ title: '密码已更新' });
+      toast({
+        title: '密码已更新',
+        description: '您的密码已成功修改，请重新登录'
+      });
+      // 密码修改成功后自动注销，让用户重新登录
+      setTimeout(() => {
+        logout();
+      }, 1500);
     } catch (error: any) {
       toast({
         title: '修改失败',
@@ -139,6 +189,33 @@ export default function SettingsPage() {
                     onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                     className="mt-1"
                   />
+                  <div className="mt-2 flex items-center gap-2">
+                    {user?.emailVerifiedAt ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600 dark:text-green-400">
+                          邮箱已验证
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                        <span className="text-sm text-amber-600 dark:text-amber-400">
+                          邮箱未验证
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSendVerificationEmail}
+                          disabled={isSendingVerification}
+                          className="ml-2"
+                        >
+                          <Mail className="mr-1 h-3 w-3" />
+                          {isSendingVerification ? '发送中...' : '发送验证邮件'}
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <Button onClick={handleSaveProfile} disabled={isSaving}>
                   <Save className="mr-2 h-4 w-4" />
@@ -180,6 +257,11 @@ export default function SettingsPage() {
                       onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                       className="mt-1"
                     />
+                    {passwords.newPassword && (
+                      <div className="mt-3">
+                        <PasswordStrengthIndicator password={passwords.newPassword} />
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="confirmPassword">确认新密码</Label>
