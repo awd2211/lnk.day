@@ -17,8 +17,10 @@ import { Switch } from '@/components/ui/switch';
 import { PricingCard } from '@/components/billing/PricingCard';
 import { InvoiceList } from '@/components/billing/InvoiceList';
 import { PaymentMethods } from '@/components/billing/PaymentMethods';
+import { AddPaymentMethodDialog } from '@/components/billing/AddPaymentMethodDialog';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useSubscription,
   usePricing,
@@ -40,7 +42,9 @@ export default function BillingPage() {
   const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Queries
   const { data: subscription, isLoading: subscriptionLoading } = useSubscription();
@@ -150,9 +154,17 @@ export default function BillingPage() {
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    // Redirect to Stripe portal to add payment method
-    handleManageSubscription();
+  const handleAddPaymentMethod = () => {
+    setShowAddPaymentMethod(true);
+  };
+
+  const handlePaymentMethodAdded = () => {
+    // 刷新支付方式列表
+    queryClient.invalidateQueries({ queryKey: ['billing', 'payment-methods'] });
+    toast({
+      title: '添加成功',
+      description: '支付方式已成功添加',
+    });
   };
 
   const statusColors: Record<string, string> = {
@@ -323,7 +335,7 @@ export default function BillingPage() {
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                  {pricingData?.plans.map((plan) => (
+                  {pricingData?.plans?.map((plan) => (
                     <PricingCard
                       key={plan.id}
                       plan={plan}
@@ -396,6 +408,13 @@ export default function BillingPage() {
         onConfirm={handleDeletePayment}
         isLoading={deletePayment.isPending}
         variant="destructive"
+      />
+
+      {/* Add Payment Method Dialog */}
+      <AddPaymentMethodDialog
+        open={showAddPaymentMethod}
+        onOpenChange={setShowAddPaymentMethod}
+        onSuccess={handlePaymentMethodAdded}
       />
     </Layout>
   );

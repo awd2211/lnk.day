@@ -10,12 +10,11 @@ import {
   Calendar,
   Users,
   Globe,
-  FileImage,
-  Smartphone,
-  BarChart3,
   Loader2,
   CheckCircle,
   Zap,
+  Target,
+  Infinity,
 } from 'lucide-react';
 
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -43,139 +42,139 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { quotaService } from '@/lib/api';
+
+// Type definitions matching backend
+interface PlanLimits {
+  maxLinks: number;
+  maxClicks: number;
+  maxQrCodes: number;
+  maxTeamMembers: number;
+  maxCustomDomains: number;
+  maxCampaigns: number;
+  maxApiRequests: number;
+  retentionDays: number;
+  features: {
+    customBranding: boolean;
+    advancedAnalytics: boolean;
+    apiAccess: boolean;
+    bulkOperations: boolean;
+    abtesting: boolean;
+    deepLinks: boolean;
+    passwordProtection: boolean;
+    expiringLinks: boolean;
+    geoTargeting: boolean;
+    deviceTargeting: boolean;
+  };
+}
+
+interface TeamQuota {
+  id: string;
+  teamId: string;
+  plan: 'free' | 'starter' | 'pro' | 'enterprise';
+  linksUsed: number;
+  clicksUsed: number;
+  qrCodesUsed: number;
+  apiRequestsUsed: number;
+  billingCycleStart?: string;
+  billingCycleEnd?: string;
+  customLimits?: Partial<PlanLimits>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface QuotaUsageResponse {
+  quota: TeamQuota;
+  limits: PlanLimits;
+  usage: {
+    links: { used: number; limit: number; percentage: number };
+    clicks: { used: number; limit: number; percentage: number };
+    qrCodes: { used: number; limit: number; percentage: number };
+    apiRequests: { used: number; limit: number; percentage: number };
+  };
+}
+
+interface QuotaUsageLog {
+  id: string;
+  teamId: string;
+  resourceType: string;
+  action: string;
+  amount: number;
+  resourceId?: string;
+  timestamp: string;
+}
+
+interface PlanInfo {
+  plan: string;
+  limits: PlanLimits;
+}
 
 interface QuotaItem {
   name: string;
-  used: number;
-  limit: number;
+  key: keyof QuotaUsageResponse['usage'];
   unit: string;
   icon: React.ReactNode;
   description: string;
 }
 
-interface UsageHistory {
-  date: string;
-  links: number;
-  clicks: number;
-  api_calls: number;
-}
-
 function QuotaPage() {
-  const { user } = useAuth();
-
-  // Fetch quota data
-  const { data: quotaData, isLoading: quotaLoading } = useQuery({
-    queryKey: ['quota'],
-    queryFn: async () => {
-      const response = await api.get('/api/v1/quota');
-      return response.data;
-    },
-  });
-
-  // Fetch usage history
-  const { data: usageData, isLoading: usageLoading } = useQuery({
+  // Fetch quota usage data
+  const { data: usageData, isLoading: usageLoading } = useQuery<QuotaUsageResponse>({
     queryKey: ['quota-usage'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/quota/usage');
+      const response = await quotaService.getUsage();
       return response.data;
     },
   });
 
-  // Mock data for demonstration
-  const quota = quotaData || {
-    plan: 'Pro',
-    renewDate: '2024-02-01',
-    quotas: {
-      links: { used: 2847, limit: 10000 },
-      clicks: { used: 456000, limit: 1000000 },
-      qrCodes: { used: 156, limit: 500 },
-      apiCalls: { used: 12500, limit: 50000 },
-      teamMembers: { used: 8, limit: 25 },
-      customDomains: { used: 3, limit: 10 },
-      bioLinks: { used: 5, limit: 20 },
-      deepLinks: { used: 45, limit: 200 },
+  // Fetch usage logs
+  const { data: logsData, isLoading: logsLoading } = useQuery<QuotaUsageLog[]>({
+    queryKey: ['quota-logs'],
+    queryFn: async () => {
+      const response = await quotaService.getLogs({ limit: 50 });
+      return response.data;
     },
-  };
+  });
 
-  const usageHistory: UsageHistory[] = usageData?.history || [
-    { date: '2024-01-01', links: 120, clicks: 45000, api_calls: 3500 },
-    { date: '2024-01-08', links: 95, clicks: 52000, api_calls: 4200 },
-    { date: '2024-01-15', links: 143, clicks: 48000, api_calls: 3800 },
-    { date: '2024-01-22', links: 88, clicks: 61000, api_calls: 5100 },
-  ];
+  // Fetch available plans
+  const { data: plansData, isLoading: plansLoading } = useQuery<PlanInfo[]>({
+    queryKey: ['quota-plans'],
+    queryFn: async () => {
+      const response = await quotaService.getPlans();
+      return response.data;
+    },
+  });
 
   const quotaItems: QuotaItem[] = [
     {
       name: '链接数量',
-      used: quota.quotas.links.used,
-      limit: quota.quotas.links.limit,
+      key: 'links',
       unit: '个',
       icon: <Link2 className="h-5 w-5" />,
       description: '已创建的短链接总数',
     },
     {
       name: '月点击量',
-      used: quota.quotas.clicks.used,
-      limit: quota.quotas.clicks.limit,
+      key: 'clicks',
       unit: '次',
       icon: <MousePointerClick className="h-5 w-5" />,
       description: '本月链接点击次数',
     },
     {
       name: 'QR 码数量',
-      used: quota.quotas.qrCodes.used,
-      limit: quota.quotas.qrCodes.limit,
+      key: 'qrCodes',
       unit: '个',
       icon: <QrCode className="h-5 w-5" />,
       description: '已创建的 QR 码总数',
     },
     {
       name: 'API 调用',
-      used: quota.quotas.apiCalls.used,
-      limit: quota.quotas.apiCalls.limit,
+      key: 'apiRequests',
       unit: '次/月',
       icon: <Key className="h-5 w-5" />,
       description: '本月 API 调用次数',
     },
-    {
-      name: '团队成员',
-      used: quota.quotas.teamMembers.used,
-      limit: quota.quotas.teamMembers.limit,
-      unit: '人',
-      icon: <Users className="h-5 w-5" />,
-      description: '团队成员数量限制',
-    },
-    {
-      name: '自定义域名',
-      used: quota.quotas.customDomains.used,
-      limit: quota.quotas.customDomains.limit,
-      unit: '个',
-      icon: <Globe className="h-5 w-5" />,
-      description: '可绑定的自定义域名数',
-    },
-    {
-      name: 'Bio 链接',
-      used: quota.quotas.bioLinks.used,
-      limit: quota.quotas.bioLinks.limit,
-      unit: '个',
-      icon: <FileImage className="h-5 w-5" />,
-      description: 'Bio 链接页面数量',
-    },
-    {
-      name: '深度链接',
-      used: quota.quotas.deepLinks.used,
-      limit: quota.quotas.deepLinks.limit,
-      unit: '个',
-      icon: <Smartphone className="h-5 w-5" />,
-      description: '移动端深度链接数量',
-    },
   ];
-
-  const getUsagePercentage = (used: number, limit: number) => {
-    return Math.min((used / limit) * 100, 100);
-  };
 
   const getUsageColor = (percentage: number) => {
     if (percentage >= 90) return 'text-destructive';
@@ -183,19 +182,52 @@ function QuotaPage() {
     return 'text-green-500';
   };
 
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-destructive';
-    if (percentage >= 75) return 'bg-orange-500';
-    return 'bg-green-500';
-  };
-
   const formatNumber = (num: number) => {
+    if (num === -1) return '无限';
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
   };
 
-  if (quotaLoading) {
+  const formatLimit = (limit: number) => {
+    if (limit === -1) return '无限';
+    return formatNumber(limit);
+  };
+
+  const getPlanDisplayName = (plan: string) => {
+    const names: Record<string, string> = {
+      free: '免费版',
+      starter: '入门版',
+      pro: 'Pro 版',
+      enterprise: '企业版',
+    };
+    return names[plan] || plan;
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('zh-CN');
+  };
+
+  const formatResourceType = (type: string) => {
+    const types: Record<string, string> = {
+      links: '链接',
+      clicks: '点击',
+      qrCodes: 'QR码',
+      apiRequests: 'API请求',
+    };
+    return types[type] || type;
+  };
+
+  const formatAction = (action: string) => {
+    const actions: Record<string, string> = {
+      increment: '增加',
+      decrement: '减少',
+    };
+    return actions[action] || action;
+  };
+
+  if (usageLoading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center min-h-[400px]">
@@ -204,6 +236,10 @@ function QuotaPage() {
       </AppLayout>
     );
   }
+
+  const usage = usageData?.usage;
+  const quota = usageData?.quota;
+  const limits = usageData?.limits;
 
   return (
     <AppLayout>
@@ -223,182 +259,283 @@ function QuotaPage() {
         </div>
 
         {/* Plan Info */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-lg">{quota.plan} 套餐</h3>
-                    <Badge variant="secondary">当前方案</Badge>
+        {quota && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <CheckCircle className="h-6 w-6 text-primary" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    <Calendar className="inline h-4 w-4 mr-1" />
-                    下次续期: {new Date(quota.renewDate).toLocaleDateString()}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-lg">
+                        {getPlanDisplayName(quota.plan)}
+                      </h3>
+                      <Badge variant="secondary">当前方案</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      <Calendar className="inline h-4 w-4 mr-1" />
+                      计费周期: {formatDate(quota.billingCycleStart)} - {formatDate(quota.billingCycleEnd)}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">需要更多配额？</p>
+                  <Button variant="link" className="p-0 h-auto">
+                    查看升级选项 <ArrowUpRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">需要更多配额？</p>
-                <Button variant="link" className="p-0 h-auto">
-                  查看升级选项 <ArrowUpRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quota Overview Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {quotaItems.slice(0, 4).map((item) => {
-            const percentage = getUsagePercentage(item.used, item.limit);
-            return (
-              <Card key={item.name}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
-                  <div className={getUsageColor(percentage)}>{item.icon}</div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold">{formatNumber(item.used)}</span>
-                    <span className="text-sm text-muted-foreground">
-                      / {formatNumber(item.limit)} {item.unit}
-                    </span>
-                  </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="mt-2">
-                          <Progress
-                            value={percentage}
-                            className={`h-2 ${percentage >= 90 ? '[&>div]:bg-destructive' : percentage >= 75 ? '[&>div]:bg-orange-500' : ''}`}
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{percentage.toFixed(1)}% 已使用</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {percentage >= 75 && (
-                    <div className="flex items-center gap-1 mt-2 text-xs">
-                      <AlertTriangle className={`h-3 w-3 ${getUsageColor(percentage)}`} />
-                      <span className={getUsageColor(percentage)}>
-                        {percentage >= 90 ? '即将达到上限' : '使用量较高'}
+        {usage && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {quotaItems.map((item) => {
+              const usageItem = usage[item.key];
+              const isUnlimited = usageItem.limit === -1;
+              const percentage = isUnlimited ? 0 : usageItem.percentage;
+
+              return (
+                <Card key={item.name}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{item.name}</CardTitle>
+                    <div className={isUnlimited ? 'text-primary' : getUsageColor(percentage)}>
+                      {item.icon}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold">{formatNumber(usageItem.used)}</span>
+                      <span className="text-sm text-muted-foreground">
+                        / {formatLimit(usageItem.limit)} {item.unit}
                       </span>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="mt-2">
+                            {isUnlimited ? (
+                              <div className="flex items-center gap-1 text-xs text-primary">
+                                <Infinity className="h-3 w-3" />
+                                <span>无限制</span>
+                              </div>
+                            ) : (
+                              <Progress
+                                value={percentage}
+                                className={`h-2 ${percentage >= 90 ? '[&>div]:bg-destructive' : percentage >= 75 ? '[&>div]:bg-orange-500' : ''}`}
+                              />
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{isUnlimited ? '无限制' : `${percentage.toFixed(1)}% 已使用`}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    {!isUnlimited && percentage >= 75 && (
+                      <div className="flex items-center gap-1 mt-2 text-xs">
+                        <AlertTriangle className={`h-3 w-3 ${getUsageColor(percentage)}`} />
+                        <span className={getUsageColor(percentage)}>
+                          {percentage >= 90 ? '即将达到上限' : '使用量较高'}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {/* Detailed Quota Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>配额详情</CardTitle>
-            <CardDescription>
-              所有资源配额的详细使用情况
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>资源类型</TableHead>
-                  <TableHead>描述</TableHead>
-                  <TableHead className="text-right">已使用</TableHead>
-                  <TableHead className="text-right">配额上限</TableHead>
-                  <TableHead className="text-right">使用率</TableHead>
-                  <TableHead className="w-[200px]">进度</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotaItems.map((item) => {
-                  const percentage = getUsagePercentage(item.used, item.limit);
-                  return (
-                    <TableRow key={item.name}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="text-muted-foreground">{item.icon}</div>
-                          <span className="font-medium">{item.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {item.description}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatNumber(item.used)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatNumber(item.limit)} {item.unit}
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${getUsageColor(percentage)}`}>
-                        {percentage.toFixed(1)}%
-                      </TableCell>
-                      <TableCell>
-                        <Progress
-                          value={percentage}
-                          className={`h-2 ${percentage >= 90 ? '[&>div]:bg-destructive' : percentage >= 75 ? '[&>div]:bg-orange-500' : ''}`}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {usage && limits && (
+          <Card>
+            <CardHeader>
+              <CardTitle>配额详情</CardTitle>
+              <CardDescription>
+                所有资源配额的详细使用情况
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>资源类型</TableHead>
+                    <TableHead>描述</TableHead>
+                    <TableHead className="text-right">已使用</TableHead>
+                    <TableHead className="text-right">配额上限</TableHead>
+                    <TableHead className="text-right">使用率</TableHead>
+                    <TableHead className="w-[200px]">进度</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quotaItems.map((item) => {
+                    const usageItem = usage[item.key];
+                    const isUnlimited = usageItem.limit === -1;
+                    const percentage = isUnlimited ? 0 : usageItem.percentage;
 
-        {/* Usage History */}
+                    return (
+                      <TableRow key={item.name}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="text-muted-foreground">{item.icon}</div>
+                            <span className="font-medium">{item.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {item.description}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatNumber(usageItem.used)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatLimit(usageItem.limit)} {item.unit}
+                        </TableCell>
+                        <TableCell className={`text-right font-medium ${isUnlimited ? 'text-primary' : getUsageColor(percentage)}`}>
+                          {isUnlimited ? '-' : `${percentage.toFixed(1)}%`}
+                        </TableCell>
+                        <TableCell>
+                          {isUnlimited ? (
+                            <div className="flex items-center gap-1 text-xs text-primary">
+                              <Infinity className="h-3 w-3" />
+                              <span>无限制</span>
+                            </div>
+                          ) : (
+                            <Progress
+                              value={percentage}
+                              className={`h-2 ${percentage >= 90 ? '[&>div]:bg-destructive' : percentage >= 75 ? '[&>div]:bg-orange-500' : ''}`}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  {/* Additional limits */}
+                  <TableRow>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="text-muted-foreground">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium">团队成员</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      团队成员数量限制
+                    </TableCell>
+                    <TableCell className="text-right font-medium">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {formatLimit(limits.maxTeamMembers)} 人
+                    </TableCell>
+                    <TableCell className="text-right">-</TableCell>
+                    <TableCell>-</TableCell>
+                  </TableRow>
+
+                  <TableRow>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="text-muted-foreground">
+                          <Globe className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium">自定义域名</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      可绑定的自定义域名数
+                    </TableCell>
+                    <TableCell className="text-right font-medium">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {formatLimit(limits.maxCustomDomains)} 个
+                    </TableCell>
+                    <TableCell className="text-right">-</TableCell>
+                    <TableCell>-</TableCell>
+                  </TableRow>
+
+                  <TableRow>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="text-muted-foreground">
+                          <Target className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium">营销活动</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      可创建的营销活动数量
+                    </TableCell>
+                    <TableCell className="text-right font-medium">-</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {formatLimit(limits.maxCampaigns)} 个
+                    </TableCell>
+                    <TableCell className="text-right">-</TableCell>
+                    <TableCell>-</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Usage Logs */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              使用趋势
+              使用日志
             </CardTitle>
             <CardDescription>
               最近的资源使用记录
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {usageLoading ? (
+            {logsLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : (
+            ) : logsData && logsData.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>周期</TableHead>
-                    <TableHead className="text-right">新建链接</TableHead>
-                    <TableHead className="text-right">点击量</TableHead>
-                    <TableHead className="text-right">API 调用</TableHead>
+                    <TableHead>时间</TableHead>
+                    <TableHead>资源类型</TableHead>
+                    <TableHead>操作</TableHead>
+                    <TableHead className="text-right">数量</TableHead>
+                    <TableHead>资源ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {usageHistory.map((record, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">
-                        {new Date(record.date).toLocaleDateString('zh-CN', {
-                          month: 'short',
-                          day: 'numeric',
-                        })} - {new Date(new Date(record.date).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('zh-CN', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
+                  {logsData.slice(0, 20).map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(log.timestamp).toLocaleString('zh-CN')}
                       </TableCell>
-                      <TableCell className="text-right">{record.links}</TableCell>
-                      <TableCell className="text-right">{formatNumber(record.clicks)}</TableCell>
-                      <TableCell className="text-right">{formatNumber(record.api_calls)}</TableCell>
+                      <TableCell className="font-medium">
+                        {formatResourceType(log.resourceType)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={log.action === 'increment' ? 'default' : 'secondary'}>
+                          {formatAction(log.action)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {log.action === 'increment' ? '+' : '-'}{log.amount}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {log.resourceId ? log.resourceId.slice(0, 8) + '...' : '-'}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                暂无使用记录
+              </div>
             )}
           </CardContent>
         </Card>
@@ -412,68 +549,92 @@ function QuotaPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Free Plan */}
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">免费版</h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <Link2 className="h-4 w-4" /> 100 个链接
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <MousePointerClick className="h-4 w-4" /> 10K 点击/月
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <QrCode className="h-4 w-4" /> 10 个 QR 码
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Users className="h-4 w-4" /> 1 个成员
-                  </li>
-                </ul>
+            {plansLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
+            ) : plansData ? (
+              <div className="grid gap-4 md:grid-cols-4">
+                {plansData.map((planInfo) => {
+                  const isCurrent = quota?.plan === planInfo.plan;
 
-              {/* Pro Plan */}
-              <div className="border-2 border-primary rounded-lg p-4 relative">
-                <Badge className="absolute -top-2 right-4">当前</Badge>
-                <h4 className="font-semibold mb-2">Pro 版</h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <Link2 className="h-4 w-4" /> 10,000 个链接
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <MousePointerClick className="h-4 w-4" /> 1M 点击/月
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <QrCode className="h-4 w-4" /> 500 个 QR 码
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Users className="h-4 w-4" /> 25 个成员
-                  </li>
-                </ul>
-              </div>
+                  return (
+                    <div
+                      key={planInfo.plan}
+                      className={`border rounded-lg p-4 relative ${isCurrent ? 'border-2 border-primary' : ''}`}
+                    >
+                      {isCurrent && (
+                        <Badge className="absolute -top-2 right-4">当前</Badge>
+                      )}
+                      <h4 className="font-semibold mb-3">
+                        {getPlanDisplayName(planInfo.plan)}
+                      </h4>
+                      <ul className="space-y-2 text-sm text-muted-foreground">
+                        <li className="flex items-center gap-2">
+                          <Link2 className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxLinks)} 个链接
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <MousePointerClick className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxClicks)} 点击/月
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <QrCode className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxQrCodes)} 个 QR 码
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxTeamMembers)} 个成员
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxCustomDomains)} 个域名
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <Key className="h-4 w-4" />
+                          {formatLimit(planInfo.limits.maxApiRequests)} API/月
+                        </li>
+                      </ul>
 
-              {/* Enterprise Plan */}
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-2">企业版</h4>
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-center gap-2">
-                    <Link2 className="h-4 w-4" /> 无限链接
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <MousePointerClick className="h-4 w-4" /> 无限点击
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <QrCode className="h-4 w-4" /> 无限 QR 码
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Users className="h-4 w-4" /> 无限成员
-                  </li>
-                </ul>
-                <Button className="w-full mt-4" variant="outline">
-                  联系销售
-                </Button>
+                      {/* Features */}
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-xs font-medium mb-2">功能</p>
+                        <div className="space-y-1">
+                          {planInfo.limits.features.apiAccess && (
+                            <p className="text-xs text-green-600">API 访问</p>
+                          )}
+                          {planInfo.limits.features.advancedAnalytics && (
+                            <p className="text-xs text-green-600">高级分析</p>
+                          )}
+                          {planInfo.limits.features.customBranding && (
+                            <p className="text-xs text-green-600">自定义品牌</p>
+                          )}
+                          {planInfo.limits.features.abtesting && (
+                            <p className="text-xs text-green-600">A/B 测试</p>
+                          )}
+                          {planInfo.limits.features.geoTargeting && (
+                            <p className="text-xs text-green-600">地理定向</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isCurrent && planInfo.plan !== 'free' && (
+                        <Button
+                          className="w-full mt-4"
+                          variant={planInfo.plan === 'enterprise' ? 'outline' : 'default'}
+                        >
+                          {planInfo.plan === 'enterprise' ? '联系销售' : '升级'}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                无法加载套餐信息
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

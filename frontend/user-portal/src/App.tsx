@@ -19,7 +19,6 @@ const BioLinksPage = lazy(() => import('@/pages/BioLinksPage'));
 const BioLinkEditorPage = lazy(() => import('@/pages/BioLinkEditorPage'));
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'));
 const QRPage = lazy(() => import('@/pages/QRPage'));
-const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
 const DomainsPage = lazy(() => import('@/pages/DomainsPage'));
 const SSOPage = lazy(() => import('@/pages/SSOPage'));
@@ -54,7 +53,6 @@ const SecuritySettingsPage = lazy(() => import('@/pages/SecuritySettingsPage'));
 const TenantSettingsPage = lazy(() => import('@/pages/TenantSettingsPage'));
 const CommentsPage = lazy(() => import('@/pages/CommentsPage'));
 const SeoManagerPage = lazy(() => import('@/pages/SeoManagerPage'));
-const NotificationIntegrationsPage = lazy(() => import('@/pages/NotificationIntegrationsPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -203,13 +201,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* /settings 重定向到 /security-settings（已合并功能） */}
           <Route
             path="/settings"
-            element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/security-settings" replace />}
           />
           <Route
             path="/team"
@@ -467,13 +462,10 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* /notification-integrations 重定向到 /integrations（通知渠道已合并到集成页面） */}
           <Route
             path="/notification-integrations"
-            element={
-              <ProtectedRoute>
-                <NotificationIntegrationsPage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/integrations" replace />}
           />
         </Routes>
       </Suspense>

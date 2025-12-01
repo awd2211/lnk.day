@@ -78,11 +78,16 @@ const createApiClient = (baseURL: string) => {
     timeout: 30000, // 30 seconds timeout
   });
 
-  // Request interceptor - add auth token
+  // Request interceptor - add auth token and team id
   client.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Add team id header for scoped APIs
+    const teamId = localStorage.getItem('teamId');
+    if (teamId) {
+      config.headers['x-team-id'] = teamId;
     }
     return config;
   });
@@ -340,7 +345,7 @@ export const linkTemplateService = {
   delete: (id: string) => linkApi.delete(`/api/v1/link-templates/${id}`),
   toggleFavorite: (id: string) => linkApi.post(`/api/v1/link-templates/${id}/favorite`),
   createLinkFromTemplate: (data: { templateId: string; originalUrl: string; customSlug?: string; title?: string }) =>
-    linkApi.post('/api/v1/link-templates/create-link', data),
+    linkApi.post('/api/v1/link-templates/use', data),
   getPresets: () => linkApi.get('/api/v1/link-templates/presets'),
   getPresetsByCategory: (category: string) => linkApi.get(`/api/v1/link-templates/presets/category/${category}`),
   createFromPreset: (presetId: string, name: string) =>
@@ -362,21 +367,33 @@ export const redirectRulesService = {
   getStats: (linkId: string) => linkApi.get(`/api/v1/links/${linkId}/redirect-rules/stats`),
 };
 
-// Security API
-export const securityService = {
-  analyze: (url: string) => linkApi.post('/api/v1/security/analyze', { url }),
-  quickCheck: (url: string) => linkApi.post('/api/v1/security/quick-check', { url }),
-  batchScan: (urls: string[]) => linkApi.post('/api/v1/security/batch-scan', { urls }),
+// Link Security API (link-service - URL scanning)
+// 使用 /api/v1/link-security 前缀避免与 user-service 的 /api/v1/security 冲突
+export const linkSecurityService = {
+  // URL scanning
+  scan: (url: string, force?: boolean) =>
+    linkApi.post('/api/v1/link-security/scan', { url, force }),
+  analyze: (url: string) => linkApi.post('/api/v1/link-security/analyze', { url }),
+  quickCheck: (url: string) => linkApi.post('/api/v1/link-security/quick-check', { url }),
+  batchScan: (urls: string[]) => linkApi.post('/api/v1/link-security/batch-scan', { urls }),
+  // History and stats
+  getRecentScans: (limit?: number) =>
+    linkApi.get('/api/v1/link-security/recent', { params: { limit } }),
   getScanHistory: (url: string, limit?: number) =>
-    linkApi.get('/api/v1/security/history', { params: { url, limit } }),
-  getStats: () => linkApi.get('/api/v1/security/stats'),
+    linkApi.get('/api/v1/link-security/history', { params: { url, limit } }),
+  getStats: () => linkApi.get('/api/v1/link-security/stats'),
+  getCategories: () => linkApi.get('/api/v1/link-security/categories'),
+  getReputation: (url: string) =>
+    linkApi.get('/api/v1/link-security/reputation', { params: { url } }),
+  checkSafeBrowsing: (url: string) =>
+    linkApi.get('/api/v1/link-security/safe-browsing', { params: { url } }),
   // Suspended links management
   getSuspendedLinks: (params?: { limit?: number; offset?: number }) =>
-    linkApi.get('/api/v1/security/suspended-links', { params }),
+    linkApi.get('/api/v1/link-security/suspended-links', { params }),
   reinstateLink: (linkId: string, reason: string) =>
-    linkApi.post(`/api/v1/security/suspended-links/${linkId}/reinstate`, { reason }),
+    linkApi.post(`/api/v1/link-security/suspended-links/${linkId}/reinstate`, { reason }),
   checkAndHandle: (url: string) =>
-    linkApi.post('/api/v1/security/check-and-handle', { url }),
+    linkApi.post('/api/v1/link-security/check-and-handle', { url }),
 };
 
 // API Keys API
@@ -418,6 +435,7 @@ export const billingService = {
   createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
     api.post('/api/v1/stripe/checkout', data),
   createPortalSession: (data: { returnUrl: string }) => api.post('/api/v1/stripe/portal', data),
+  createSetupIntent: () => api.post('/api/v1/stripe/setup-intent'),
   getPaymentMethods: () => api.get('/api/v1/stripe/payment-methods'),
   setDefaultPaymentMethod: (paymentMethodId: string) =>
     api.post('/api/v1/stripe/payment-methods/default', { paymentMethodId }),
@@ -440,8 +458,33 @@ export const privacyService = {
 export const quotaService = {
   getUsage: () => api.get('/api/v1/quota'),
   getLimits: () => api.get('/api/v1/quota/limits'),
-  getLogs: (params?: { limit?: number; offset?: number }) =>
+  checkQuota: (type: 'links' | 'clicks' | 'qrCodes' | 'apiRequests', amount?: number) =>
+    api.get('/api/v1/quota/check', { params: { type, amount } }),
+  checkFeature: (feature: string) =>
+    api.get('/api/v1/quota/feature', { params: { feature } }),
+  getLogs: (params?: { type?: string; startDate?: string; endDate?: string; limit?: number }) =>
     api.get('/api/v1/quota/logs', { params }),
+  getPlans: () => api.get('/api/v1/quota/plans'),
+};
+
+// Security API
+export const securityService = {
+  // Sessions
+  getSessions: () => api.get('/api/v1/security/sessions'),
+  revokeSession: (sessionId: string) => api.delete(`/api/v1/security/sessions/${sessionId}`),
+  revokeOtherSessions: () => api.post('/api/v1/security/sessions/revoke-others'),
+  // Security Events
+  getEvents: (params?: { limit?: number; offset?: number; type?: string }) =>
+    api.get('/api/v1/security/events', { params }),
+  // Overview
+  getOverview: () => api.get('/api/v1/security/overview'),
+  // 2FA
+  get2FAStatus: () => api.get('/api/v1/auth/2fa/status'),
+  enable2FA: () => api.post('/api/v1/auth/2fa/enable'),
+  verify2FA: (code: string) => api.post('/api/v1/auth/2fa/verify', { code }),
+  disable2FA: (code: string) => api.delete('/api/v1/auth/2fa/disable', { data: { code } }),
+  regenerateBackupCodes: (code: string) =>
+    api.post('/api/v1/auth/2fa/regenerate-backup-codes', { code }),
 };
 
 // User/Team API
@@ -511,16 +554,40 @@ export const bioLinksService = {
     pageApi.get('/api/v1/bio-links/check-username', { params: { username } }),
   getAnalytics: (id: string, params?: { startDate?: string; endDate?: string }) =>
     pageApi.get(`/api/v1/bio-links/${id}/analytics`, { params }),
-  // Block management
-  getBlocks: (bioLinkId: string) => pageApi.get(`/api/v1/bio-links/${bioLinkId}/blocks`),
+  // Block/Item management (后端使用 items 路由)
+  getBlocks: (bioLinkId: string) => pageApi.get(`/api/v1/bio-links/${bioLinkId}/items`),
   createBlock: (bioLinkId: string, data: any) =>
-    pageApi.post(`/api/v1/bio-links/${bioLinkId}/blocks`, data),
+    pageApi.post(`/api/v1/bio-links/${bioLinkId}/items`, data),
   updateBlock: (bioLinkId: string, blockId: string, data: any) =>
-    pageApi.patch(`/api/v1/bio-links/${bioLinkId}/blocks/${blockId}`, data),
+    pageApi.put(`/api/v1/bio-links/${bioLinkId}/items/${blockId}`, data),
   deleteBlock: (bioLinkId: string, blockId: string) =>
-    pageApi.delete(`/api/v1/bio-links/${bioLinkId}/blocks/${blockId}`),
+    pageApi.delete(`/api/v1/bio-links/${bioLinkId}/items/${blockId}`),
   reorderBlocks: (bioLinkId: string, blockIds: string[]) =>
-    pageApi.post(`/api/v1/bio-links/${bioLinkId}/blocks/reorder`, { blockIds }),
+    pageApi.post(`/api/v1/bio-links/${bioLinkId}/items/reorder`, { blockIds }),
+};
+
+// Comment Management API (page-service)
+export const commentService = {
+  getAll: (params?: {
+    status?: string;
+    pageId?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  }) => api.get('/api/v1/comments', { params }),
+  getStats: () => api.get('/api/v1/comments/stats'),
+  getOne: (id: string) => api.get(`/api/v1/comments/${id}`),
+  update: (id: string, data: { status?: string; isPinned?: boolean; content?: string }) =>
+    api.put(`/api/v1/comments/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/comments/${id}`),
+  approve: (id: string) => api.post(`/api/v1/comments/${id}/approve`),
+  reject: (id: string) => api.post(`/api/v1/comments/${id}/reject`),
+  markAsSpam: (id: string) => api.post(`/api/v1/comments/${id}/spam`),
+  togglePin: (id: string) => api.post(`/api/v1/comments/${id}/pin`),
+  reply: (id: string, data: { content: string; ownerName: string }) =>
+    api.post(`/api/v1/comments/${id}/reply`, data),
+  bulkAction: (ids: string[], action: 'approve' | 'reject' | 'spam' | 'delete') =>
+    api.post('/api/v1/comments/bulk', { ids, action }),
 };
 
 // Saved Search API
@@ -546,7 +613,7 @@ export const domainService = {
   delete: (id: string) => api.delete(`/api/v1/domains/${id}`),
   verify: (id: string) => api.post(`/api/v1/domains/${id}/verify`),
   setDefault: (id: string) => api.post(`/api/v1/domains/${id}/set-default`),
-  getDnsRecords: (id: string) => api.get(`/api/v1/domains/${id}/dns-records`),
+  getDnsRecords: (id: string) => api.get(`/api/v1/domains/${id}/verification`),
 };
 
 // Notification API (notification-service: 60020)
@@ -596,6 +663,139 @@ export const campaignService = {
   complete: (id: string) => api.post(`/api/v1/campaigns/${id}/complete`),
 };
 
+// Tenant API (user-service)
+export const tenantService = {
+  // Tenant CRUD
+  getAll: () => api.get('/api/v1/tenants'),
+  getOne: (id: string) => api.get(`/api/v1/tenants/${id}`),
+  create: (data: { name: string; slug: string; description?: string; type?: string }) =>
+    api.post('/api/v1/tenants', data),
+  update: (id: string, data: { name?: string; description?: string; status?: string }) =>
+    api.put(`/api/v1/tenants/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/tenants/${id}`),
+
+  // Branding
+  getBranding: (id: string) => api.get(`/api/v1/tenants/${id}/branding`),
+  updateBranding: (id: string, branding: {
+    logo?: string;
+    logoDark?: string;
+    favicon?: string;
+    primaryColor?: string;
+    secondaryColor?: string;
+    accentColor?: string;
+    fontFamily?: string;
+    customCss?: string;
+  }) => api.put(`/api/v1/tenants/${id}/branding`, branding),
+
+  // Settings
+  getSettings: (id: string) => api.get(`/api/v1/tenants/${id}/settings`),
+  updateSettings: (id: string, settings: {
+    timezone?: string;
+    locale?: string;
+    dateFormat?: string;
+    currency?: string;
+    defaultLinkExpiry?: number;
+    allowPublicSignup?: boolean;
+    requireEmailVerification?: boolean;
+    require2FA?: boolean;
+    ipWhitelist?: string[];
+    allowedEmailDomains?: string[];
+  }) => api.put(`/api/v1/tenants/${id}/settings`, settings),
+
+  // Features & Limits
+  updateFeatures: (id: string, features: Record<string, boolean>) =>
+    api.put(`/api/v1/tenants/${id}/features`, features),
+  updateLimits: (id: string, limits: {
+    maxUsers?: number;
+    maxTeams?: number;
+    maxLinks?: number;
+    maxClicks?: number;
+    maxDomains?: number;
+    maxApiKeys?: number;
+    maxWebhooks?: number;
+    storageQuota?: number;
+  }) => api.put(`/api/v1/tenants/${id}/limits`, limits),
+
+  // Usage
+  getUsage: (id: string) => api.get(`/api/v1/tenants/${id}/usage`),
+  getStats: (id: string) => api.get(`/api/v1/tenants/${id}/stats`),
+
+  // Domains
+  updateDomains: (id: string, domains: {
+    customDomain?: string;
+    appDomain?: string;
+    shortDomain?: string;
+  }) => api.put(`/api/v1/tenants/${id}/domains`, domains),
+
+  // Members
+  getMembers: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/api/v1/tenants/${id}/members`, { params }),
+  addMember: (id: string, data: { userId: string; role?: string; permissions?: string[] }) =>
+    api.post(`/api/v1/tenants/${id}/members`, data),
+  updateMember: (id: string, memberId: string, data: { role?: string; permissions?: string[] }) =>
+    api.put(`/api/v1/tenants/${id}/members/${memberId}`, data),
+  removeMember: (id: string, memberId: string) =>
+    api.delete(`/api/v1/tenants/${id}/members/${memberId}`),
+
+  // Invitations
+  getInvitations: (id: string) => api.get(`/api/v1/tenants/${id}/invitations`),
+  createInvitation: (id: string, data: {
+    email: string;
+    role?: string;
+    permissions?: string[];
+    expiresInDays?: number;
+  }) => api.post(`/api/v1/tenants/${id}/invitations`, data),
+  cancelInvitation: (id: string, invitationId: string) =>
+    api.delete(`/api/v1/tenants/${id}/invitations/${invitationId}`),
+  acceptInvitation: (token: string) =>
+    api.post(`/api/v1/tenants/invitations/${token}/accept`),
+
+  // API Keys
+  getApiKeys: (id: string) => api.get(`/api/v1/tenants/${id}/api-keys`),
+  createApiKey: (id: string, data: {
+    name: string;
+    permissions?: string[];
+    scopes?: string[];
+    rateLimit?: number;
+    ipWhitelist?: string[];
+    expiresInDays?: number;
+  }) => api.post(`/api/v1/tenants/${id}/api-keys`, data),
+  revokeApiKey: (id: string, keyId: string) =>
+    api.delete(`/api/v1/tenants/${id}/api-keys/${keyId}`),
+
+  // Audit Logs
+  getAuditLogs: (id: string, params?: {
+    page?: number;
+    limit?: number;
+    action?: string;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => api.get(`/api/v1/tenants/${id}/audit-logs`, { params }),
+
+  // Sub-tenants
+  getSubTenants: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/api/v1/tenants/${id}/sub-tenants`, { params }),
+  createSubTenant: (id: string, data: {
+    name: string;
+    slug: string;
+    ownerEmail: string;
+    type?: string;
+  }) => api.post(`/api/v1/tenants/${id}/sub-tenants`, data),
+
+  // Billing
+  getBilling: (id: string) => api.get(`/api/v1/tenants/${id}/billing`),
+  updateBilling: (id: string, billing: {
+    billingEmail?: string;
+    taxId?: string;
+    paymentMethod?: string;
+  }) => api.put(`/api/v1/tenants/${id}/billing`, billing),
+
+  // Public endpoints
+  getBySlug: (slug: string) => api.get(`/api/v1/tenants/by-slug/${slug}`),
+  getByDomain: (domain: string) => api.get(`/api/v1/tenants/by-domain/${domain}`),
+};
+
 // Integration API (integration-service: 60016)
 export const integrationService = {
   // General integrations
@@ -621,4 +821,157 @@ export const integrationService = {
   // Shopify
   getShopifyProducts: (params?: any) => api.get('/api/v1/shopify/products', { params }),
   createShopifyLink: (productId: string) => api.post(`/api/v1/shopify/products/${productId}/link`),
+};
+
+// Page API (page-service: 60007)
+export const pageService = {
+  getAll: (params?: { page?: number; limit?: number; status?: string; type?: string }) =>
+    api.get('/api/v1/pages', { params }),
+  getOne: (id: string) => api.get(`/api/v1/pages/${id}`),
+  getBySlug: (slug: string) => api.get(`/api/v1/pages/slug/${slug}`),
+  create: (data: any) => api.post('/api/v1/pages', data),
+  update: (id: string, data: any) => api.patch(`/api/v1/pages/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/pages/${id}`),
+  publish: (id: string) => api.post(`/api/v1/pages/${id}/publish`),
+  unpublish: (id: string) => api.post(`/api/v1/pages/${id}/unpublish`),
+  duplicate: (id: string) => api.post(`/api/v1/pages/${id}/duplicate`),
+  getAnalytics: (id: string, params?: { startDate?: string; endDate?: string }) =>
+    api.get(`/api/v1/pages/${id}/analytics`, { params }),
+};
+
+// SEO Service (page-service: 60007)
+export const seoService = {
+  // Generate SEO data
+  generateSeo: (input: {
+    title: string;
+    description?: string;
+    keywords?: string[];
+    image?: string;
+    url: string;
+    type?: 'website' | 'article' | 'profile' | 'product';
+  }) => api.post('/api/v1/seo/generate', input),
+
+  // Generate HTML meta tags
+  generateHtmlMeta: (input: {
+    title: string;
+    description?: string;
+    keywords?: string[];
+    image?: string;
+    url: string;
+  }) => api.post('/api/v1/seo/generate-html', input),
+
+  // Get Bio Link SEO
+  getBioLinkSeo: (username: string) => api.get(`/api/v1/u/${username}/seo`),
+
+  // Get Page SEO
+  getPageSeo: (slug: string) => api.get(`/api/v1/p/${slug}/seo`),
+
+  // Update Bio Link SEO
+  updateBioLinkSeo: (id: string, seo: {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    ogImage?: string;
+    favicon?: string;
+    canonicalUrl?: string;
+    noIndex?: boolean;
+  }) => api.patch(`/api/v1/bio-links/${id}`, { seo }),
+
+  // Update Page SEO
+  updatePageSeo: (id: string, seo: {
+    title?: string;
+    description?: string;
+    keywords?: string[];
+    ogImage?: string;
+    favicon?: string;
+    noIndex?: boolean;
+  }) => api.patch(`/api/v1/pages/${id}`, { seo }),
+};
+
+// Slack Integration API (notification-service: 60020)
+export const slackService = {
+  // Installation
+  getInstallation: () => api.get('/api/v1/slack/installation'),
+  getInstallUrl: (redirectUrl?: string) =>
+    api.get('/api/v1/slack/oauth/install', { params: { redirectUrl } }),
+  uninstall: () => api.delete('/api/v1/slack/uninstall'),
+  // Channels
+  getChannels: () => api.get('/api/v1/slack/channels'),
+  // Settings
+  updateSettings: (settings: {
+    defaultChannelId?: string;
+    notifyOnLinkCreate?: boolean;
+    notifyOnMilestone?: boolean;
+    notifyOnAlert?: boolean;
+    notifyOnWeeklyReport?: boolean;
+    milestoneThresholds?: number[];
+  }) => api.put('/api/v1/slack/settings', settings),
+  // Test
+  sendTestMessage: () => api.post('/api/v1/slack/test'),
+};
+
+// Microsoft Teams Integration API (notification-service: 60020)
+export const teamsService = {
+  // Installations
+  getInstallations: () => api.get('/api/v1/teams-notifications/installations'),
+  getInstallation: (id: string) => api.get(`/api/v1/teams-notifications/installations/${id}`),
+  createInstallation: (data: {
+    teamId: string;
+    name: string;
+    webhookUrl: string;
+    settings: {
+      notifyOnLinkCreate: boolean;
+      notifyOnMilestone: boolean;
+      notifyOnAlert: boolean;
+      notifyOnWeeklyReport: boolean;
+      milestoneThresholds: number[];
+    };
+  }) => api.post('/api/v1/teams-notifications/installations', data),
+  updateInstallation: (id: string, data: {
+    name?: string;
+    webhookUrl?: string;
+    isActive?: boolean;
+    settings?: {
+      notifyOnLinkCreate?: boolean;
+      notifyOnMilestone?: boolean;
+      notifyOnAlert?: boolean;
+      notifyOnWeeklyReport?: boolean;
+      milestoneThresholds?: number[];
+    };
+  }) => api.put(`/api/v1/teams-notifications/installations/${id}`, data),
+  deleteInstallation: (id: string) => api.delete(`/api/v1/teams-notifications/installations/${id}`),
+  testInstallation: (id: string) => api.post(`/api/v1/teams-notifications/installations/${id}/test`),
+  validateWebhook: (webhookUrl: string) =>
+    api.post('/api/v1/teams-notifications/validate-webhook', { webhookUrl }),
+};
+
+// Open API Documentation and Usage Service (api-gateway: 60000)
+export const openApiService = {
+  // Documentation
+  getDocs: () => api.get('/api/v1/open/docs'),
+  getSdkConfig: () => api.get('/api/v1/open/sdk/config'),
+  getChangelog: () => api.get('/api/v1/open/changelog'),
+  getErrorCodes: () => api.get('/api/v1/open/errors'),
+  getApiStatus: () => api.get('/api/v1/open/status'),
+
+  // Usage Statistics (requires API key auth)
+  getUsage: (params?: { startDate?: string; endDate?: string }) =>
+    api.get('/api/v1/open/usage', { params }),
+  getRateLimitStatus: () => api.get('/api/v1/open/rate-limit/status'),
+
+  // Webhook
+  generateWebhookSecret: () => api.post('/api/v1/open/webhooks/secret'),
+  verifyWebhookSignature: (payload: string, signature: string, secret: string) =>
+    api.post('/api/v1/open/webhooks/verify', { payload, signature, secret }),
+
+  // SDK Downloads
+  getSdkDownloadUrl: (language: string) => api.get(`/api/v1/open/sdk/download/${language}`),
+
+  // Code Examples
+  getCodeExample: (language: string, operation: string) =>
+    api.get(`/api/v1/open/examples/${language}/${operation}`),
+
+  // API Key validation
+  validateApiKey: (apiKey: string) =>
+    api.post('/api/v1/open/validate-key', {}, { headers: { 'X-API-Key': apiKey } }),
 };

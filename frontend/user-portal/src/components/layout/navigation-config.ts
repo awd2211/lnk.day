@@ -92,7 +92,6 @@ export const navigationGroups: NavGroup[] = [
       { title: '模板', href: '/templates', icon: FileCode },
       { title: 'UTM 模板', href: '/utm-templates', icon: LinkIcon },
       { title: '安全检查', href: '/security-scan', icon: Shield },
-      { title: '通知集成', href: '/notification-integrations', icon: Bell },
     ],
   },
   {
@@ -114,7 +113,6 @@ export const navigationGroups: NavGroup[] = [
       { title: '配额管理', href: '/quota', icon: Gauge },
       { title: '安全设置', href: '/security-settings', icon: ShieldCheck },
       { title: '团队', href: '/team', icon: Users },
-      { title: '设置', href: '/settings', icon: Settings },
       { title: '套餐', href: '/billing', icon: CreditCard },
     ],
   },

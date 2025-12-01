@@ -62,7 +62,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
+import { linkSecurityService } from '@/lib/api';
 
 interface ScanResult {
   id: string;
@@ -96,37 +96,37 @@ function SecurityScanPage() {
   const [selectedResult, setSelectedResult] = useState<ScanResult | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  // Fetch scan history
+  // Fetch recent scans (scan history)
   const { data: historyData, isLoading: historyLoading } = useQuery({
     queryKey: ['security-scan-history'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/security/history');
+      const response = await linkSecurityService.getRecentScans(50);
       return response.data;
     },
   });
 
   // Fetch overall stats
-  const { data: statsData } = useQuery({
+  const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ['security-stats'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/security/stats');
+      const response = await linkSecurityService.getStats();
       return response.data;
     },
   });
 
-  const history: ScanHistory[] = historyData?.data || [];
+  const history: ScanHistory[] = historyData?.scans || [];
   const stats = statsData || {
-    totalScans: 1234,
-    safeLinks: 1156,
-    warningLinks: 65,
-    dangerousLinks: 13,
-    averageScore: 87,
+    totalScans: 0,
+    safeLinks: 0,
+    warningLinks: 0,
+    dangerousLinks: 0,
+    averageScore: 0,
   };
 
   // Single URL scan mutation
   const scanMutation = useMutation({
     mutationFn: async (url: string) => {
-      const response = await api.post('/api/v1/security/scan', { url });
+      const response = await linkSecurityService.scan(url);
       return response.data;
     },
     onSuccess: (data) => {
@@ -151,7 +151,7 @@ function SecurityScanPage() {
   // Bulk scan mutation
   const bulkScanMutation = useMutation({
     mutationFn: async (urls: string[]) => {
-      const response = await api.post('/api/v1/security/scan/bulk', { urls });
+      const response = await linkSecurityService.batchScan(urls);
       return response.data;
     },
     onSuccess: (data) => {
@@ -159,7 +159,7 @@ function SecurityScanPage() {
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
       toast({
         title: '批量扫描完成',
-        description: `已扫描 ${data.total} 个 URL`
+        description: `已扫描 ${data.count} 个 URL`
       });
       setBulkUrls('');
     },
@@ -261,7 +261,11 @@ function SecurityScanPage() {
               <Search className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalScans.toLocaleString()}</div>
+              {statsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-2xl font-bold">{stats.totalScans?.toLocaleString() || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -270,7 +274,11 @@ function SecurityScanPage() {
               <CheckCircle className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-500">{stats.safeLinks}</div>
+              {statsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-2xl font-bold text-green-500">{stats.safeLinks || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -279,7 +287,11 @@ function SecurityScanPage() {
               <AlertTriangle className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-500">{stats.warningLinks}</div>
+              {statsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-2xl font-bold text-orange-500">{stats.warningLinks || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -288,7 +300,11 @@ function SecurityScanPage() {
               <XCircle className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">{stats.dangerousLinks}</div>
+              {statsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-2xl font-bold text-destructive">{stats.dangerousLinks || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -297,9 +313,13 @@ function SecurityScanPage() {
               <Shield className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${getScoreColor(stats.averageScore)}`}>
-                {stats.averageScore}
-              </div>
+              {statsLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className={`text-2xl font-bold ${getScoreColor(stats.averageScore || 0)}`}>
+                  {stats.averageScore || 0}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

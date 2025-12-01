@@ -289,6 +289,9 @@ export default function IntegrationsPage() {
   const [editingChannel, setEditingChannel] = useState<NotificationChannel | null>(null);
   const [deletingChannel, setDeletingChannel] = useState<NotificationChannel | null>(null);
   const [disconnectingIntegration, setDisconnectingIntegration] = useState<Integration | null>(null);
+  const [connectingType, setConnectingType] = useState<string | null>(null);
+  const [connectDialogType, setConnectDialogType] = useState<string | null>(null);
+  const [integrationConfig, setIntegrationConfig] = useState<Record<string, string>>({});
   const [channelFormData, setChannelFormData] = useState({
     name: '',
     type: 'email' as NotificationChannel['type'],
@@ -316,19 +319,117 @@ export default function IntegrationsPage() {
     a => !integrations?.some(i => i.type === a.type && i.status === 'connected')
   );
 
+  // 获取集成配置字段
+  const getIntegrationConfigFields = (type: string) => {
+    switch (type) {
+      case 'zapier':
+        return [
+          { key: 'webhookUrl', label: 'Zapier Webhook URL', type: 'url', placeholder: 'https://hooks.zapier.com/...' },
+        ];
+      case 'hubspot':
+        return [
+          { key: 'apiKey', label: 'HubSpot API Key', type: 'password', placeholder: 'pat-na1-...' },
+        ];
+      case 'salesforce':
+        return [
+          { key: 'clientId', label: 'Connected App Client ID', type: 'text', placeholder: 'Your Salesforce Client ID' },
+          { key: 'clientSecret', label: 'Connected App Client Secret', type: 'password', placeholder: 'Your Client Secret' },
+        ];
+      case 'shopify':
+        return [
+          { key: 'shopDomain', label: '店铺域名', type: 'text', placeholder: 'your-store.myshopify.com' },
+          { key: 'accessToken', label: 'Admin API Access Token', type: 'password', placeholder: 'shpat_...' },
+        ];
+      case 'slack':
+        return [
+          { key: 'webhookUrl', label: 'Slack Webhook URL', type: 'url', placeholder: 'https://hooks.slack.com/services/...' },
+        ];
+      case 'teams':
+        return [
+          { key: 'webhookUrl', label: 'Teams Webhook URL', type: 'url', placeholder: 'https://outlook.office.com/webhook/...' },
+        ];
+      case 'google_analytics':
+        return [
+          { key: 'measurementId', label: 'Measurement ID (GA4)', type: 'text', placeholder: 'G-XXXXXXXXXX' },
+          { key: 'apiSecret', label: 'API Secret', type: 'password', placeholder: 'Your API Secret' },
+        ];
+      case 'facebook_pixel':
+        return [
+          { key: 'pixelId', label: 'Pixel ID', type: 'text', placeholder: '123456789012345' },
+          { key: 'accessToken', label: 'Access Token', type: 'password', placeholder: 'Your Access Token' },
+        ];
+      default:
+        return [
+          { key: 'apiKey', label: 'API Key', type: 'password', placeholder: 'Enter your API key' },
+        ];
+    }
+  };
+
+  // 获取集成配置说明
+  const getIntegrationInstructions = (type: string) => {
+    switch (type) {
+      case 'zapier':
+        return '在 Zapier 创建一个新的 Zap，选择 Webhook 触发器，复制生成的 Webhook URL 粘贴到下方。';
+      case 'hubspot':
+        return '在 HubSpot 设置中创建私有应用并获取 API Key。导航到：设置 → 集成 → 私有应用。';
+      case 'salesforce':
+        return '在 Salesforce 中创建 Connected App。导航到：设置 → 应用管理器 → 新建 Connected App。';
+      case 'shopify':
+        return '在 Shopify 后台创建自定义应用。导航到：设置 → 应用和销售渠道 → 开发应用。';
+      case 'slack':
+        return '在 Slack 创建传入 Webhook。访问 api.slack.com/apps，创建应用后启用 Incoming Webhooks。';
+      case 'teams':
+        return '在 Teams 频道中添加 Incoming Webhook 连接器，复制生成的 Webhook URL。';
+      case 'google_analytics':
+        return '在 Google Analytics 管理界面获取 Measurement ID (G-开头) 和 API Secret。';
+      case 'facebook_pixel':
+        return '在 Facebook Events Manager 中获取 Pixel ID 和 Conversions API 的 Access Token。';
+      default:
+        return '请提供所需的配置信息以连接此集成。';
+    }
+  };
+
   const handleConnect = (type: string) => {
-    connectIntegration.mutate({ type: type as Integration['type'] }, {
-      onSuccess: (data) => {
-        if (data.authUrl) {
-          window.location.href = data.authUrl;
-        } else {
-          toast({ title: '集成已连接' });
-        }
-      },
-      onError: () => {
-        toast({ title: '连接失败', variant: 'destructive' });
-      },
-    });
+    // 打开配置对话框
+    setConnectDialogType(type);
+    setIntegrationConfig({});
+  };
+
+  const handleSubmitIntegration = () => {
+    if (!connectDialogType) return;
+
+    const fields = getIntegrationConfigFields(connectDialogType);
+    const missingFields = fields.filter(f => !integrationConfig[f.key]?.trim());
+
+    if (missingFields.length > 0) {
+      toast({
+        title: '请填写所有必填字段',
+        description: `缺少: ${missingFields.map(f => f.label).join(', ')}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setConnectingType(connectDialogType);
+    connectIntegration.mutate(
+      { type: connectDialogType as Integration['type'], config: integrationConfig },
+      {
+        onSuccess: () => {
+          toast({ title: '集成已连接成功！' });
+          setConnectDialogType(null);
+          setIntegrationConfig({});
+          setConnectingType(null);
+        },
+        onError: (error: any) => {
+          toast({
+            title: '连接失败',
+            description: error?.response?.data?.message || '请检查配置信息是否正确',
+            variant: 'destructive',
+          });
+          setConnectingType(null);
+        },
+      }
+    );
   };
 
   const handleDisconnect = () => {
@@ -428,8 +529,8 @@ export default function IntegrationsPage() {
     setChannelFormData({
       name: channel.name,
       type: channel.type,
-      config: channel.config,
-      events: channel.events,
+      config: channel.config || {},
+      events: channel.events || [],
       enabled: channel.enabled,
     });
     setEditingChannel(channel);
@@ -509,7 +610,7 @@ export default function IntegrationsPage() {
                       key={integration.type}
                       integration={integration}
                       onConnect={() => handleConnect(integration.type)}
-                      isConnecting={connectIntegration.isPending}
+                      isConnecting={connectingType === integration.type}
                     />
                   ))}
                 </div>
@@ -761,6 +862,156 @@ export default function IntegrationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 连接集成配置对话框 */}
+      <Dialog
+        open={!!connectDialogType}
+        onOpenChange={() => {
+          setConnectDialogType(null);
+          setIntegrationConfig({});
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {connectDialogType && (() => {
+                const Icon = integrationIcons[connectDialogType] || Plug;
+                return <Icon className="h-5 w-5" />;
+              })()}
+              连接 {availableIntegrations?.find(i => i.type === connectDialogType)?.name || connectDialogType}
+            </DialogTitle>
+            <DialogDescription>
+              {connectDialogType && getIntegrationInstructions(connectDialogType)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {connectDialogType && getIntegrationConfigFields(connectDialogType).map((field) => (
+              <div key={field.key} className="space-y-2">
+                <Label htmlFor={`integration-${field.key}`}>{field.label}</Label>
+                <Input
+                  id={`integration-${field.key}`}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={integrationConfig[field.key] || ''}
+                  onChange={(e) => setIntegrationConfig({
+                    ...integrationConfig,
+                    [field.key]: e.target.value,
+                  })}
+                />
+              </div>
+            ))}
+
+            {/* 帮助链接 */}
+            {connectDialogType && (
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p className="font-medium mb-1">需要帮助？</p>
+                <div className="flex flex-wrap gap-2">
+                  {connectDialogType === 'zapier' && (
+                    <a
+                      href="https://zapier.com/apps/webhook/integrations"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Zapier Webhook 文档 <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'hubspot' && (
+                    <a
+                      href="https://developers.hubspot.com/docs/api/private-apps"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      HubSpot API 文档 <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'slack' && (
+                    <a
+                      href="https://api.slack.com/messaging/webhooks"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Slack Webhook 文档 <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'google_analytics' && (
+                    <a
+                      href="https://developers.google.com/analytics/devguides/collection/protocol/ga4"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      GA4 Measurement Protocol <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'facebook_pixel' && (
+                    <a
+                      href="https://developers.facebook.com/docs/marketing-api/conversions-api"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Facebook Conversions API <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'shopify' && (
+                    <a
+                      href="https://shopify.dev/docs/api/admin-rest"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Shopify Admin API <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'salesforce' && (
+                    <a
+                      href="https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_what_is_rest_api.htm"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Salesforce REST API <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {connectDialogType === 'teams' && (
+                    <a
+                      href="https://docs.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/add-incoming-webhook"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      Teams Webhook 文档 <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConnectDialogType(null);
+                setIntegrationConfig({});
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleSubmitIntegration}
+              disabled={connectingType === connectDialogType}
+            >
+              {connectingType === connectDialogType && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              连接
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

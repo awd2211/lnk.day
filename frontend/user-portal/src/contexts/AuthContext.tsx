@@ -48,12 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // 用户ID不同，说明切换了账户，清除缓存
         queryClient.clear();
       }
-      // 保存当前用户ID到 localStorage
+      // 保存当前用户ID和teamId到 localStorage
       localStorage.setItem('cachedUserId', data.id);
+      if (data.teamId) {
+        localStorage.setItem('teamId', data.teamId);
+      }
       setUser(data);
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('cachedUserId');
+      localStorage.removeItem('teamId');
       setToken(null);
       queryClient.clear();
     } finally {
@@ -70,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.refreshToken) {
       localStorage.setItem('refreshToken', data.refreshToken);
     }
+    if (data.user?.teamId) {
+      localStorage.setItem('teamId', data.user.teamId);
+    }
     setToken(data.accessToken);
     setUser(data.user);
   };
@@ -80,6 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.refreshToken) {
       localStorage.setItem('refreshToken', data.refreshToken);
     }
+    if (data.user?.teamId) {
+      localStorage.setItem('teamId', data.user.teamId);
+    }
     setToken(data.accessToken);
     setUser(data.user);
   };
@@ -88,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('cachedUserId');
+    localStorage.removeItem('teamId');
     setToken(null);
     setUser(null);
     // 清除所有 React Query 缓存，确保切换账户时不会看到旧数据

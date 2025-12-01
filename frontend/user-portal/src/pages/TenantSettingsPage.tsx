@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
   Palette,
@@ -16,10 +17,11 @@ import {
   Trash2,
   Plus,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 
-import Layout from '@/components/Layout';
-import { useAuth } from '@/contexts/AuthContext';
+import AppLayout from '@/components/AppLayout';
+import { tenantService, domainService, billingService } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -57,193 +59,342 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-// Types
+// Types matching backend entity
 interface TenantBranding {
   logo?: string;
+  logoDark?: string;
   favicon?: string;
-  primaryColor: string;
-  secondaryColor: string;
-  fontFamily: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  fontFamily?: string;
   customCss?: string;
 }
 
 interface TenantSettings {
-  timezone: string;
-  dateFormat: string;
-  language: string;
-  emailFrom?: string;
-  emailReplyTo?: string;
-  webhookSecret?: string;
+  timezone?: string;
+  locale?: string;
+  dateFormat?: string;
+  currency?: string;
+  defaultLinkExpiry?: number;
+  allowPublicSignup?: boolean;
+  requireEmailVerification?: boolean;
+  require2FA?: boolean;
+  ipWhitelist?: string[];
+  allowedEmailDomains?: string[];
 }
 
 interface TenantFeatures {
-  customDomains: boolean;
-  apiAccess: boolean;
-  advancedAnalytics: boolean;
-  teamManagement: boolean;
-  customBranding: boolean;
-  webhooks: boolean;
-  sso: boolean;
-  dataExport: boolean;
+  analytics?: boolean;
+  campaigns?: boolean;
+  qrCodes?: boolean;
+  bioLinks?: boolean;
+  deepLinks?: boolean;
+  customDomains?: boolean;
+  apiAccess?: boolean;
+  webhooks?: boolean;
+  sso?: boolean;
+  auditLogs?: boolean;
+  whiteLabel?: boolean;
+  subAccounts?: boolean;
 }
 
 interface TenantLimits {
-  maxLinks: number;
-  maxClicks: number;
-  maxTeamMembers: number;
-  maxDomains: number;
-  maxApiCalls: number;
-  storageLimit: number;
+  maxUsers?: number;
+  maxTeams?: number;
+  maxLinks?: number;
+  maxClicks?: number;
+  maxDomains?: number;
+  maxApiKeys?: number;
+  maxWebhooks?: number;
+  storageQuota?: number;
 }
 
-interface TenantUsage {
-  links: number;
-  clicks: number;
-  teamMembers: number;
-  domains: number;
-  apiCalls: number;
-  storage: number;
+interface TenantBilling {
+  plan?: string;
+  customerId?: string;
+  subscriptionId?: string;
+  billingEmail?: string;
+  taxId?: string;
+  paymentMethod?: string;
 }
 
 interface Tenant {
   id: string;
   name: string;
   slug: string;
-  plan: string;
-  status: 'active' | 'suspended' | 'trial';
-  branding: TenantBranding;
-  settings: TenantSettings;
-  features: TenantFeatures;
-  limits: TenantLimits;
-  usage: TenantUsage;
+  description?: string;
+  status: 'active' | 'suspended' | 'pending' | 'trial';
+  type: string;
+  ownerId: string;
+  branding?: TenantBranding;
+  customDomain?: string;
+  appDomain?: string;
+  shortDomain?: string;
+  settings?: TenantSettings;
+  features?: TenantFeatures;
+  limits?: TenantLimits;
+  billing?: TenantBilling;
+  trialEndsAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TenantUsage {
+  users: number;
+  teams: number;
+  links: number;
+  clicks: number;
+  domains: number;
+  apiKeys: number;
+  webhooks: number;
+  storage: number;
+}
+
+interface Domain {
+  id: string;
+  domain: string;
+  status: 'pending' | 'verified' | 'failed';
+  sslStatus?: 'pending' | 'active' | 'expired';
+  isDefault: boolean;
   createdAt: string;
 }
 
-// Mock data
-const mockTenant: Tenant = {
-  id: '1',
-  name: '我的企业',
-  slug: 'my-company',
-  plan: 'pro',
-  status: 'active',
-  branding: {
-    primaryColor: '#2563eb',
-    secondaryColor: '#1e40af',
-    fontFamily: 'Inter',
-  },
-  settings: {
-    timezone: 'Asia/Shanghai',
-    dateFormat: 'YYYY-MM-DD',
-    language: 'zh-CN',
-  },
-  features: {
-    customDomains: true,
-    apiAccess: true,
-    advancedAnalytics: true,
-    teamManagement: true,
-    customBranding: true,
-    webhooks: true,
-    sso: false,
-    dataExport: true,
-  },
-  limits: {
-    maxLinks: 10000,
-    maxClicks: 1000000,
-    maxTeamMembers: 20,
-    maxDomains: 5,
-    maxApiCalls: 100000,
-    storageLimit: 5120,
-  },
-  usage: {
-    links: 2340,
-    clicks: 156789,
-    teamMembers: 8,
-    domains: 2,
-    apiCalls: 45678,
-    storage: 1024,
-  },
-  createdAt: '2024-01-15T08:00:00Z',
-};
+interface Invoice {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'failed';
+}
 
 const PLAN_LABELS: Record<string, string> = {
   free: '免费版',
+  starter: '入门版',
   pro: '专业版',
   enterprise: '企业版',
 };
 
 const PLAN_COLORS: Record<string, string> = {
   free: 'bg-gray-100 text-gray-700',
+  starter: 'bg-green-100 text-green-700',
   pro: 'bg-blue-100 text-blue-700',
   enterprise: 'bg-purple-100 text-purple-700',
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  active: 'bg-green-100 text-green-700',
+  suspended: 'bg-red-100 text-red-700',
+  pending: 'bg-yellow-100 text-yellow-700',
+  trial: 'bg-blue-100 text-blue-700',
+};
+
 export default function TenantSettingsPage() {
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
+  const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [newDomain, setNewDomain] = useState('');
 
   // Form states
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-  const [branding, setBranding] = useState<TenantBranding>(mockTenant.branding);
-  const [settings, setSettings] = useState<TenantSettings>(mockTenant.settings);
+  const [branding, setBranding] = useState<TenantBranding>({
+    primaryColor: '#2563eb',
+    secondaryColor: '#1e40af',
+    fontFamily: 'Inter',
+  });
+  const [settings, setSettings] = useState<TenantSettings>({
+    timezone: 'Asia/Shanghai',
+    dateFormat: 'YYYY-MM-DD',
+    locale: 'zh-CN',
+  });
 
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadTenant();
-  }, []);
+  // Fetch tenants list (user's tenants)
+  const { data: tenantsData, isLoading: tenantsLoading } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: async () => {
+      const response = await tenantService.getAll();
+      return response.data as Tenant[];
+    },
+  });
 
-  const loadTenant = async () => {
-    setIsLoading(true);
-    // TODO: Replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setTenant(mockTenant);
-    setName(mockTenant.name);
-    setSlug(mockTenant.slug);
-    setBranding(mockTenant.branding);
-    setSettings(mockTenant.settings);
-    setIsLoading(false);
-  };
+  // Get first tenant (or selected tenant in a more complex app)
+  const currentTenant = tenantsData?.[0];
 
-  const handleSaveGeneral = async () => {
-    setIsSaving(true);
-    try {
-      // TODO: API call to save tenant settings
-      await new Promise((resolve) => setTimeout(resolve, 500));
+  // Fetch tenant details
+  const { data: tenant, isLoading: tenantLoading } = useQuery({
+    queryKey: ['tenant', currentTenant?.id],
+    queryFn: async () => {
+      if (!currentTenant?.id) return null;
+      const response = await tenantService.getOne(currentTenant.id);
+      const data = response.data as Tenant;
+      // Update form states
+      setName(data.name);
+      setSlug(data.slug);
+      if (data.branding) setBranding(data.branding);
+      if (data.settings) setSettings(data.settings);
+      return data;
+    },
+    enabled: !!currentTenant?.id,
+  });
+
+  // Fetch usage
+  const { data: usage } = useQuery({
+    queryKey: ['tenant-usage', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return null;
+      const response = await tenantService.getUsage(tenant.id);
+      return response.data as TenantUsage;
+    },
+    enabled: !!tenant?.id,
+  });
+
+  // Fetch domains
+  const { data: domainsData } = useQuery({
+    queryKey: ['domains'],
+    queryFn: async () => {
+      const response = await domainService.getAll();
+      return response.data?.domains || response.data || [];
+    },
+  });
+
+  // Fetch billing
+  const { data: billingData } = useQuery({
+    queryKey: ['billing'],
+    queryFn: async () => {
+      const response = await billingService.getSubscription();
+      return response.data;
+    },
+  });
+
+  // Fetch invoices
+  const { data: invoicesData } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: async () => {
+      const response = await billingService.getInvoices({ limit: 10 });
+      return response.data?.invoices || response.data || [];
+    },
+  });
+
+  // Update tenant mutation
+  const updateTenantMutation = useMutation({
+    mutationFn: async (data: { name?: string; slug?: string }) => {
+      if (!tenant?.id) throw new Error('No tenant');
+      return tenantService.update(tenant.id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant'] });
       toast({ title: '设置已保存' });
-    } catch {
+    },
+    onError: () => {
       toast({ title: '保存失败', variant: 'destructive' });
-    }
-    setIsSaving(false);
-  };
+    },
+  });
 
-  const handleSaveBranding = async () => {
-    setIsSaving(true);
-    try {
-      // TODO: API call to save branding
-      await new Promise((resolve) => setTimeout(resolve, 500));
+  // Update branding mutation
+  const updateBrandingMutation = useMutation({
+    mutationFn: async (data: TenantBranding) => {
+      if (!tenant?.id) throw new Error('No tenant');
+      return tenantService.updateBranding(tenant.id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant'] });
       toast({ title: '品牌设置已保存' });
-    } catch {
+    },
+    onError: () => {
       toast({ title: '保存失败', variant: 'destructive' });
-    }
-    setIsSaving(false);
+    },
+  });
+
+  // Update settings mutation
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: TenantSettings) => {
+      if (!tenant?.id) throw new Error('No tenant');
+      return tenantService.updateSettings(tenant.id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant'] });
+      toast({ title: '设置已保存' });
+    },
+    onError: () => {
+      toast({ title: '保存失败', variant: 'destructive' });
+    },
+  });
+
+  // Add domain mutation
+  const addDomainMutation = useMutation({
+    mutationFn: async (domain: string) => {
+      return domainService.create({ domain });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['domains'] });
+      setAddDomainOpen(false);
+      setNewDomain('');
+      toast({ title: '域名已添加' });
+    },
+    onError: () => {
+      toast({ title: '添加失败', variant: 'destructive' });
+    },
+  });
+
+  // Verify domain mutation
+  const verifyDomainMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return domainService.verify(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['domains'] });
+      toast({ title: '正在验证域名...' });
+    },
+    onError: () => {
+      toast({ title: '验证失败', variant: 'destructive' });
+    },
+  });
+
+  // Delete domain mutation
+  const deleteDomainMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return domainService.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['domains'] });
+      toast({ title: '域名已删除' });
+    },
+    onError: () => {
+      toast({ title: '删除失败', variant: 'destructive' });
+    },
+  });
+
+  const handleSaveGeneral = () => {
+    updateTenantMutation.mutate({ name, slug });
+    updateSettingsMutation.mutate(settings);
   };
 
-  const getUsagePercentage = (used: number, limit: number) => {
+  const handleSaveBranding = () => {
+    updateBrandingMutation.mutate(branding);
+  };
+
+  const getUsagePercentage = (used: number | undefined, limit: number | undefined) => {
+    if (!used || !limit) return 0;
     return Math.min((used / limit) * 100, 100);
   };
 
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number | undefined) => {
+    if (!num) return '0';
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
   };
 
+  const isLoading = tenantsLoading || tenantLoading;
+  const isSaving = updateTenantMutation.isPending || updateBrandingMutation.isPending || updateSettingsMutation.isPending;
+
   if (isLoading) {
     return (
-      <Layout>
+      <AppLayout>
         <div className="space-y-6">
           <Skeleton className="h-8 w-48" />
           <div className="grid gap-4 md:grid-cols-4">
@@ -253,22 +404,30 @@ export default function TenantSettingsPage() {
           </div>
           <Skeleton className="h-96" />
         </div>
-      </Layout>
+      </AppLayout>
     );
   }
 
   if (!tenant) {
     return (
-      <Layout>
+      <AppLayout>
         <div className="text-center py-12">
+          <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <p className="text-muted-foreground">无法加载租户信息</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            您可能还没有创建组织
+          </p>
         </div>
-      </Layout>
+      </AppLayout>
     );
   }
 
+  const domains = domainsData as Domain[] || [];
+  const invoices = invoicesData as Invoice[] || [];
+  const plan = tenant.billing?.plan || billingData?.plan || 'free';
+
   return (
-    <Layout>
+    <AppLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -276,9 +435,14 @@ export default function TenantSettingsPage() {
             <h1 className="text-2xl font-bold">租户设置</h1>
             <p className="text-muted-foreground">管理您的组织设置和配置</p>
           </div>
-          <Badge className={PLAN_COLORS[tenant.plan]}>
-            {PLAN_LABELS[tenant.plan]}
-          </Badge>
+          <div className="flex gap-2">
+            <Badge className={STATUS_COLORS[tenant.status]}>
+              {tenant.status === 'active' ? '活跃' : tenant.status === 'trial' ? '试用' : tenant.status}
+            </Badge>
+            <Badge className={PLAN_COLORS[plan]}>
+              {PLAN_LABELS[plan] || plan}
+            </Badge>
+          </div>
         </div>
 
         {/* Usage Overview */}
@@ -289,13 +453,13 @@ export default function TenantSettingsPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatNumber(tenant.usage.links)}</div>
+              <div className="text-2xl font-bold">{formatNumber(usage?.links)}</div>
               <Progress
-                value={getUsagePercentage(tenant.usage.links, tenant.limits.maxLinks)}
+                value={getUsagePercentage(usage?.links, tenant.limits?.maxLinks)}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {formatNumber(tenant.limits.maxLinks)} 上限
+                {formatNumber(tenant.limits?.maxLinks)} 上限
               </p>
             </CardContent>
           </Card>
@@ -306,13 +470,13 @@ export default function TenantSettingsPage() {
               <Gauge className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatNumber(tenant.usage.clicks)}</div>
+              <div className="text-2xl font-bold">{formatNumber(usage?.clicks)}</div>
               <Progress
-                value={getUsagePercentage(tenant.usage.clicks, tenant.limits.maxClicks)}
+                value={getUsagePercentage(usage?.clicks, tenant.limits?.maxClicks)}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {formatNumber(tenant.limits.maxClicks)} 上限
+                {formatNumber(tenant.limits?.maxClicks)} 上限
               </p>
             </CardContent>
           </Card>
@@ -323,30 +487,30 @@ export default function TenantSettingsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{tenant.usage.teamMembers}</div>
+              <div className="text-2xl font-bold">{usage?.users || 0}</div>
               <Progress
-                value={getUsagePercentage(tenant.usage.teamMembers, tenant.limits.maxTeamMembers)}
+                value={getUsagePercentage(usage?.users, tenant.limits?.maxUsers)}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {tenant.limits.maxTeamMembers} 上限
+                {tenant.limits?.maxUsers || '无限'} 上限
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">API 调用</CardTitle>
+              <CardTitle className="text-sm font-medium">API Keys</CardTitle>
               <Key className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatNumber(tenant.usage.apiCalls)}</div>
+              <div className="text-2xl font-bold">{usage?.apiKeys || 0}</div>
               <Progress
-                value={getUsagePercentage(tenant.usage.apiCalls, tenant.limits.maxApiCalls)}
+                value={getUsagePercentage(usage?.apiKeys, tenant.limits?.maxApiKeys)}
                 className="mt-2"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {formatNumber(tenant.limits.maxApiCalls)} / 月
+                {tenant.limits?.maxApiKeys || '无限'} 上限
               </p>
             </CardContent>
           </Card>
@@ -450,8 +614,8 @@ export default function TenantSettingsPage() {
                     <div className="space-y-2">
                       <Label>语言</Label>
                       <Select
-                        value={settings.language}
-                        onValueChange={(v) => setSettings({ ...settings, language: v })}
+                        value={settings.locale}
+                        onValueChange={(v) => setSettings({ ...settings, locale: v })}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -469,26 +633,30 @@ export default function TenantSettingsPage() {
                 <Separator />
 
                 <div className="space-y-4">
-                  <h4 className="font-medium">邮件设置</h4>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="emailFrom">发件人地址</Label>
-                      <Input
-                        id="emailFrom"
-                        type="email"
-                        value={settings.emailFrom || ''}
-                        onChange={(e) => setSettings({ ...settings, emailFrom: e.target.value })}
-                        placeholder="noreply@yourcompany.com"
+                  <h4 className="font-medium">安全设置</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>强制双因素认证</Label>
+                        <p className="text-sm text-muted-foreground">
+                          要求所有成员启用 2FA
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.require2FA}
+                        onCheckedChange={(v) => setSettings({ ...settings, require2FA: v })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="emailReplyTo">回复地址</Label>
-                      <Input
-                        id="emailReplyTo"
-                        type="email"
-                        value={settings.emailReplyTo || ''}
-                        onChange={(e) => setSettings({ ...settings, emailReplyTo: e.target.value })}
-                        placeholder="support@yourcompany.com"
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>邮箱验证</Label>
+                        <p className="text-sm text-muted-foreground">
+                          新成员必须验证邮箱
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.requireEmailVerification}
+                        onCheckedChange={(v) => setSettings({ ...settings, requireEmailVerification: v })}
                       />
                     </div>
                   </div>
@@ -496,7 +664,11 @@ export default function TenantSettingsPage() {
               </CardContent>
               <CardFooter>
                 <Button onClick={handleSaveGeneral} disabled={isSaving}>
-                  <Save className="h-4 w-4 mr-2" />
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
                   {isSaving ? '保存中...' : '保存设置'}
                 </Button>
               </CardFooter>
@@ -592,14 +764,14 @@ export default function TenantSettingsPage() {
                       <div className="flex gap-2">
                         <Input
                           type="color"
-                          value={branding.primaryColor}
+                          value={branding.primaryColor || '#2563eb'}
                           onChange={(e) =>
                             setBranding({ ...branding, primaryColor: e.target.value })
                           }
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
-                          value={branding.primaryColor}
+                          value={branding.primaryColor || '#2563eb'}
                           onChange={(e) =>
                             setBranding({ ...branding, primaryColor: e.target.value })
                           }
@@ -612,14 +784,14 @@ export default function TenantSettingsPage() {
                       <div className="flex gap-2">
                         <Input
                           type="color"
-                          value={branding.secondaryColor}
+                          value={branding.secondaryColor || '#1e40af'}
                           onChange={(e) =>
                             setBranding({ ...branding, secondaryColor: e.target.value })
                           }
                           className="w-12 h-10 p-1 cursor-pointer"
                         />
                         <Input
-                          value={branding.secondaryColor}
+                          value={branding.secondaryColor || '#1e40af'}
                           onChange={(e) =>
                             setBranding({ ...branding, secondaryColor: e.target.value })
                           }
@@ -638,7 +810,7 @@ export default function TenantSettingsPage() {
                   <div className="space-y-2">
                     <Label>字体系列</Label>
                     <Select
-                      value={branding.fontFamily}
+                      value={branding.fontFamily || 'Inter'}
                       onValueChange={(v) => setBranding({ ...branding, fontFamily: v })}
                     >
                       <SelectTrigger className="w-[200px]">
@@ -672,7 +844,11 @@ export default function TenantSettingsPage() {
               </CardContent>
               <CardFooter>
                 <Button onClick={handleSaveBranding} disabled={isSaving}>
-                  <Save className="h-4 w-4 mr-2" />
+                  {isSaving ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
                   {isSaving ? '保存中...' : '保存品牌设置'}
                 </Button>
               </CardFooter>
@@ -700,17 +876,17 @@ export default function TenantSettingsPage() {
                       description: '通过 API 集成和自动化',
                     },
                     {
-                      key: 'advancedAnalytics',
+                      key: 'analytics',
                       label: '高级分析',
                       description: '详细的点击分析和报告',
                     },
                     {
-                      key: 'teamManagement',
-                      label: '团队管理',
-                      description: '邀请团队成员并管理权限',
+                      key: 'campaigns',
+                      label: '营销活动',
+                      description: '创建和管理营销活动',
                     },
                     {
-                      key: 'customBranding',
+                      key: 'whiteLabel',
                       label: '自定义品牌',
                       description: '使用您的品牌标识',
                     },
@@ -725,9 +901,9 @@ export default function TenantSettingsPage() {
                       description: '企业级身份认证',
                     },
                     {
-                      key: 'dataExport',
-                      label: '数据导出',
-                      description: '导出链接和分析数据',
+                      key: 'auditLogs',
+                      label: '审计日志',
+                      description: '记录所有操作历史',
                     },
                   ].map((feature) => (
                     <div
@@ -741,8 +917,8 @@ export default function TenantSettingsPage() {
                         </p>
                       </div>
                       <Switch
-                        checked={tenant.features[feature.key as keyof TenantFeatures]}
-                        disabled={!tenant.features[feature.key as keyof TenantFeatures]}
+                        checked={tenant.features?.[feature.key as keyof TenantFeatures] || false}
+                        disabled={!tenant.features?.[feature.key as keyof TenantFeatures]}
                       />
                     </div>
                   ))}
@@ -770,7 +946,7 @@ export default function TenantSettingsPage() {
                       管理您的自定义短链接域名
                     </CardDescription>
                   </div>
-                  <Dialog>
+                  <Dialog open={addDomainOpen} onOpenChange={setAddDomainOpen}>
                     <DialogTrigger asChild>
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
@@ -787,65 +963,111 @@ export default function TenantSettingsPage() {
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <Label htmlFor="domain">域名</Label>
-                          <Input id="domain" placeholder="link.yourcompany.com" />
+                          <Input
+                            id="domain"
+                            placeholder="link.yourcompany.com"
+                            value={newDomain}
+                            onChange={(e) => setNewDomain(e.target.value)}
+                          />
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="submit">添加域名</Button>
+                        <Button
+                          onClick={() => addDomainMutation.mutate(newDomain)}
+                          disabled={!newDomain || addDomainMutation.isPending}
+                        >
+                          {addDomainMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : null}
+                          添加域名
+                        </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>域名</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead>SSL</TableHead>
-                      <TableHead>添加时间</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">link.mycompany.com</TableCell>
-                      <TableCell>
-                        <Badge variant="default">已验证</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-green-600">
-                          <Shield className="h-3 w-3 mr-1" />
-                          有效
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">2024-01-15</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">go.mycompany.com</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">待验证</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-yellow-600">
-                          待配置
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">2024-02-01</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm">
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                {domains.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>还没有添加自定义域名</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>域名</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>SSL</TableHead>
+                        <TableHead>添加时间</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {domains.map((domain) => (
+                        <TableRow key={domain.id}>
+                          <TableCell className="font-medium">
+                            {domain.domain}
+                            {domain.isDefault && (
+                              <Badge variant="outline" className="ml-2">默认</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={domain.status === 'verified' ? 'default' : 'secondary'}
+                            >
+                              {domain.status === 'verified' ? '已验证' : domain.status === 'pending' ? '待验证' : '验证失败'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                domain.sslStatus === 'active'
+                                  ? 'text-green-600'
+                                  : 'text-yellow-600'
+                              }
+                            >
+                              {domain.sslStatus === 'active' ? (
+                                <>
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  有效
+                                </>
+                              ) : (
+                                '待配置'
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(domain.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {domain.status !== 'verified' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => verifyDomainMutation.mutate(domain.id)}
+                                  disabled={verifyDomainMutation.isPending}
+                                >
+                                  验证
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteDomainMutation.mutate(domain.id)}
+                                disabled={deleteDomainMutation.isPending}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -861,13 +1083,15 @@ export default function TenantSettingsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-2xl font-bold">
-                        {PLAN_LABELS[tenant.plan]}
+                        {PLAN_LABELS[plan] || plan}
                       </h3>
                       <p className="text-muted-foreground">
-                        ¥299/月，按年付费
+                        {billingData?.interval === 'year' ? '按年付费' : '按月付费'}
                       </p>
                     </div>
-                    <Button variant="outline">升级计划</Button>
+                    <Button variant="outline" asChild>
+                      <a href="/billing">升级计划</a>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -877,51 +1101,60 @@ export default function TenantSettingsPage() {
                   <CardTitle>账单历史</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>日期</TableHead>
-                        <TableHead>描述</TableHead>
-                        <TableHead>金额</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>2024-02-01</TableCell>
-                        <TableCell>专业版 - 月度订阅</TableCell>
-                        <TableCell>¥299.00</TableCell>
-                        <TableCell>
-                          <Badge variant="default">已支付</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">
-                            下载发票
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>2024-01-01</TableCell>
-                        <TableCell>专业版 - 月度订阅</TableCell>
-                        <TableCell>¥299.00</TableCell>
-                        <TableCell>
-                          <Badge variant="default">已支付</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">
-                            下载发票
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+                  {invoices.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CreditCard className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>暂无账单记录</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>日期</TableHead>
+                          <TableHead>描述</TableHead>
+                          <TableHead>金额</TableHead>
+                          <TableHead>状态</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoices.map((invoice) => (
+                          <TableRow key={invoice.id}>
+                            <TableCell>
+                              {new Date(invoice.date).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>{invoice.description}</TableCell>
+                            <TableCell>
+                              {invoice.currency === 'cny' ? '¥' : '$'}
+                              {(invoice.amount / 100).toFixed(2)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={invoice.status === 'paid' ? 'default' : 'secondary'}
+                              >
+                                {invoice.status === 'paid' ? '已支付' : invoice.status === 'pending' ? '待支付' : '失败'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => billingService.downloadInvoice(invoice.id)}
+                              >
+                                下载发票
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </AppLayout>
   );
 }
