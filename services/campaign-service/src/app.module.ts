@@ -23,6 +23,7 @@ import { CampaignAnalyticsModule } from './modules/analytics/campaign-analytics.
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { CampaignSagaModule } from './saga/saga.module';
+import { AutomationModule } from './modules/automation/automation.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { CampaignSagaModule } from './saga/saga.module';
     CampaignAnalyticsModule,
     HealthModule,
     CampaignSagaModule,
+    AutomationModule,
   ],
   providers: [
     {
