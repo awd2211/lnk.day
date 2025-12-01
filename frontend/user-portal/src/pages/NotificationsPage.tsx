@@ -25,7 +25,7 @@ import {
   StarOff,
 } from 'lucide-react';
 
-import DashboardLayout from '@/components/DashboardLayout';
+import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -361,7 +361,7 @@ export default function NotificationsPage() {
   const isAllSelected = notifications.length > 0 && selectedNotifications.length === notifications.length;
 
   return (
-    <DashboardLayout
+    <Layout
       title="通知中心"
       description="查看和管理您的所有通知"
       actions={
@@ -783,6 +783,6 @@ export default function NotificationsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </Layout>
   );
 }
