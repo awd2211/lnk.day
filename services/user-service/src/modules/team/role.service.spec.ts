@@ -421,4 +421,116 @@ describe('RoleService', () => {
       expect(result.presets).toBeDefined();
     });
   });
+
+  describe('onModuleInit', () => {
+    it('should refresh preset role cache on module init', async () => {
+      // Reset httpService mock to track calls
+      mockHttpService.get.mockClear();
+
+      // Call onModuleInit directly - line 63 coverage
+      await service.onModuleInit();
+
+      expect(httpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/system/preset-roles-internal'),
+        expect.objectContaining({ timeout: 5000 }),
+      );
+    });
+  });
+
+  describe('update - setting isDefault', () => {
+    it('should unset other default roles when setting a non-default role to default', async () => {
+      const nonDefaultRole = { ...mockRole, isDefault: false };
+      roleRepository.findOne
+        .mockResolvedValueOnce(nonDefaultRole) // findOne for the role itself
+        .mockResolvedValueOnce(null); // findOne for name conflict check
+      roleRepository.update.mockResolvedValue({ affected: 1, raw: {}, generatedMaps: [] });
+      roleRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      // Update non-default role to be default - line 197 coverage
+      const result = await service.update('role-123', 'team-123', {
+        isDefault: true,
+      });
+
+      // Should have called update to unset other default roles
+      expect(roleRepository.update).toHaveBeenCalledWith(
+        { teamId: 'team-123', isDefault: true },
+        { isDefault: false },
+      );
+      expect(result.isDefault).toBe(true);
+    });
+
+    it('should not unset other defaults when role is already default', async () => {
+      const alreadyDefaultRole = { ...mockRole, isDefault: true };
+      roleRepository.findOne
+        .mockResolvedValueOnce(alreadyDefaultRole)
+        .mockResolvedValueOnce(null);
+      roleRepository.save.mockImplementation((r) => Promise.resolve(r));
+
+      await service.update('role-123', 'team-123', {
+        isDefault: true,
+      });
+
+      // Should NOT have called update since role is already default
+      expect(roleRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getAvailablePermissions - fallback path', () => {
+    it('should fall back to PRESET_ROLE_PERMISSIONS when cache is null', async () => {
+      // Make refreshPresetRoleCache fail so cache remains null
+      mockHttpService.get.mockReturnValue(throwError(() => new Error('Network error')));
+
+      // Access the service's private property to ensure cache is null
+      (service as any).presetRoleCache = null;
+
+      // Now when getAvailablePermissions calls refreshPresetRoleCache and it fails,
+      // if presetRoleCache is still null, it should use the fallback (line 319)
+      // But since the catch block sets presetRoleCache, we need a different approach
+
+      // Actually, looking at the code, line 319 is the fallback when presetRoleCache is null
+      // after refreshPresetRoleCache. Let's set up a scenario where cache stays null.
+
+      // Create a fresh service instance where http always fails
+      const failingHttpService = {
+        get: jest.fn().mockReturnValue(throwError(() => new Error('Always fails'))),
+      };
+
+      const freshModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          RoleService,
+          {
+            provide: getRepositoryToken(CustomRole),
+            useValue: createMockRepository(),
+          },
+          {
+            provide: getRepositoryToken(TeamMember),
+            useValue: createMockRepository(),
+          },
+          {
+            provide: HttpService,
+            useValue: failingHttpService,
+          },
+        ],
+      }).compile();
+
+      const freshService = freshModule.get<RoleService>(RoleService);
+
+      // Force cache to be null and make refresh also not set it
+      (freshService as any).presetRoleCache = null;
+
+      // Mock refreshPresetRoleCache to do nothing (not set the cache)
+      const originalRefresh = (freshService as any).refreshPresetRoleCache.bind(freshService);
+      jest.spyOn(freshService as any, 'refreshPresetRoleCache').mockImplementation(async () => {
+        // Do nothing - leave cache as null so fallback path is taken
+      });
+
+      const result = await freshService.getAvailablePermissions();
+
+      // Line 319: fallback to PRESET_ROLE_PERMISSIONS
+      expect(result.presets).toBeDefined();
+      expect(result.presets.length).toBeGreaterThan(0);
+      expect(result.presets.some((p: any) => p.name === 'ADMIN')).toBe(true);
+      expect(result.permissions).toEqual(Object.values(Permission));
+    });
+  });
 });

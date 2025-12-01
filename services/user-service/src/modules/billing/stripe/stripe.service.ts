@@ -71,9 +71,22 @@ export class StripeService {
     };
   }
 
+  // ========== Helper Methods ==========
+
+  private ensureStripeConfigured(): void {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe 支付服务未配置，请联系管理员设置 STRIPE_SECRET_KEY');
+    }
+  }
+
+  isConfigured(): boolean {
+    return !!this.stripe;
+  }
+
   // ========== Customer Management ==========
 
   async createOrGetCustomer(teamId: string, email: string, name?: string): Promise<string> {
+    this.ensureStripeConfigured();
     // Check if customer already exists
     const existingSubscription = await this.subscriptionRepository.findOne({
       where: { teamId },
@@ -97,6 +110,7 @@ export class StripeService {
   }
 
   async getCustomer(customerId: string): Promise<Stripe.Customer | null> {
+    this.ensureStripeConfigured();
     try {
       const customer = await this.stripe.customers.retrieve(customerId);
       return customer.deleted ? null : customer as Stripe.Customer;
@@ -159,6 +173,7 @@ export class StripeService {
   }
 
   async getCheckoutSession(sessionId: string): Promise<Stripe.Checkout.Session> {
+    this.ensureStripeConfigured();
     return this.stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription', 'customer'],
     });
@@ -167,6 +182,7 @@ export class StripeService {
   // ========== Billing Portal ==========
 
   async createBillingPortalSession(teamId: string): Promise<{ url: string }> {
+    this.ensureStripeConfigured();
     const subscription = await this.subscriptionRepository.findOne({
       where: { teamId, paymentProvider: PaymentProvider.STRIPE },
     });
@@ -186,6 +202,7 @@ export class StripeService {
   // ========== Subscription Management ==========
 
   async getStripeSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
+    this.ensureStripeConfigured();
     try {
       return await this.stripe.subscriptions.retrieve(subscriptionId);
     } catch {
@@ -197,6 +214,7 @@ export class StripeService {
     subscriptionId: string,
     cancelAtPeriodEnd: boolean = true,
   ): Promise<Stripe.Subscription> {
+    this.ensureStripeConfigured();
     if (cancelAtPeriodEnd) {
       return this.stripe.subscriptions.update(subscriptionId, {
         cancel_at_period_end: true,
@@ -207,6 +225,7 @@ export class StripeService {
   }
 
   async reactivateStripeSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+    this.ensureStripeConfigured();
     return this.stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: false,
     });
@@ -217,6 +236,7 @@ export class StripeService {
     newPlan: PlanType,
     billingCycle: BillingCycle,
   ): Promise<Stripe.Subscription> {
+    this.ensureStripeConfigured();
     const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
     const priceId = billingCycle === BillingCycle.YEARLY
       ? this.priceIds[newPlan].yearly
@@ -236,6 +256,7 @@ export class StripeService {
   // ========== Payment Methods ==========
 
   async createSetupIntent(customerId: string): Promise<{ clientSecret: string }> {
+    this.ensureStripeConfigured();
     const setupIntent = await this.stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -245,6 +266,7 @@ export class StripeService {
   }
 
   async listPaymentMethods(customerId: string): Promise<Stripe.PaymentMethod[]> {
+    this.ensureStripeConfigured();
     const paymentMethods = await this.stripe.paymentMethods.list({
       customer: customerId,
       type: 'card',
@@ -257,6 +279,7 @@ export class StripeService {
     customerId: string,
     paymentMethodId: string,
   ): Promise<void> {
+    this.ensureStripeConfigured();
     await this.stripe.customers.update(customerId, {
       invoice_settings: {
         default_payment_method: paymentMethodId,
@@ -265,12 +288,14 @@ export class StripeService {
   }
 
   async detachPaymentMethod(paymentMethodId: string): Promise<void> {
+    this.ensureStripeConfigured();
     await this.stripe.paymentMethods.detach(paymentMethodId);
   }
 
   // ========== Invoices ==========
 
   async listStripeInvoices(customerId: string, limit: number = 10): Promise<Stripe.Invoice[]> {
+    this.ensureStripeConfigured();
     const invoices = await this.stripe.invoices.list({
       customer: customerId,
       limit,

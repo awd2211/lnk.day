@@ -1325,4 +1325,261 @@ describe('StripeService', () => {
       expect(result.data[0].total_usage).toBe(1000);
     });
   });
+
+  describe('sendTrialEndingNotification - customer without email', () => {
+    it('should return early when customer has no email', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      // Customer exists but has no email property
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        id: 'cus_123',
+        // no email field
+      });
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      // Should not send notification when customer has no email
+      expect(notificationService.sendTrialEndingEmail).not.toHaveBeenCalled();
+    });
+
+    it('should return early when customer email is null', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        id: 'cus_123',
+        email: null,
+      });
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            items: { data: [{ price: { id: 'price_pro_monthly' } }] },
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(notificationService.sendTrialEndingEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPlanNameFromPriceId - unknown price', () => {
+    it('should return Unknown for unrecognized price ID', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        id: 'cus_123',
+        email: 'test@example.com',
+      });
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            // price ID that doesn't match any configured price
+            items: { data: [{ price: { id: 'price_unknown_xyz' } }] },
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(notificationService.sendTrialEndingEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.objectContaining({
+          planName: 'Unknown',
+        }),
+      );
+    });
+
+    it('should return Free when priceId is undefined', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.customers.retrieve.mockResolvedValue({
+        id: 'cus_123',
+        email: 'test@example.com',
+      });
+
+      const event = {
+        type: 'customer.subscription.trial_will_end',
+        data: {
+          object: {
+            id: 'sub_stripe_123',
+            customer: 'cus_123',
+            trial_end: Math.floor(Date.now() / 1000) + 3 * 24 * 60 * 60,
+            // no price id
+            items: { data: [{ price: {} }] },
+          },
+        },
+      };
+
+      await service.handleWebhookEvent(event as any);
+
+      expect(notificationService.sendTrialEndingEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.objectContaining({
+          planName: 'Free',
+        }),
+      );
+    });
+  });
+
+  describe('updateQuantity - no subscription item', () => {
+    it('should throw BadRequestException when no subscription item found', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_123',
+        items: { data: [] }, // Empty items array
+      });
+
+      await expect(service.updateQuantity('sub_123', 5)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('previewPlanChange - with proration line items', () => {
+    it('should calculate proration amount from line items', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.invoices.retrieveUpcoming.mockResolvedValue({
+        subtotal: 9900,
+        tax: 0,
+        total: 7400, // Total after proration
+        currency: 'usd',
+        lines: {
+          data: [
+            { description: 'Remaining time on Pro Plan', amount: -2500, quantity: 1 }, // No 'proration' word
+            { description: 'Enterprise Plan', amount: 9900, quantity: 1 }, // New plan
+          ],
+        },
+        subscription_proration_date: Math.floor(Date.now() / 1000),
+      });
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        items: { data: [{ id: 'si_123', price: { unit_amount: 4900 } }] },
+      });
+
+      const result = await service.previewPlanChange('team-123', PlanType.ENTERPRISE, BillingCycle.MONTHLY);
+
+      expect(result.currentAmount).toBe(49);
+      expect(result.prorationAmount).toBe(0); // No items with 'proration' in description
+      expect(result.effectiveDate).toBeInstanceOf(Date);
+    });
+
+    it('should detect proration line items case-insensitively', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.invoices.retrieveUpcoming.mockResolvedValue({
+        subtotal: 9900,
+        tax: 0,
+        total: 7400,
+        currency: 'usd',
+        lines: {
+          data: [
+            { description: 'Time proration for upgrade', amount: -2500, quantity: 1 },
+            { description: 'Enterprise Plan', amount: 9900, quantity: 1 },
+          ],
+        },
+        subscription_proration_date: Math.floor(Date.now() / 1000),
+      });
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        items: { data: [{ id: 'si_123', price: { unit_amount: 4900 } }] },
+      });
+
+      const result = await service.previewPlanChange('team-123', PlanType.ENTERPRISE, BillingCycle.MONTHLY);
+
+      // 'proration' found in description
+      expect(result.prorationAmount).toBe(-25); // -2500 cents = -$25
+    });
+
+    it('should use current date when no proration date in preview', async () => {
+      subscriptionRepository.findOne.mockResolvedValue(mockSubscription);
+
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.invoices.retrieveUpcoming.mockResolvedValue({
+        subtotal: 9900,
+        tax: 0,
+        total: 9900,
+        currency: 'usd',
+        lines: { data: [] },
+        // No subscription_proration_date
+      });
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        items: { data: [{ id: 'si_123', price: { unit_amount: 4900 } }] },
+      });
+
+      const beforeCall = new Date();
+      const result = await service.previewPlanChange('team-123', PlanType.ENTERPRISE, BillingCycle.MONTHLY);
+      const afterCall = new Date();
+
+      // effectiveDate should be around current time
+      expect(result.effectiveDate.getTime()).toBeGreaterThanOrEqual(beforeCall.getTime());
+      expect(result.effectiveDate.getTime()).toBeLessThanOrEqual(afterCall.getTime());
+    });
+  });
+
+  describe('previewUpcomingInvoice - with subscription and price change', () => {
+    it('should preview invoice with subscription items change', async () => {
+      const stripeInstance = (service as any).stripe;
+      stripeInstance.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_123',
+        items: { data: [{ id: 'si_123' }] },
+      });
+      stripeInstance.invoices.retrieveUpcoming.mockResolvedValue({
+        subtotal: 9900,
+        tax: 500,
+        total: 10400,
+        currency: 'usd',
+        lines: { data: [{ description: 'Pro Plan', amount: 9900, quantity: 1 }] },
+        subscription_proration_date: Math.floor(Date.now() / 1000),
+      });
+
+      const result = await service.previewUpcomingInvoice(
+        'cus_123',
+        'sub_123',
+        'price_new_plan',
+        2,
+      );
+
+      expect(result.total).toBe(104);
+      expect(result.tax).toBe(5);
+      expect(result.prorationDate).toBeInstanceOf(Date);
+      expect(stripeInstance.invoices.retrieveUpcoming).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer: 'cus_123',
+          subscription: 'sub_123',
+          subscription_items: [
+            expect.objectContaining({
+              price: 'price_new_plan',
+              quantity: 2,
+            }),
+          ],
+        }),
+      );
+    });
+  });
 });

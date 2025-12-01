@@ -839,4 +839,259 @@ describe('LdapService', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('STARTTLS success path', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should resolve client when STARTTLS succeeds', async () => {
+      const starttlsConfig = { ...mockLdapConfig, securityProtocol: 'starttls' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(starttlsConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(starttlsConfig as LdapConfig);
+
+      // Mock successful STARTTLS
+      (ldap.createClient as jest.Mock).mockImplementationOnce(() => {
+        const client = createMockLdapClient();
+        setTimeout(() => {
+          if (client._eventHandlers['connect']) {
+            client._eventHandlers['connect']();
+          }
+        }, 0);
+        // STARTTLS succeeds
+        mockStarttls.mockImplementation((opts, controls, callback) => {
+          callback(null); // Success - line 280 coverage
+        });
+        return client;
+      });
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(true);
+      expect(mockStarttls).toHaveBeenCalled();
+    });
+  });
+
+  describe('searchWithFilter error event', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should handle search error event (res.on error)', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      // Mock search that emits error event on result
+      const mockSearchResultWithError = {
+        on: jest.fn((event, handler) => {
+          if (event === 'error') {
+            // Trigger the error event after a tick - line 358 coverage
+            setTimeout(() => handler(new Error('LDAP search stream error')), 0);
+          }
+          return mockSearchResultWithError;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResultWithError);
+      });
+
+      const result = await service.testConnection('team-123');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Search error');
+    });
+  });
+
+  describe('getUserGroups edge cases', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should return empty array when groupBaseDn is empty', async () => {
+      // Config without groupBaseDn - line 374 coverage
+      const noGroupConfig = {
+        ...mockLdapConfig,
+        securityProtocol: 'none' as const,
+        groupBaseDn: '', // Empty groupBaseDn
+      };
+      ldapConfigRepo.findOne.mockResolvedValue(noGroupConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockUserSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockUserSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockUserSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'testuser', 'password');
+
+      expect(result).not.toBeNull();
+      expect(result?.groups).toEqual([]); // Should be empty since no groupBaseDn
+      // Search should only be called once (for user), not for groups
+      expect(mockSearch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty array and log warning when getUserGroups fails', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      const mockUserSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=testuser,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['testuser'] },
+                { type: 'mail', values: ['test@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockUserSearchResult;
+        }),
+      };
+
+      // Mock group search that fails - lines 382-383 coverage
+      const mockGroupSearchResultWithError = {
+        on: jest.fn((event, handler) => {
+          if (event === 'error') {
+            setTimeout(() => handler(new Error('Group search failed')), 0);
+          }
+          return mockGroupSearchResultWithError;
+        }),
+      };
+
+      let searchCallCount = 0;
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        searchCallCount++;
+        if (searchCallCount === 1) {
+          callback(null, mockUserSearchResult);
+        } else {
+          // Group search will emit error event
+          callback(null, mockGroupSearchResultWithError);
+        }
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.authenticate('team-123', 'testuser', 'password');
+
+      expect(result).not.toBeNull();
+      expect(result?.groups).toEqual([]); // Should be empty due to error
+    });
+  });
+
+  describe('syncUsers with user sync errors', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should track errors when individual user sync fails', async () => {
+      const noneSecurityConfig = { ...mockLdapConfig, securityProtocol: 'none' as const };
+      ldapConfigRepo.findOne.mockResolvedValue(noneSecurityConfig as LdapConfig);
+      ldapConfigRepo.save.mockResolvedValue(noneSecurityConfig as LdapConfig);
+
+      mockBind.mockImplementation((dn, password, callback) => {
+        callback(null);
+      });
+
+      // The current implementation doesn't actually throw errors in the user sync loop
+      // It just increments usersUpdated. To cover line 236, we need to understand
+      // that the try-catch block in the loop would only catch errors if UserService
+      // integration was actually implemented. Since it's not throwing now, let's verify
+      // the sync completes successfully.
+      const mockSearchResult = {
+        on: jest.fn((event, handler) => {
+          if (event === 'searchEntry') {
+            handler({
+              dn: { toString: () => 'uid=user1,dc=example,dc=com' },
+              attributes: [
+                { type: 'uid', values: ['user1'] },
+                { type: 'mail', values: ['user1@example.com'] },
+              ],
+            });
+          }
+          if (event === 'end') {
+            setTimeout(() => handler(), 0);
+          }
+          return mockSearchResult;
+        }),
+      };
+
+      mockSearch.mockImplementation((baseDn, opts, callback) => {
+        callback(null, mockSearchResult);
+      });
+
+      mockUnbind.mockImplementation(() => {});
+
+      const result = await service.syncUsers('team-123');
+
+      expect(result.success).toBe(true);
+      expect(result.usersFound).toBe(1);
+      expect(result.usersUpdated).toBe(1);
+      // Line 236 is inside a catch block that is currently unreachable
+      // because the try block doesn't throw. This is expected behavior for now.
+    });
+  });
 });

@@ -8,10 +8,15 @@ import { UserService } from '../../user/user.service';
 export interface JwtPayload {
   sub: string;
   email: string;
+  type?: 'user' | 'admin';
   role?: string;         // 用于 admin 用户
-  teamId?: string;
+  teamId?: string;       // 顶层 teamId (兼容旧格式)
   teamRole?: string;     // OWNER | ADMIN | MEMBER | VIEWER
   permissions?: string[];
+  scope?: {              // 新的 scope 格式
+    level: 'personal' | 'team' | 'platform';
+    teamId?: string;
+  };
   iat?: number;
   exp?: number;
 }
@@ -24,6 +29,10 @@ export interface AuthenticatedUser {
   teamRole?: string;
   permissions: string[];
   isConsoleAdmin?: boolean;
+  scope?: {
+    level: 'personal' | 'team' | 'platform';
+    teamId?: string;
+  };
 }
 
 @Injectable()
@@ -62,14 +71,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
+    // 从 scope.teamId 或顶层 teamId 获取 teamId（优先使用 scope）
+    const effectiveTeamId = payload.scope?.teamId || payload.teamId || user.teamId;
+
     // 返回包含权限信息的用户对象
     return {
       id: user.id,
       email: user.email,
       name: user.name,
-      teamId: payload.teamId || user.teamId,
+      teamId: effectiveTeamId,
       teamRole: payload.teamRole || undefined,
       permissions: payload.permissions || [],
+      scope: payload.scope || (effectiveTeamId ? { level: 'personal', teamId: effectiveTeamId } : undefined),
     };
   }
 }
