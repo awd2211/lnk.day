@@ -1,6 +1,20 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+def to_camel(string: str) -> str:
+    """Convert snake_case to camelCase"""
+    components = string.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+class CamelModel(BaseModel):
+    """Base model with camelCase serialization"""
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 
 class ClickEvent(BaseModel):
@@ -27,36 +41,36 @@ class AnalyticsQuery(BaseModel):
     granularity: str = "day"  # hour, day, week, month
 
 
-class ClickStats(BaseModel):
+class ClickStats(CamelModel):
     total_clicks: int
     unique_clicks: int
     period: str
 
 
-class TimeSeriesData(BaseModel):
+class TimeSeriesData(CamelModel):
     timestamp: datetime
     clicks: int
 
 
-class GeoStats(BaseModel):
+class GeoStats(CamelModel):
     country: str
     clicks: int
     percentage: float
 
 
-class DeviceStats(BaseModel):
+class DeviceStats(CamelModel):
     device: str
     clicks: int
     percentage: float
 
 
-class BrowserStats(BaseModel):
+class BrowserStats(CamelModel):
     browser: str
     clicks: int
     percentage: float
 
 
-class AnalyticsResponse(BaseModel):
+class AnalyticsResponse(CamelModel):
     total_clicks: int
     unique_clicks: int
     time_series: List[TimeSeriesData]

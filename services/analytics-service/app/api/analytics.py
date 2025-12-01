@@ -1,43 +1,99 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Request
 
 from app.services.analytics_service import AnalyticsService
 from app.services.realtime_service import realtime_service
 from app.models.analytics import AnalyticsResponse
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 analytics_service = AnalyticsService()
 
 
-@router.get("/link/{link_id}", response_model=AnalyticsResponse)
+def parse_date(date_str: Optional[str]) -> Optional[datetime]:
+    """Parse date string in various formats"""
+    if not date_str:
+        return None
+
+    # Try ISO format with time
+    for fmt in [
+        "%Y-%m-%dT%H:%M:%S.%fZ",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+    ]:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def normalize_end_date(end_date: datetime) -> datetime:
+    """Ensure end_date includes the entire day (set to 23:59:59 if midnight)"""
+    if end_date.hour == 0 and end_date.minute == 0 and end_date.second == 0:
+        return end_date.replace(hour=23, minute=59, second=59)
+    return end_date
+
+
+def get_date_params(request: Request) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Extract start_date and end_date from request query params, supporting both camelCase and snake_case"""
+    params = dict(request.query_params)
+
+    # Support both camelCase and snake_case
+    start_str = params.get("startDate") or params.get("start_date")
+    end_str = params.get("endDate") or params.get("end_date")
+
+    start_date = parse_date(start_str)
+    end_date = parse_date(end_str)
+
+    return start_date, end_date
+
+
+@router.get("/link/{link_id}")
 async def get_link_analytics(
     link_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
+    request: Request,
 ):
     """获取链接分析数据"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
 
+    end_date = normalize_end_date(end_date)
+
+    logger.info(f"get_link_analytics: link_id={link_id}, start_date={start_date}, end_date={end_date}")
+
     try:
-        return analytics_service.get_link_analytics(link_id, start_date, end_date)
+        result = analytics_service.get_link_analytics(link_id, start_date, end_date)
+        logger.info(f"get_link_analytics result: total_clicks={result.total_clicks}")
+        # Return with camelCase aliases
+        return result.model_dump(by_alias=True)
     except Exception as e:
+        logger.error(f"get_link_analytics error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/team")
-async def get_team_analytics(
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-):
+async def get_team_analytics(request: Request):
     """获取团队分析数据（包含所有统计信息）"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_team_analytics(start_date, end_date)
@@ -46,16 +102,16 @@ async def get_team_analytics(
 
 
 @router.get("/team/{team_id}/summary")
-async def get_team_summary(
-    team_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-):
+async def get_team_summary(team_id: str, request: Request):
     """获取团队统计概览"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_team_summary(team_id, start_date, end_date)
@@ -134,15 +190,18 @@ async def compare_periods(
 @router.get("/link/{link_id}/geo")
 async def get_geo_stats(
     link_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
+    request: Request,
     limit: int = Query(default=20, le=100),
 ):
     """获取地理位置统计"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_geo_detailed(link_id, start_date, end_date, limit)
@@ -151,16 +210,16 @@ async def get_geo_stats(
 
 
 @router.get("/link/{link_id}/devices")
-async def get_device_stats(
-    link_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-):
+async def get_device_stats(link_id: str, request: Request):
     """获取设备/浏览器/操作系统统计"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return {
@@ -175,15 +234,18 @@ async def get_device_stats(
 @router.get("/link/{link_id}/referrers")
 async def get_referrer_stats(
     link_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
+    request: Request,
     limit: int = Query(default=20, le=100),
 ):
     """获取来源统计"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_referrer_detailed(link_id, start_date, end_date, limit)
@@ -192,16 +254,16 @@ async def get_referrer_stats(
 
 
 @router.get("/link/{link_id}/hourly-activity")
-async def get_hourly_activity(
-    link_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-):
+async def get_hourly_activity(link_id: str, request: Request):
     """获取按星期和小时的访问热力图数据"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_hourly_activity(link_id, start_date, end_date)
@@ -210,16 +272,16 @@ async def get_hourly_activity(
 
 
 @router.get("/team/{team_id}/hourly-activity")
-async def get_team_hourly_activity(
-    team_id: str,
-    start_date: Optional[datetime] = Query(default=None),
-    end_date: Optional[datetime] = Query(default=None),
-):
+async def get_team_hourly_activity(team_id: str, request: Request):
     """获取团队按星期和小时的访问热力图数据"""
+    start_date, end_date = get_date_params(request)
+
     if not start_date:
         start_date = datetime.now() - timedelta(days=30)
     if not end_date:
         end_date = datetime.now()
+
+    end_date = normalize_end_date(end_date)
 
     try:
         return analytics_service.get_team_hourly_activity(team_id, start_date, end_date)

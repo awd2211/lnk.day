@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analytics, reports, export, schedules, tasks
+from app.api import analytics, reports, export, schedules, tasks, retention, attribution
 from app.funnels import router as funnels
 from app.cohorts import router as cohorts
+from app.performance import router as performance
+from app.insights import router as insights
 from app.core.config import settings
 from app.services.realtime_service import realtime_service
 from app.services.kafka_consumer import KafkaClickConsumer
@@ -99,6 +101,10 @@ app.include_router(schedules.router, prefix="/api/v1/schedules", tags=["schedule
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(funnels, prefix="/api/v1/funnels", tags=["funnels"])
 app.include_router(cohorts, prefix="/api/v1/cohorts", tags=["cohorts"])
+app.include_router(retention.router, prefix="/api/v1/analytics", tags=["retention"])
+app.include_router(attribution.router, prefix="/api/v1/analytics", tags=["attribution"])
+app.include_router(performance, prefix="/api/v1/performance", tags=["performance"])
+app.include_router(insights, prefix="/api/v1/insights", tags=["insights"])
 
 
 @app.get("/health")
