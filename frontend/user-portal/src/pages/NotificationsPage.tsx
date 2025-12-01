@@ -19,10 +19,10 @@ import {
   MessageSquare,
   Smartphone,
   Clock,
-  RefreshCw,
-  Archive,
+  Loader2,
   Star,
   StarOff,
+  Archive,
 } from 'lucide-react';
 
 import Layout from '@/components/Layout';
@@ -54,169 +54,92 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 interface Notification {
   id: string;
-  type: 'link' | 'team' | 'billing' | 'security' | 'system' | 'campaign';
+  type: string;
   title: string;
   message: string;
   read: boolean;
   starred: boolean;
   createdAt: string;
-  actionUrl?: string;
+  link?: string;
   metadata?: Record<string, any>;
+  category?: string;
 }
 
 interface NotificationPreferences {
   email: {
     enabled: boolean;
-    digest: 'realtime' | 'daily' | 'weekly' | 'never';
-    types: {
-      link: boolean;
-      team: boolean;
-      billing: boolean;
-      security: boolean;
-      system: boolean;
-      campaign: boolean;
-    };
+    linkCreated: boolean;
+    milestone: boolean;
+    weeklyReport: boolean;
+    securityAlerts: boolean;
   };
   push: {
     enabled: boolean;
-    types: {
-      link: boolean;
-      team: boolean;
-      billing: boolean;
-      security: boolean;
-      system: boolean;
-      campaign: boolean;
-    };
+    linkCreated: boolean;
+    milestone: boolean;
+    weeklyReport: boolean;
+    securityAlerts: boolean;
   };
-  slack: {
+  inApp: {
     enabled: boolean;
-    webhookUrl: string;
-    types: {
-      link: boolean;
-      team: boolean;
-      billing: boolean;
-      security: boolean;
-      system: boolean;
-      campaign: boolean;
-    };
+    linkCreated: boolean;
+    milestone: boolean;
+    weeklyReport: boolean;
+    securityAlerts: boolean;
   };
 }
 
-// Mock data
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'link',
-    title: '链接达到里程碑',
-    message: '您的链接 "产品发布" 已获得 10,000 次点击！',
-    read: false,
-    starred: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    actionUrl: '/links/123',
-    metadata: { linkId: '123', clicks: 10000 },
+// API functions
+const notificationApi = {
+  getNotifications: async (params: { page?: number; limit?: number; read?: boolean; type?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params.page) searchParams.set('page', String(params.page));
+    if (params.limit) searchParams.set('limit', String(params.limit));
+    if (params.read !== undefined) searchParams.set('read', String(params.read));
+    if (params.type) searchParams.set('type', params.type);
+    const response = await api.get(`/api/v1/notifications?${searchParams.toString()}`);
+    return response.data;
   },
-  {
-    id: '2',
-    type: 'team',
-    title: '新团队成员加入',
-    message: 'john@example.com 已接受邀请加入您的团队',
-    read: false,
-    starred: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    metadata: { memberEmail: 'john@example.com' },
+  getUnreadCount: async () => {
+    const response = await api.get('/api/v1/notifications/unread-count');
+    return response.data;
   },
-  {
-    id: '3',
-    type: 'billing',
-    title: '付款成功',
-    message: '您的月度订阅费用 $49.00 已成功扣款',
-    read: true,
-    starred: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    actionUrl: '/billing',
-    metadata: { amount: 49.00, currency: 'USD' },
+  getPreferences: async () => {
+    const response = await api.get('/api/v1/notifications/preferences');
+    return response.data;
   },
-  {
-    id: '4',
-    type: 'security',
-    title: '新设备登录',
-    message: '检测到来自新设备的登录：Chrome on Windows, 北京',
-    read: true,
-    starred: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    metadata: { device: 'Chrome on Windows', location: '北京' },
+  updatePreferences: async (data: Partial<NotificationPreferences>) => {
+    const response = await api.put('/api/v1/notifications/preferences', data);
+    return response.data;
   },
-  {
-    id: '5',
-    type: 'campaign',
-    title: '活动目标达成',
-    message: '您的活动 "双十一促销" 已达成转化目标！',
-    read: false,
-    starred: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    actionUrl: '/campaigns/456',
-    metadata: { campaignId: '456', goalType: 'conversion' },
+  markAsRead: async (id: string) => {
+    const response = await api.post(`/api/v1/notifications/${id}/read`);
+    return response.data;
   },
-  {
-    id: '6',
-    type: 'system',
-    title: '系统维护通知',
-    message: '计划于本周六凌晨 2:00-4:00 进行系统维护',
-    read: true,
-    starred: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+  markMultipleAsRead: async (ids: string[]) => {
+    const response = await api.post('/api/v1/notifications/read-batch', { ids });
+    return response.data;
   },
-  {
-    id: '7',
-    type: 'link',
-    title: '链接即将过期',
-    message: '您的链接 "限时优惠" 将于 3 天后过期',
-    read: false,
-    starred: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-    actionUrl: '/links/789',
-    metadata: { linkId: '789', expiresIn: '3 days' },
+  markAllAsRead: async () => {
+    const response = await api.post('/api/v1/notifications/read-all');
+    return response.data;
   },
-];
-
-const mockPreferences: NotificationPreferences = {
-  email: {
-    enabled: true,
-    digest: 'daily',
-    types: {
-      link: true,
-      team: true,
-      billing: true,
-      security: true,
-      system: true,
-      campaign: true,
-    },
+  toggleStar: async (id: string) => {
+    const response = await api.post(`/api/v1/notifications/${id}/star`);
+    return response.data;
   },
-  push: {
-    enabled: true,
-    types: {
-      link: true,
-      team: true,
-      billing: true,
-      security: true,
-      system: false,
-      campaign: true,
-    },
+  deleteNotification: async (id: string) => {
+    const response = await api.delete(`/api/v1/notifications/${id}`);
+    return response.data;
   },
-  slack: {
-    enabled: false,
-    webhookUrl: '',
-    types: {
-      link: false,
-      team: false,
-      billing: false,
-      security: false,
-      system: false,
-      campaign: false,
-    },
+  deleteMultiple: async (ids: string[]) => {
+    const response = await api.post('/api/v1/notifications/delete-batch', { ids });
+    return response.data;
   },
 };
 
@@ -224,19 +147,107 @@ export default function NotificationsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [selectedNotifications, setSelectedNotifications] = useState<string[]>([]);
   const [showSettings, setShowSettings] = useState(false);
-  const [preferences, setPreferences] = useState<NotificationPreferences>(mockPreferences);
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  // In real app, fetch from API
-  const notifications = mockNotifications.filter((n) => {
-    if (filter === 'all') return true;
-    if (filter === 'unread') return !n.read;
-    if (filter === 'starred') return n.starred;
-    return n.type === filter;
+  // Fetch notifications
+  const { data: notificationData, isLoading } = useQuery({
+    queryKey: ['notifications', filter, page],
+    queryFn: () => {
+      const params: any = { page, limit: 20 };
+      if (filter === 'unread') params.read = false;
+      else if (filter === 'read') params.read = true;
+      else if (filter !== 'all' && filter !== 'starred') params.type = filter;
+      return notificationApi.getNotifications(params);
+    },
   });
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
-  const starredCount = mockNotifications.filter((n) => n.starred).length;
+  // Fetch unread count
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: notificationApi.getUnreadCount,
+  });
+
+  // Fetch preferences
+  const { data: preferences, refetch: refetchPreferences } = useQuery({
+    queryKey: ['notification-preferences'],
+    queryFn: notificationApi.getPreferences,
+    enabled: showSettings,
+  });
+
+  // Mutations
+  const markAsReadMutation = useMutation({
+    mutationFn: notificationApi.markAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+
+  const markMultipleAsReadMutation = useMutation({
+    mutationFn: notificationApi.markMultipleAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      setSelectedNotifications([]);
+      toast({ title: '已标记为已读' });
+    },
+  });
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: notificationApi.markAllAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      toast({ title: '已将所有通知标记为已读' });
+    },
+  });
+
+  const toggleStarMutation = useMutation({
+    mutationFn: notificationApi.toggleStar,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: notificationApi.deleteNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      toast({ title: '通知已删除' });
+    },
+  });
+
+  const deleteMultipleMutation = useMutation({
+    mutationFn: notificationApi.deleteMultiple,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      setSelectedNotifications([]);
+      toast({ title: '通知已删除' });
+    },
+  });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: notificationApi.updatePreferences,
+    onSuccess: () => {
+      refetchPreferences();
+      toast({ title: '设置已保存' });
+    },
+  });
+
+  const notifications: Notification[] = notificationData?.items || [];
+  const totalNotifications = notificationData?.total || 0;
+  const unreadCount = unreadData?.count || 0;
+
+  // Filter starred locally if needed
+  const filteredNotifications = filter === 'starred'
+    ? notifications.filter(n => n.starred)
+    : notifications;
+
+  const starredCount = notifications.filter(n => n.starred).length;
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -265,6 +276,10 @@ export default function NotificationsPage() {
       security: 'bg-red-100 text-red-700',
       system: 'bg-yellow-100 text-yellow-700',
       campaign: 'bg-orange-100 text-orange-700',
+      info: 'bg-blue-100 text-blue-700',
+      success: 'bg-green-100 text-green-700',
+      warning: 'bg-yellow-100 text-yellow-700',
+      error: 'bg-red-100 text-red-700',
     };
     const labels: Record<string, string> = {
       link: '链接',
@@ -273,6 +288,10 @@ export default function NotificationsPage() {
       security: '安全',
       system: '系统',
       campaign: '活动',
+      info: '信息',
+      success: '成功',
+      warning: '警告',
+      error: '错误',
     };
     return <Badge className={styles[type] || 'bg-gray-100'}>{labels[type] || type}</Badge>;
   };
@@ -301,64 +320,59 @@ export default function NotificationsPage() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedNotifications(notifications.map((n) => n.id));
+      setSelectedNotifications(filteredNotifications.map((n) => n.id));
     } else {
       setSelectedNotifications([]);
     }
   };
 
   const handleMarkAsRead = (ids: string[]) => {
-    console.log('Mark as read:', ids);
-    // In real app, call API
+    if (ids.length === 1) {
+      markAsReadMutation.mutate(ids[0]);
+    } else {
+      markMultipleAsReadMutation.mutate(ids);
+    }
   };
 
   const handleMarkAllAsRead = () => {
-    console.log('Mark all as read');
-    // In real app, call API
+    markAllAsReadMutation.mutate();
   };
 
   const handleDelete = (ids: string[]) => {
-    console.log('Delete:', ids);
-    // In real app, call API
+    if (ids.length === 1) {
+      deleteMutation.mutate(ids[0]);
+    } else {
+      deleteMultipleMutation.mutate(ids);
+    }
   };
 
   const handleToggleStar = (id: string) => {
-    console.log('Toggle star:', id);
-    // In real app, call API
+    toggleStarMutation.mutate(id);
+  };
+
+  const handleSavePreferences = () => {
+    if (preferences) {
+      updatePreferencesMutation.mutate(preferences);
+      setShowSettings(false);
+    }
   };
 
   const handlePreferenceChange = (
-    channel: 'email' | 'push' | 'slack',
+    channel: 'email' | 'push' | 'inApp',
     key: string,
-    value: any
-  ) => {
-    setPreferences((prev) => ({
-      ...prev,
-      [channel]: {
-        ...prev[channel],
-        [key]: value,
-      },
-    }));
-  };
-
-  const handleTypeToggle = (
-    channel: 'email' | 'push' | 'slack',
-    type: string,
     value: boolean
   ) => {
-    setPreferences((prev) => ({
-      ...prev,
+    if (!preferences) return;
+    queryClient.setQueryData(['notification-preferences'], {
+      ...preferences,
       [channel]: {
-        ...prev[channel],
-        types: {
-          ...prev[channel].types,
-          [type]: value,
-        },
+        ...preferences[channel],
+        [key]: value,
       },
-    }));
+    });
   };
 
-  const isAllSelected = notifications.length > 0 && selectedNotifications.length === notifications.length;
+  const isAllSelected = filteredNotifications.length > 0 && selectedNotifications.length === filteredNotifications.length;
 
   return (
     <Layout
@@ -366,8 +380,16 @@ export default function NotificationsPage() {
       description="查看和管理您的所有通知"
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleMarkAllAsRead}>
-            <CheckCheck className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            onClick={handleMarkAllAsRead}
+            disabled={markAllAsReadMutation.isPending || unreadCount === 0}
+          >
+            {markAllAsReadMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCheck className="mr-2 h-4 w-4" />
+            )}
             全部已读
           </Button>
           <Button variant="outline" onClick={() => setShowSettings(true)}>
@@ -386,7 +408,7 @@ export default function NotificationsPage() {
                 <Bell className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockNotifications.length}</p>
+                <p className="text-2xl font-bold">{totalNotifications}</p>
                 <p className="text-sm text-muted-foreground">全部通知</p>
               </div>
             </div>
@@ -419,7 +441,7 @@ export default function NotificationsPage() {
                 <Check className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{mockNotifications.length - unreadCount}</p>
+                <p className="text-2xl font-bold">{totalNotifications - unreadCount}</p>
                 <p className="text-sm text-muted-foreground">已读</p>
               </div>
             </div>
@@ -454,6 +476,7 @@ export default function NotificationsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleMarkAsRead(selectedNotifications)}
+                  disabled={markMultipleAsReadMutation.isPending}
                 >
                   <Check className="mr-1 h-3 w-3" />
                   标为已读
@@ -462,6 +485,7 @@ export default function NotificationsPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(selectedNotifications)}
+                  disabled={deleteMultipleMutation.isPending}
                 >
                   <Trash2 className="mr-1 h-3 w-3" />
                   删除
@@ -480,13 +504,17 @@ export default function NotificationsPage() {
               onCheckedChange={handleSelectAll}
             />
             <span className="text-sm text-muted-foreground">
-              {notifications.length} 条通知
+              {filteredNotifications.length} 条通知
             </span>
           </div>
 
           {/* List */}
           <div className="divide-y">
-            {notifications.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Bell className="h-12 w-12 text-muted-foreground/50" />
                 <h3 className="mt-4 text-lg font-medium">暂无通知</h3>
@@ -495,7 +523,7 @@ export default function NotificationsPage() {
                 </p>
               </div>
             ) : (
-              notifications.map((notification) => (
+              filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={cn(
@@ -513,6 +541,7 @@ export default function NotificationsPage() {
                   <button
                     className="mt-0.5"
                     onClick={() => handleToggleStar(notification.id)}
+                    disabled={toggleStarMutation.isPending}
                   >
                     {notification.starred ? (
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -551,16 +580,20 @@ export default function NotificationsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {notification.actionUrl && (
-                        <DropdownMenuItem>
-                          <Link2 className="mr-2 h-4 w-4" />
-                          查看详情
+                      {notification.link && (
+                        <DropdownMenuItem asChild>
+                          <a href={notification.link}>
+                            <Link2 className="mr-2 h-4 w-4" />
+                            查看详情
+                          </a>
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => handleMarkAsRead([notification.id])}>
-                        <Check className="mr-2 h-4 w-4" />
-                        {notification.read ? '标为未读' : '标为已读'}
-                      </DropdownMenuItem>
+                      {!notification.read && (
+                        <DropdownMenuItem onClick={() => handleMarkAsRead([notification.id])}>
+                          <Check className="mr-2 h-4 w-4" />
+                          标为已读
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleToggleStar(notification.id)}>
                         {notification.starred ? (
                           <>
@@ -573,10 +606,6 @@ export default function NotificationsPage() {
                             收藏
                           </>
                         )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Archive className="mr-2 h-4 w-4" />
-                        归档
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
@@ -592,6 +621,31 @@ export default function NotificationsPage() {
               ))
             )}
           </div>
+
+          {/* Pagination */}
+          {notificationData?.totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 border-t p-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => p - 1)}
+                disabled={page === 1}
+              >
+                上一页
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                第 {page} / {notificationData.totalPages} 页
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => p + 1)}
+                disabled={page >= notificationData.totalPages}
+              >
+                下一页
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -603,183 +657,183 @@ export default function NotificationsPage() {
             <DialogDescription>配置您希望接收通知的方式和类型</DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="email" className="mt-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="email" className="flex-1">
-                <Mail className="mr-2 h-4 w-4" />
-                邮件
-              </TabsTrigger>
-              <TabsTrigger value="push" className="flex-1">
-                <Smartphone className="mr-2 h-4 w-4" />
-                推送
-              </TabsTrigger>
-              <TabsTrigger value="slack" className="flex-1">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Slack
-              </TabsTrigger>
-            </TabsList>
+          {preferences ? (
+            <Tabs defaultValue="email" className="mt-4">
+              <TabsList className="w-full">
+                <TabsTrigger value="email" className="flex-1">
+                  <Mail className="mr-2 h-4 w-4" />
+                  邮件
+                </TabsTrigger>
+                <TabsTrigger value="push" className="flex-1">
+                  <Smartphone className="mr-2 h-4 w-4" />
+                  推送
+                </TabsTrigger>
+                <TabsTrigger value="inApp" className="flex-1">
+                  <Bell className="mr-2 h-4 w-4" />
+                  应用内
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="email" className="mt-4 space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium">启用邮件通知</p>
-                  <p className="text-sm text-muted-foreground">接收重要事件的邮件提醒</p>
-                </div>
-                <Switch
-                  checked={preferences.email.enabled}
-                  onCheckedChange={(v) => handlePreferenceChange('email', 'enabled', v)}
-                />
-              </div>
-
-              {preferences.email.enabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label>邮件摘要频率</Label>
-                    <Select
-                      value={preferences.email.digest}
-                      onValueChange={(v) => handlePreferenceChange('email', 'digest', v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="realtime">实时</SelectItem>
-                        <SelectItem value="daily">每日摘要</SelectItem>
-                        <SelectItem value="weekly">每周摘要</SelectItem>
-                        <SelectItem value="never">不发送</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <TabsContent value="email" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">启用邮件通知</p>
+                    <p className="text-sm text-muted-foreground">接收重要事件的邮件提醒</p>
                   </div>
+                  <Switch
+                    checked={preferences.email?.enabled}
+                    onCheckedChange={(v) => handlePreferenceChange('email', 'enabled', v)}
+                  />
+                </div>
 
+                {preferences.email?.enabled && (
                   <div className="space-y-3">
                     <Label>通知类型</Label>
-                    {Object.entries(preferences.email.types).map(([type, enabled]) => (
-                      <div key={type} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {getTypeIcon(type)}
-                          <span className="text-sm">
-                            {{
-                              link: '链接相关',
-                              team: '团队相关',
-                              billing: '账单相关',
-                              security: '安全相关',
-                              system: '系统通知',
-                              campaign: '活动相关',
-                            }[type]}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={enabled}
-                          onCheckedChange={(v) => handleTypeToggle('email', type, v)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </TabsContent>
-
-            <TabsContent value="push" className="mt-4 space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium">启用浏览器推送</p>
-                  <p className="text-sm text-muted-foreground">在浏览器中接收实时通知</p>
-                </div>
-                <Switch
-                  checked={preferences.push.enabled}
-                  onCheckedChange={(v) => handlePreferenceChange('push', 'enabled', v)}
-                />
-              </div>
-
-              {preferences.push.enabled && (
-                <div className="space-y-3">
-                  <Label>通知类型</Label>
-                  {Object.entries(preferences.push.types).map(([type, enabled]) => (
-                    <div key={type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {getTypeIcon(type)}
-                        <span className="text-sm">
-                          {{
-                            link: '链接相关',
-                            team: '团队相关',
-                            billing: '账单相关',
-                            security: '安全相关',
-                            system: '系统通知',
-                            campaign: '活动相关',
-                          }[type]}
-                        </span>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">链接创建</span>
                       <Switch
-                        checked={enabled}
-                        onCheckedChange={(v) => handleTypeToggle('push', type, v)}
+                        checked={preferences.email?.linkCreated}
+                        onCheckedChange={(v) => handlePreferenceChange('email', 'linkCreated', v)}
                       />
                     </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="slack" className="mt-4 space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div>
-                  <p className="font-medium">启用 Slack 集成</p>
-                  <p className="text-sm text-muted-foreground">将通知发送到 Slack 频道</p>
-                </div>
-                <Switch
-                  checked={preferences.slack.enabled}
-                  onCheckedChange={(v) => handlePreferenceChange('slack', 'enabled', v)}
-                />
-              </div>
-
-              {preferences.slack.enabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Webhook URL</Label>
-                    <input
-                      type="url"
-                      className="w-full rounded-md border px-3 py-2 text-sm"
-                      placeholder="https://hooks.slack.com/services/..."
-                      value={preferences.slack.webhookUrl}
-                      onChange={(e) =>
-                        handlePreferenceChange('slack', 'webhookUrl', e.target.value)
-                      }
-                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">里程碑达成</span>
+                      <Switch
+                        checked={preferences.email?.milestone}
+                        onCheckedChange={(v) => handlePreferenceChange('email', 'milestone', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">周报</span>
+                      <Switch
+                        checked={preferences.email?.weeklyReport}
+                        onCheckedChange={(v) => handlePreferenceChange('email', 'weeklyReport', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">安全警报</span>
+                      <Switch
+                        checked={preferences.email?.securityAlerts}
+                        onCheckedChange={(v) => handlePreferenceChange('email', 'securityAlerts', v)}
+                      />
+                    </div>
                   </div>
+                )}
+              </TabsContent>
 
+              <TabsContent value="push" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">启用浏览器推送</p>
+                    <p className="text-sm text-muted-foreground">在浏览器中接收实时通知</p>
+                  </div>
+                  <Switch
+                    checked={preferences.push?.enabled}
+                    onCheckedChange={(v) => handlePreferenceChange('push', 'enabled', v)}
+                  />
+                </div>
+
+                {preferences.push?.enabled && (
                   <div className="space-y-3">
                     <Label>通知类型</Label>
-                    {Object.entries(preferences.slack.types).map(([type, enabled]) => (
-                      <div key={type} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {getTypeIcon(type)}
-                          <span className="text-sm">
-                            {{
-                              link: '链接相关',
-                              team: '团队相关',
-                              billing: '账单相关',
-                              security: '安全相关',
-                              system: '系统通知',
-                              campaign: '活动相关',
-                            }[type]}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={enabled}
-                          onCheckedChange={(v) => handleTypeToggle('slack', type, v)}
-                        />
-                      </div>
-                    ))}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">链接创建</span>
+                      <Switch
+                        checked={preferences.push?.linkCreated}
+                        onCheckedChange={(v) => handlePreferenceChange('push', 'linkCreated', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">里程碑达成</span>
+                      <Switch
+                        checked={preferences.push?.milestone}
+                        onCheckedChange={(v) => handlePreferenceChange('push', 'milestone', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">周报</span>
+                      <Switch
+                        checked={preferences.push?.weeklyReport}
+                        onCheckedChange={(v) => handlePreferenceChange('push', 'weeklyReport', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">安全警报</span>
+                      <Switch
+                        checked={preferences.push?.securityAlerts}
+                        onCheckedChange={(v) => handlePreferenceChange('push', 'securityAlerts', v)}
+                      />
+                    </div>
                   </div>
-                </>
-              )}
-            </TabsContent>
-          </Tabs>
+                )}
+              </TabsContent>
+
+              <TabsContent value="inApp" className="mt-4 space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">启用应用内通知</p>
+                    <p className="text-sm text-muted-foreground">在应用内显示通知</p>
+                  </div>
+                  <Switch
+                    checked={preferences.inApp?.enabled}
+                    onCheckedChange={(v) => handlePreferenceChange('inApp', 'enabled', v)}
+                  />
+                </div>
+
+                {preferences.inApp?.enabled && (
+                  <div className="space-y-3">
+                    <Label>通知类型</Label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">链接创建</span>
+                      <Switch
+                        checked={preferences.inApp?.linkCreated}
+                        onCheckedChange={(v) => handlePreferenceChange('inApp', 'linkCreated', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">里程碑达成</span>
+                      <Switch
+                        checked={preferences.inApp?.milestone}
+                        onCheckedChange={(v) => handlePreferenceChange('inApp', 'milestone', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">周报</span>
+                      <Switch
+                        checked={preferences.inApp?.weeklyReport}
+                        onCheckedChange={(v) => handlePreferenceChange('inApp', 'weeklyReport', v)}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">安全警报</span>
+                      <Switch
+                        checked={preferences.inApp?.securityAlerts}
+                        onCheckedChange={(v) => handlePreferenceChange('inApp', 'securityAlerts', v)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowSettings(false)}>
               取消
             </Button>
-            <Button onClick={() => setShowSettings(false)}>保存设置</Button>
+            <Button
+              onClick={handleSavePreferences}
+              disabled={updatePreferencesMutation.isPending}
+            >
+              {updatePreferencesMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              保存设置
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
