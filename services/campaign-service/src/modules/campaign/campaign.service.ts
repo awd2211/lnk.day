@@ -195,4 +195,47 @@ export class CampaignService {
 
     return this.campaignRepository.save(duplicate);
   }
+
+  /**
+   * Get platform-wide campaign statistics (for admin console)
+   */
+  async getGlobalStats(): Promise<{
+    totalCampaigns: number;
+    activeCampaigns: number;
+    pausedCampaigns: number;
+    completedCampaigns: number;
+    totalLinks: number;
+    totalClicks: number;
+    totalConversions: number;
+  }> {
+    const [
+      totalCampaigns,
+      activeCampaigns,
+      pausedCampaigns,
+      completedCampaigns,
+    ] = await Promise.all([
+      this.campaignRepository.count(),
+      this.campaignRepository.count({ where: { status: CampaignStatus.ACTIVE } }),
+      this.campaignRepository.count({ where: { status: CampaignStatus.PAUSED } }),
+      this.campaignRepository.count({ where: { status: CampaignStatus.COMPLETED } }),
+    ]);
+
+    // Get aggregated stats
+    const aggregateResult = await this.campaignRepository
+      .createQueryBuilder('campaign')
+      .select('SUM(campaign.totalLinks)', 'totalLinks')
+      .addSelect('SUM(campaign.totalClicks)', 'totalClicks')
+      .addSelect('SUM(campaign.conversions)', 'totalConversions')
+      .getRawOne();
+
+    return {
+      totalCampaigns,
+      activeCampaigns,
+      pausedCampaigns,
+      completedCampaigns,
+      totalLinks: parseInt(aggregateResult?.totalLinks || '0', 10),
+      totalClicks: parseInt(aggregateResult?.totalClicks || '0', 10),
+      totalConversions: parseInt(aggregateResult?.totalConversions || '0', 10),
+    };
+  }
 }

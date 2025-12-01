@@ -104,6 +104,48 @@ export class CollaborationService {
     await this.collaboratorRepository.remove(collaborator);
   }
 
+  async updateRoleById(
+    campaignId: string,
+    collaboratorId: string,
+    role: CollaboratorRole,
+    updatedBy: string,
+  ): Promise<CampaignCollaborator> {
+    const collaborator = await this.collaboratorRepository.findOne({
+      where: { id: collaboratorId, campaignId },
+    });
+
+    if (!collaborator) {
+      throw new NotFoundException('Collaborator not found');
+    }
+
+    collaborator.role = role;
+    collaborator.permissions = ROLE_PERMISSIONS[role];
+
+    await this.logActivity(campaignId, updatedBy, 'role_changed', {
+      collaboratorId,
+      userId: collaborator.userId,
+      newRole: role,
+    });
+
+    return this.collaboratorRepository.save(collaborator);
+  }
+
+  async removeCollaboratorById(campaignId: string, collaboratorId: string, removedBy: string): Promise<void> {
+    const collaborator = await this.collaboratorRepository.findOne({
+      where: { id: collaboratorId, campaignId },
+    });
+
+    if (!collaborator) {
+      throw new NotFoundException('Collaborator not found');
+    }
+
+    await this.logActivity(campaignId, removedBy, 'collaborator_removed', {
+      collaboratorId,
+      userId: collaborator.userId,
+    });
+    await this.collaboratorRepository.remove(collaborator);
+  }
+
   async checkPermission(campaignId: string, userId: string, permission: string): Promise<boolean> {
     const collaborator = await this.collaboratorRepository.findOne({
       where: { campaignId, userId },
@@ -182,6 +224,66 @@ export class CollaborationService {
     }
 
     await this.commentRepository.remove(comment);
+  }
+
+  async pinComment(commentId: string, pinned: boolean): Promise<CampaignComment> {
+    const comment = await this.commentRepository.findOne({ where: { id: commentId } });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    comment.isPinned = pinned;
+    return this.commentRepository.save(comment);
+  }
+
+  async addReaction(
+    commentId: string,
+    emoji: string,
+    user: { id: string; name: string },
+  ): Promise<CampaignComment> {
+    const comment = await this.commentRepository.findOne({ where: { id: commentId } });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const reactions = comment.reactions || [];
+    const existingReaction = reactions.find((r) => r.emoji === emoji);
+
+    if (existingReaction) {
+      // Check if user already reacted with this emoji
+      const userExists = existingReaction.users.some((u) => u.id === user.id);
+      if (!userExists) {
+        existingReaction.users.push(user);
+      }
+    } else {
+      reactions.push({ emoji, users: [user] });
+    }
+
+    comment.reactions = reactions;
+    return this.commentRepository.save(comment);
+  }
+
+  async removeReaction(commentId: string, emoji: string, userId: string): Promise<CampaignComment> {
+    const comment = await this.commentRepository.findOne({ where: { id: commentId } });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const reactions = comment.reactions || [];
+    const existingReaction = reactions.find((r) => r.emoji === emoji);
+
+    if (existingReaction) {
+      existingReaction.users = existingReaction.users.filter((u) => u.id !== userId);
+      // Remove the reaction entirely if no users left
+      if (existingReaction.users.length === 0) {
+        comment.reactions = reactions.filter((r) => r.emoji !== emoji);
+      }
+    }
+
+    return this.commentRepository.save(comment);
   }
 
   // Activity log

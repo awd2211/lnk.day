@@ -1,8 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import axios from 'axios';
+
+const EVERY_HOUR = 60 * 60 * 1000;
 import {
   CampaignGoal,
   GoalNotification,
@@ -32,8 +33,9 @@ export interface UpdateGoalProgressDto {
 }
 
 @Injectable()
-export class GoalsService {
+export class GoalsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(GoalsService.name);
+  private deadlineCheckInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @InjectRepository(CampaignGoal)
@@ -41,6 +43,23 @@ export class GoalsService {
     @InjectRepository(GoalNotification)
     private readonly notificationRepository: Repository<GoalNotification>,
   ) {}
+
+  onModuleInit() {
+    this.deadlineCheckInterval = setInterval(() => {
+      this.checkDeadlines().catch((err) => {
+        this.logger.error(`检查目标截止时间失败: ${err.message}`);
+      });
+    }, EVERY_HOUR);
+    this.logger.log('目标截止时间检查定时任务已启动 (每小时)');
+  }
+
+  onModuleDestroy() {
+    if (this.deadlineCheckInterval) {
+      clearInterval(this.deadlineCheckInterval);
+      this.deadlineCheckInterval = null;
+      this.logger.log('目标截止时间检查定时任务已停止');
+    }
+  }
 
   async create(dto: CreateGoalDto): Promise<CampaignGoal> {
     const thresholds: NotificationThreshold[] = (dto.thresholds || [50, 75, 90, 100]).map(
@@ -344,7 +363,6 @@ export class GoalsService {
   }
 
   // Check for deadline warnings
-  @Cron(CronExpression.EVERY_HOUR)
   async checkDeadlines(): Promise<void> {
     const now = new Date();
     const warningThreshold = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours

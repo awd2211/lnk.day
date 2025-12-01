@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
+// ScheduleModule.forRoot() 只需在根模块 (AppModule) 中调用一次
 import { CampaignGoal, GoalNotification } from './entities/campaign-goal.entity';
 import { GoalsService } from './goals.service';
 import { GoalsController, GoalsStandaloneController } from './goals.controller';
@@ -9,8 +9,6 @@ import { GoalsController, GoalsStandaloneController } from './goals.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([CampaignGoal, GoalNotification]),
-    ScheduleModule.forRoot(),
-    
   ],
   controllers: [GoalsController, GoalsStandaloneController],
   providers: [GoalsService],

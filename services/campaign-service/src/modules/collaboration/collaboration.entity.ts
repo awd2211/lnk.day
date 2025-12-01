@@ -92,6 +92,15 @@ export class CampaignComment {
   @Column({ default: false })
   isEdited: boolean;
 
+  @Column({ default: false })
+  isPinned: boolean;
+
+  @Column('jsonb', { nullable: true, default: [] })
+  reactions?: Array<{
+    emoji: string;
+    users: Array<{ id: string; name: string }>;
+  }>;
+
   @CreateDateColumn()
   createdAt: Date;
 

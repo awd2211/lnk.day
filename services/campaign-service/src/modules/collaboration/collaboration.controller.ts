@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -56,29 +57,42 @@ export class CollaborationController {
     );
   }
 
-  @Put('collaborators/:userId')
+  @Put('collaborators/:collaboratorId')
   @ApiHeader({ name: 'x-team-id', required: true })
   @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '更新协作者角色' })
   updateRole(
     @Param('campaignId') campaignId: string,
-    @Param('userId') userId: string,
+    @Param('collaboratorId') collaboratorId: string,
     @Body() body: { role: CollaboratorRole },
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.collaborationService.updateRole(campaignId, userId, body.role, user.sub);
+    return this.collaborationService.updateRoleById(campaignId, collaboratorId, body.role, user.sub);
   }
 
-  @Delete('collaborators/:userId')
+  @Patch('collaborators/:collaboratorId')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
+  @ApiOperation({ summary: '更新协作者角色 (PATCH)' })
+  updateRolePatch(
+    @Param('campaignId') campaignId: string,
+    @Param('collaboratorId') collaboratorId: string,
+    @Body() body: { role: CollaboratorRole },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.collaborationService.updateRoleById(campaignId, collaboratorId, body.role, user.sub);
+  }
+
+  @Delete('collaborators/:collaboratorId')
   @ApiHeader({ name: 'x-team-id', required: true })
   @RequirePermissions(Permission.CAMPAIGNS_EDIT)
   @ApiOperation({ summary: '移除协作者' })
   removeCollaborator(
     @Param('campaignId') campaignId: string,
-    @Param('userId') userId: string,
+    @Param('collaboratorId') collaboratorId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.collaborationService.removeCollaborator(campaignId, userId, user.sub);
+    return this.collaborationService.removeCollaboratorById(campaignId, collaboratorId, user.sub);
   }
 
   // Comments
@@ -135,6 +149,44 @@ export class CollaborationController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.collaborationService.deleteComment(commentId, user.sub);
+  }
+
+  @Post('comments/:commentId/pin')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_EDIT)
+  @ApiOperation({ summary: '置顶/取消置顶评论' })
+  pinComment(
+    @Param('commentId') commentId: string,
+    @Body() body: { pinned: boolean },
+  ) {
+    return this.collaborationService.pinComment(commentId, body.pinned);
+  }
+
+  @Post('comments/:commentId/reactions')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
+  @ApiOperation({ summary: '添加表情反应' })
+  addReaction(
+    @Param('commentId') commentId: string,
+    @Body() body: { emoji: string },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.collaborationService.addReaction(commentId, body.emoji, {
+      id: user.sub,
+      name: user.name || user.email,
+    });
+  }
+
+  @Delete('comments/:commentId/reactions/:emoji')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
+  @ApiOperation({ summary: '移除表情反应' })
+  removeReaction(
+    @Param('commentId') commentId: string,
+    @Param('emoji') emoji: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.collaborationService.removeReaction(commentId, emoji, user.sub);
   }
 
   // Activity log

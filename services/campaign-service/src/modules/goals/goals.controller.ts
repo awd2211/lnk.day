@@ -173,6 +173,22 @@ export class GoalsController {
 export class GoalsStandaloneController {
   constructor(private readonly goalsService: GoalsService) {}
 
+  @Get('stats')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
+  @ApiOperation({ summary: '获取目标统计数据' })
+  async getStats(@ScopedTeamId() teamId: string) {
+    return this.goalsService.getTeamGoalStats(teamId);
+  }
+
+  @Get('team-stats')
+  @ApiHeader({ name: 'x-team-id', required: true })
+  @RequirePermissions(Permission.CAMPAIGNS_VIEW)
+  @ApiOperation({ summary: '获取团队目标统计汇总' })
+  async getTeamStats(@ScopedTeamId() teamId: string) {
+    return this.goalsService.getTeamGoalStats(teamId);
+  }
+
   @Post('bulk-update')
   @ApiHeader({ name: 'x-team-id', required: true })
   @RequirePermissions(Permission.CAMPAIGNS_EDIT)
