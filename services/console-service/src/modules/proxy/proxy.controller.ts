@@ -193,10 +193,18 @@ export class ProxyController {
   // Page Management
   @Get('pages')
   @ApiOperation({ summary: '获取页面列表' })
-  @ApiQuery({ name: 'teamId', required: true })
+  @ApiQuery({ name: 'teamId', required: false, description: '可选，不传则返回所有团队的页面' })
   @ApiQuery({ name: 'status', required: false })
-  getPages(@Headers('authorization') auth: string, @Query('teamId') teamId: string, @Query('status') status?: string) {
-    return this.proxyService.getPages(teamId, { status }, auth);
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getPages(
+    @Headers('authorization') auth: string,
+    @Query('teamId') teamId?: string,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.proxyService.getPages(teamId, { status, page, limit }, auth);
   }
 
   @Get('pages/stats')
@@ -1296,5 +1304,448 @@ export class ProxyController {
   @ApiOperation({ summary: '测试通知渠道' })
   testNotificationChannel(@Headers('authorization') auth: string, @Param('id') id: string) {
     return this.proxyService.testNotificationChannel(id, auth);
+  }
+
+  // ==================== SSO Configuration ====================
+  @Get('sso/stats')
+  @ApiOperation({ summary: '获取 SSO 统计' })
+  getSsoStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getSsoStats(auth);
+  }
+
+  @Get('sso')
+  @ApiOperation({ summary: '获取 SSO 配置列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'status', required: false })
+  getSsoConfigs(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.proxyService.getSsoConfigs({ page, limit, type, status }, auth);
+  }
+
+  @Get('sso/:id')
+  @ApiOperation({ summary: '获取 SSO 配置详情' })
+  getSsoConfig(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getSsoConfig(id, auth);
+  }
+
+  @Post('sso')
+  @ApiOperation({ summary: '创建 SSO 配置' })
+  createSsoConfig(@Headers('authorization') auth: string, @Body() data: any) {
+    return this.proxyService.createSsoConfig(data, auth);
+  }
+
+  @Put('sso/:id')
+  @ApiOperation({ summary: '更新 SSO 配置' })
+  updateSsoConfig(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: any) {
+    return this.proxyService.updateSsoConfig(id, data, auth);
+  }
+
+  @Delete('sso/:id')
+  @ApiOperation({ summary: '删除 SSO 配置' })
+  deleteSsoConfig(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.deleteSsoConfig(id, auth);
+  }
+
+  @Post('sso/:id/test')
+  @ApiOperation({ summary: '测试 SSO 配置' })
+  testSsoConfig(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.testSsoConfig(id, auth);
+  }
+
+  @Patch('sso/:id/toggle')
+  @ApiOperation({ summary: '启用/禁用 SSO 配置' })
+  toggleSsoConfig(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { enabled: boolean },
+  ) {
+    return this.proxyService.toggleSsoConfig(id, data.enabled, auth);
+  }
+
+  // ==================== Security Scan ====================
+  @Get('security/stats')
+  @ApiOperation({ summary: '获取安全扫描统计' })
+  getSecurityStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getSecurityStats(auth);
+  }
+
+  @Get('security/scans')
+  @ApiOperation({ summary: '获取安全扫描记录列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'threatLevel', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getSecurityScans(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('threatLevel') threatLevel?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getSecurityScans({ page, limit, status, threatLevel, search }, auth);
+  }
+
+  @Get('security/scans/:id')
+  @ApiOperation({ summary: '获取安全扫描详情' })
+  getSecurityScan(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getSecurityScan(id, auth);
+  }
+
+  @Post('security/scans')
+  @ApiOperation({ summary: '触发安全扫描' })
+  triggerSecurityScan(@Headers('authorization') auth: string, @Body() data: { linkId: string }) {
+    return this.proxyService.triggerSecurityScan(data.linkId, auth);
+  }
+
+  @Get('security/blacklist')
+  @ApiOperation({ summary: '获取黑名单列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getSecurityBlacklist(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('type') type?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getSecurityBlacklist({ page, limit, type, search }, auth);
+  }
+
+  @Post('security/blacklist')
+  @ApiOperation({ summary: '添加到黑名单' })
+  addToBlacklist(@Headers('authorization') auth: string, @Body() data: { pattern: string; type: string; reason?: string }) {
+    return this.proxyService.addToBlacklist(data, auth);
+  }
+
+  @Delete('security/blacklist/:id')
+  @ApiOperation({ summary: '从黑名单移除' })
+  removeFromBlacklist(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.removeFromBlacklist(id, auth);
+  }
+
+  @Get('security/events')
+  @ApiOperation({ summary: '获取安全事件列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'severity', required: false })
+  @ApiQuery({ name: 'type', required: false })
+  getSecurityEvents(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('severity') severity?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.proxyService.getSecurityEvents({ page, limit, severity, type }, auth);
+  }
+
+  // ==================== A/B Tests ====================
+  @Get('ab-tests/stats')
+  @ApiOperation({ summary: '获取 A/B 测试统计' })
+  getAbTestStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getAbTestStats(auth);
+  }
+
+  @Get('ab-tests')
+  @ApiOperation({ summary: '获取 A/B 测试列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'teamId', required: false })
+  getAbTests(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.proxyService.getAbTests({ page, limit, status, teamId }, auth);
+  }
+
+  @Get('ab-tests/:id')
+  @ApiOperation({ summary: '获取 A/B 测试详情' })
+  getAbTest(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getAbTest(id, auth);
+  }
+
+  @Get('ab-tests/:id/results')
+  @ApiOperation({ summary: '获取 A/B 测试结果' })
+  getAbTestResults(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getAbTestResults(id, auth);
+  }
+
+  @Post('ab-tests/:id/stop')
+  @ApiOperation({ summary: '停止 A/B 测试' })
+  stopAbTest(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.stopAbTest(id, auth);
+  }
+
+  @Post('ab-tests/:id/winner')
+  @ApiOperation({ summary: '宣布 A/B 测试获胜者' })
+  declareAbTestWinner(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { variantId: string },
+  ) {
+    return this.proxyService.declareAbTestWinner(id, data.variantId, auth);
+  }
+
+  // ==================== Goals & Conversions ====================
+  @Get('goals/stats')
+  @ApiOperation({ summary: '获取目标统计' })
+  getGoalStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getGoalStats(auth);
+  }
+
+  @Get('goals')
+  @ApiOperation({ summary: '获取目标列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'teamId', required: false })
+  getGoals(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.proxyService.getGoals({ page, limit, status, type, teamId }, auth);
+  }
+
+  @Get('goals/:id')
+  @ApiOperation({ summary: '获取目标详情' })
+  getGoal(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getGoal(id, auth);
+  }
+
+  @Get('goals/:id/funnel')
+  @ApiOperation({ summary: '获取目标漏斗分析' })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  getGoalFunnel(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.proxyService.getGoalFunnel(id, { startDate, endDate }, auth);
+  }
+
+  @Get('goals/:id/conversions')
+  @ApiOperation({ summary: '获取目标转化记录' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  getGoalConversions(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.proxyService.getGoalConversions(id, { page, limit, startDate, endDate }, auth);
+  }
+
+  @Get('goals/rankings')
+  @ApiOperation({ summary: '获取目标排行榜' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'period', required: false })
+  getGoalRankings(
+    @Headers('authorization') auth: string,
+    @Query('limit') limit?: number,
+    @Query('period') period?: string,
+  ) {
+    return this.proxyService.getGoalRankings({ limit, period }, auth);
+  }
+
+  // ==================== Redirect Rules ====================
+  @Get('redirect-rules/stats')
+  @ApiOperation({ summary: '获取重定向规则统计' })
+  getRedirectRuleStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getRedirectRuleStats(auth);
+  }
+
+  @Get('redirect-rules')
+  @ApiOperation({ summary: '获取重定向规则列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'type', required: false })
+  @ApiQuery({ name: 'teamId', required: false })
+  getRedirectRules(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('teamId') teamId?: string,
+  ) {
+    return this.proxyService.getRedirectRules({ page, limit, status, type, teamId }, auth);
+  }
+
+  @Get('redirect-rules/conflicts')
+  @ApiOperation({ summary: '获取重定向规则冲突' })
+  getRedirectRuleConflicts(@Headers('authorization') auth: string) {
+    return this.proxyService.getRedirectRuleConflicts(auth);
+  }
+
+  @Get('redirect-rules/:id')
+  @ApiOperation({ summary: '获取重定向规则详情' })
+  getRedirectRule(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getRedirectRule(id, auth);
+  }
+
+  @Patch('redirect-rules/:id/toggle')
+  @ApiOperation({ summary: '启用/禁用重定向规则' })
+  toggleRedirectRule(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { enabled: boolean },
+  ) {
+    return this.proxyService.toggleRedirectRule(id, data.enabled, auth);
+  }
+
+  @Post('redirect-rules/:id/test')
+  @ApiOperation({ summary: '测试重定向规则' })
+  testRedirectRule(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() testData: { userAgent?: string; ip?: string; referer?: string; country?: string },
+  ) {
+    return this.proxyService.testRedirectRule(id, testData, auth);
+  }
+
+  // ==================== Platform Tags ====================
+  @Get('tags/stats')
+  @ApiOperation({ summary: '获取标签统计' })
+  getTagStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getTagStats(auth);
+  }
+
+  @Get('tags/popular')
+  @ApiOperation({ summary: '获取热门标签' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getPopularTags(
+    @Headers('authorization') auth: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.proxyService.getPopularTags({ limit }, auth);
+  }
+
+  @Get('tags')
+  @ApiOperation({ summary: '获取平台标签列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  getPlatformTags(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('category') category?: string,
+  ) {
+    return this.proxyService.getPlatformTags({ page, limit, search, category }, auth);
+  }
+
+  @Post('tags')
+  @ApiOperation({ summary: '创建平台标签' })
+  createPlatformTag(
+    @Headers('authorization') auth: string,
+    @Body() data: { name: string; color?: string; category?: string; description?: string },
+  ) {
+    return this.proxyService.createPlatformTag(data, auth);
+  }
+
+  @Put('tags/:id')
+  @ApiOperation({ summary: '更新平台标签' })
+  updatePlatformTag(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { name?: string; color?: string; category?: string; description?: string },
+  ) {
+    return this.proxyService.updatePlatformTag(id, data, auth);
+  }
+
+  @Delete('tags/:id')
+  @ApiOperation({ summary: '删除平台标签' })
+  deletePlatformTag(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.deletePlatformTag(id, auth);
+  }
+
+  // ==================== Folders ====================
+  @Get('folders/stats')
+  @ApiOperation({ summary: '获取文件夹统计' })
+  getFolderStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getFolderStats(auth);
+  }
+
+  @Get('folders')
+  @ApiOperation({ summary: '获取文件夹列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'teamId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getFolders(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('teamId') teamId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getFolders({ page, limit, teamId, search }, auth);
+  }
+
+  // ==================== Realtime Analytics ====================
+  @Get('realtime/stats')
+  @ApiOperation({ summary: '获取实时平台统计' })
+  getRealtimePlatformStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getRealtimePlatformStats(auth);
+  }
+
+  @Get('realtime/hot-links')
+  @ApiOperation({ summary: '获取实时热门链接' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'period', required: false })
+  getRealtimeHotLinks(
+    @Headers('authorization') auth: string,
+    @Query('limit') limit?: number,
+    @Query('period') period?: string,
+  ) {
+    return this.proxyService.getRealtimeHotLinks({ limit, period }, auth);
+  }
+
+  @Get('realtime/map')
+  @ApiOperation({ summary: '获取实时地理分布' })
+  getRealtimeMap(@Headers('authorization') auth: string) {
+    return this.proxyService.getRealtimeMap(auth);
+  }
+
+  @Get('realtime/timeline')
+  @ApiOperation({ summary: '获取实时时间线数据' })
+  @ApiQuery({ name: 'minutes', required: false, type: Number })
+  @ApiQuery({ name: 'interval', required: false })
+  getRealtimeTimeline(
+    @Headers('authorization') auth: string,
+    @Query('minutes') minutes?: number,
+    @Query('interval') interval?: string,
+  ) {
+    return this.proxyService.getRealtimeTimeline({ minutes, interval }, auth);
   }
 }

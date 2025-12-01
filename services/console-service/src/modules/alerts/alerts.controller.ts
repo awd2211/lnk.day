@@ -39,6 +39,12 @@ export class AlertsController {
 
   // ========== Alert Rules (MUST be before :id routes) ==========
 
+  @Get('rules/stats')
+  @ApiOperation({ summary: '获取规则统计' })
+  async getRuleStats() {
+    return this.alertsService.getRuleStats();
+  }
+
   @Get('rules/types')
   @ApiOperation({ summary: '获取规则类型列表' })
   async getRuleTypes() {

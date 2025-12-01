@@ -18,6 +18,8 @@ import { ProxyModule } from './modules/proxy/proxy.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
+import { AutomationModule } from './modules/automation/automation.module';
+import { TemplatesModule } from './modules/templates/templates.module';
 
 @Module({
   imports: [
@@ -87,6 +89,8 @@ import { AlertsModule } from './modules/alerts/alerts.module';
     HealthModule,
     AuditModule,
     AlertsModule,
+    AutomationModule,
+    TemplatesModule,
   ],
   providers: [
     {

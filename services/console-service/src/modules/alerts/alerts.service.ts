@@ -221,6 +221,40 @@ export class AlertsService {
 
   // ========== Alert Rules ==========
 
+  async getRuleStats(): Promise<{
+    totalRules: number;
+    activeRules: number;
+    triggeredToday: number;
+    criticalAlerts: number;
+  }> {
+    const totalRules = await this.ruleRepository.count();
+    const activeRules = await this.ruleRepository.count({ where: { enabled: true } });
+
+    // 今日触发的告警数
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const triggeredToday = await this.alertRepository.count({
+      where: {
+        createdAt: Between(today, new Date()),
+      },
+    });
+
+    // 严重告警数
+    const criticalAlerts = await this.alertRepository.count({
+      where: {
+        severity: AlertSeverity.CRITICAL,
+        status: AlertStatus.ACTIVE,
+      },
+    });
+
+    return {
+      totalRules,
+      activeRules,
+      triggeredToday,
+      criticalAlerts,
+    };
+  }
+
   async findAllRules(query: QueryAlertRulesDto): Promise<{
     rules: AlertRule[];
     total: number;

@@ -184,8 +184,16 @@ export class ProxyService {
   }
 
   // Link Service Proxies
-  async getLinks(teamId: string, params?: { page?: number; limit?: number; status?: string }, auth?: string): Promise<any> {
-    const result = await this.forward('link', '/links', { params: { ...params, teamId }, headers: auth ? { Authorization: auth } : {} });
+  async getLinks(teamId: string, params?: { page?: number; limit?: number; status?: string; search?: string }, auth?: string): Promise<any> {
+    // 管理后台使用内部 API 端点获取所有链接
+    const queryParams: any = { ...params };
+    if (teamId) {
+      queryParams.teamId = teamId;
+    }
+    const result = await this.forward('link', '/links/internal/admin/all', {
+      params: queryParams,
+      headers: auth ? { Authorization: auth } : {}
+    });
     return this.normalizeListResponse(result, params);
   }
 
@@ -264,11 +272,25 @@ export class ProxyService {
   }
 
   // Page Service Proxies
-  async getPages(teamId: string, params?: { status?: string }, auth?: string): Promise<any> {
-    return this.forward('page', '/pages', {
-      params,
-      headers: { 'x-team-id': teamId, ...(auth ? { Authorization: auth } : {}) },
+  async getPages(teamId?: string, params?: { status?: string; page?: number; limit?: number }, auth?: string): Promise<any> {
+    const headers: Record<string, string> = auth ? { Authorization: auth } : {};
+    if (teamId) {
+      headers['x-team-id'] = teamId;
+    }
+    // 如果没有传 teamId，则查询所有页面（管理员模式）
+    const result = await this.forward('page', '/pages', {
+      params: { ...params, all: !teamId },
+      headers,
     });
+    // Enrich with team names
+    const items = result?.items || result?.pages || result?.data || [];
+    const enrichedItems = await this.enrichWithTeamNames(items, auth);
+    return {
+      items: enrichedItems,
+      total: result?.total || items.length,
+      page: params?.page || 1,
+      limit: params?.limit || 20,
+    };
   }
 
   async getPage(id: string, auth?: string): Promise<any> {
@@ -1323,5 +1345,431 @@ export class ProxyService {
       method: 'POST',
       headers: auth ? { Authorization: auth } : {},
     });
+  }
+
+  // ==================== SSO Configuration ====================
+  async getSsoConfigs(params?: { page?: number; limit?: number; provider?: string; status?: string; type?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('user', '/sso/configs', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async getSsoConfig(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/sso/configs/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async createSsoConfig(data: any, auth?: string): Promise<any> {
+    return this.forward('user', '/sso/configs', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateSsoConfig(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('user', `/sso/configs/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async deleteSsoConfig(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/sso/configs/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async testSsoConfig(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/sso/configs/${id}/test`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async toggleSsoConfig(id: string, enabled: boolean, auth?: string): Promise<any> {
+    return this.forward('user', `/sso/configs/${id}/toggle`, {
+      method: 'PATCH',
+      data: { enabled },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSsoStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('user', '/sso/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalConfigs: 0,
+        activeConfigs: 0,
+        totalLogins: 0,
+        loginsByProvider: {},
+      };
+    }
+  }
+
+  // ==================== Security Scan ====================
+  async getSecurityStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/security/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalScans: 0,
+        threatsDetected: 0,
+        threatsBlocked: 0,
+        blacklistSize: 0,
+        recentEvents: [],
+      };
+    }
+  }
+
+  async getSecurityScans(params?: { page?: number; limit?: number; status?: string; type?: string; threatLevel?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/security/scans', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async getSecurityScan(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/security/scans/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async triggerSecurityScan(linkId: string, auth?: string): Promise<any> {
+    return this.forward('link', '/security/scans', {
+      method: 'POST',
+      data: { linkId },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSecurityBlacklist(params?: { page?: number; limit?: number; type?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/security/blacklist', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async addToBlacklist(data: { pattern: string; type: string; reason?: string }, auth?: string): Promise<any> {
+    return this.forward('link', '/security/blacklist', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async removeFromBlacklist(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/security/blacklist/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSecurityEvents(params?: { page?: number; limit?: number; severity?: string; type?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/security/events', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  // ==================== A/B Tests ====================
+  async getAbTests(params?: { page?: number; limit?: number; status?: string; teamId?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/abtests', { params, headers: auth ? { Authorization: auth } : {} });
+      const items = result?.items || result?.abtests || result?.data || [];
+      const enrichedItems = await this.enrichWithTeamNames(items, auth);
+      return {
+        items: enrichedItems,
+        total: result?.total || items.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+      };
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async getAbTest(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/abtests/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async getAbTestStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/abtests/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalTests: 0,
+        activeTests: 0,
+        completedTests: 0,
+        averageImprovement: 0,
+      };
+    }
+  }
+
+  async stopAbTest(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/abtests/${id}/stop`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getAbTestResults(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/abtests/${id}/results`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async declareAbTestWinner(id: string, variantId: string, auth?: string): Promise<any> {
+    return this.forward('link', `/abtests/${id}/winner`, {
+      method: 'POST',
+      data: { variantId },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Goals & Conversions ====================
+  async getGoals(params?: { page?: number; limit?: number; status?: string; teamId?: string; type?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('campaign', '/goals', { params, headers: auth ? { Authorization: auth } : {} });
+      const items = result?.items || result?.goals || result?.data || [];
+      const enrichedItems = await this.enrichWithTeamNames(items, auth);
+      return {
+        items: enrichedItems,
+        total: result?.total || items.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+      };
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async getGoal(id: string, auth?: string): Promise<any> {
+    return this.forward('campaign', `/goals/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async getGoalStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('campaign', '/goals/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalGoals: 0,
+        activeGoals: 0,
+        completedGoals: 0,
+        averageCompletionRate: 0,
+        totalConversions: 0,
+      };
+    }
+  }
+
+  async getGoalFunnel(id: string, params?: { startDate?: string; endDate?: string }, auth?: string): Promise<any> {
+    return this.forward('campaign', `/goals/${id}/funnel`, { params, headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async getGoalRankings(params?: { limit?: number; sortBy?: string; period?: string }, auth?: string): Promise<any> {
+    try {
+      return await this.forward('campaign', '/goals/rankings', { params, headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async getGoalConversions(id: string, params?: { page?: number; limit?: number; startDate?: string; endDate?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('campaign', `/goals/${id}/conversions`, { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  // ==================== Redirect Rules ====================
+  async getRedirectRules(params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/redirect-rules', { params, headers: auth ? { Authorization: auth } : {} });
+      const items = result?.items || result?.rules || result?.data || [];
+      const enrichedItems = await this.enrichWithTeamNames(items, auth);
+      return {
+        items: enrichedItems,
+        total: result?.total || items.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+      };
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async getRedirectRule(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/redirect-rules/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async getRedirectRuleStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/redirect-rules/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalRules: 0,
+        activeRules: 0,
+        disabledRules: 0,
+        rulesByType: {},
+        totalMatches: 0,
+      };
+    }
+  }
+
+  async getRedirectRuleConflicts(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/redirect-rules/conflicts', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { items: [], total: 0 };
+    }
+  }
+
+  async toggleRedirectRule(id: string, enabled: boolean, auth?: string): Promise<any> {
+    return this.forward('link', `/redirect-rules/${id}/toggle`, {
+      method: 'PATCH',
+      data: { enabled },
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async testRedirectRule(id: string, testData: { url?: string; userAgent?: string; country?: string }, auth?: string): Promise<any> {
+    return this.forward('link', `/redirect-rules/${id}/test`, {
+      method: 'POST',
+      data: testData,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Tags (Platform Level) ====================
+  async getPlatformTags(params?: { page?: number; limit?: number; category?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/tags/platform', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async createPlatformTag(data: { name: string; description?: string; color?: string; icon?: string; category?: string }, auth?: string): Promise<any> {
+    return this.forward('link', '/tags/platform', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updatePlatformTag(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('link', `/tags/platform/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async deletePlatformTag(id: string, auth?: string): Promise<any> {
+    return this.forward('link', `/tags/platform/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getTagStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/tags/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalTags: 0,
+        systemTags: 0,
+        customTags: 0,
+        mostUsedTags: [],
+      };
+    }
+  }
+
+  async getPopularTags(params?: { limit?: number }, auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/tags/popular', { params, headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  // ==================== Folders Stats ====================
+  async getFolderStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('link', '/folders/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalFolders: 0,
+        foldersWithLinks: 0,
+        averageLinksPerFolder: 0,
+        topFolders: [],
+      };
+    }
+  }
+
+  async getFolders(params?: { page?: number; limit?: number; teamId?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('link', '/folders', { params, headers: auth ? { Authorization: auth } : {} });
+      const items = result?.items || result?.folders || result?.data || [];
+      const enrichedItems = await this.enrichWithTeamNames(items, auth);
+      return {
+        items: enrichedItems,
+        total: result?.total || items.length,
+        page: params?.page || 1,
+        limit: params?.limit || 20,
+      };
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  // ==================== Realtime Analytics ====================
+  async getRealtimePlatformStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('analytics', '/realtime/platform/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        activeUsers: 0,
+        clicksLastMinute: 0,
+        clicksLast5Minutes: 0,
+        clicksLastHour: 0,
+        topCountries: [],
+        topDevices: [],
+      };
+    }
+  }
+
+  async getRealtimeHotLinks(params?: { limit?: number; period?: string }, auth?: string): Promise<any> {
+    try {
+      return await this.forward('analytics', '/realtime/platform/hot-links', { params, headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async getRealtimeMap(auth?: string): Promise<any> {
+    try {
+      return await this.forward('analytics', '/realtime/platform/map', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { points: [], countries: {} };
+    }
+  }
+
+  async getRealtimeTimeline(params?: { minutes?: number; interval?: string }, auth?: string): Promise<any> {
+    try {
+      return await this.forward('analytics', '/realtime/platform/timeline', { params, headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { points: [] };
+    }
   }
 }

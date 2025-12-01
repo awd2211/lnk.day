@@ -1,0 +1,112 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AutomationService } from './automation.service';
+import { CreateAutomationWorkflowDto } from './dto/create-automation-workflow.dto';
+import { UpdateAutomationWorkflowDto } from './dto/update-automation-workflow.dto';
+import { TriggerType } from './entities/automation-workflow.entity';
+
+@ApiTags('automation')
+@Controller('system/automation')
+@UseGuards(AuthGuard('jwt'))
+@ApiBearerAuth()
+export class AutomationController {
+  constructor(private readonly automationService: AutomationService) {}
+
+  @Get()
+  @ApiOperation({ summary: '获取自动化工作流列表' })
+  async findAll(
+    @Query('search') search?: string,
+    @Query('trigger') trigger?: TriggerType,
+    @Query('status') status?: 'enabled' | 'disabled',
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.automationService.findAll({
+      search,
+      trigger,
+      status,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+
+  @Get('stats')
+  @ApiOperation({ summary: '获取自动化工作流统计' })
+  async getStats() {
+    return this.automationService.getStats();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: '获取单个自动化工作流' })
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.automationService.findOne(id);
+  }
+
+  @Post()
+  @ApiOperation({ summary: '创建自动化工作流' })
+  async create(@Body() dto: CreateAutomationWorkflowDto) {
+    return this.automationService.create(dto);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: '更新自动化工作流' })
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateAutomationWorkflowDto,
+  ) {
+    return this.automationService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: '删除自动化工作流' })
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.automationService.remove(id);
+    return { success: true };
+  }
+
+  @Post(':id/toggle')
+  @ApiOperation({ summary: '切换工作流启用状态' })
+  async toggleEnabled(@Param('id', ParseUUIDPipe) id: string) {
+    return this.automationService.toggleEnabled(id);
+  }
+
+  @Post(':id/duplicate')
+  @ApiOperation({ summary: '复制工作流' })
+  async duplicate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.automationService.duplicate(id);
+  }
+
+  @Post(':id/execute')
+  @ApiOperation({ summary: '手动执行工作流' })
+  async execute(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { inputData?: Record<string, any> },
+  ) {
+    return this.automationService.execute(id, body.inputData);
+  }
+
+  @Get(':id/logs')
+  @ApiOperation({ summary: '获取工作流执行日志' })
+  async getExecutionLogs(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.automationService.getExecutionLogs(id, {
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 20,
+    });
+  }
+}
