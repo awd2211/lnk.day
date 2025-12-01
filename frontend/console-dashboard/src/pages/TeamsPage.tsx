@@ -52,6 +52,12 @@ interface Team {
   slug: string;
   plan: string;
   status: 'active' | 'suspended';
+  ownerId: string;
+  owner?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   memberCount: number;
   linkCount: number;
   qrCount?: number;
@@ -347,11 +353,11 @@ export default function TeamsPage() {
             <thead className="border-b bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">团队</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">所有者</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">套餐</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">成员</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">链接</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">点击</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">创建时间</th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">操作</th>
               </tr>
@@ -381,6 +387,21 @@ export default function TeamsPage() {
                       </button>
                     </td>
                     <td className="px-6 py-4">
+                      {team.owner ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-sm font-medium">
+                            {team.owner.name?.charAt(0) || 'U'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{team.owner.name}</p>
+                            <p className="text-xs text-gray-500">{team.owner.email}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       <button onClick={() => handleToggleStatus(team)}>
                         {team.status === 'active' ? (
                           <Badge variant="success" className="cursor-pointer">
@@ -407,9 +428,6 @@ export default function TeamsPage() {
                         <Link2 className="h-4 w-4 text-gray-400" />
                         {team.linkCount || 0}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {team.totalClicks?.toLocaleString() || 0}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {formatDate(team.createdAt)}

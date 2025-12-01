@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
-  Trash2,
   Eye,
   Megaphone,
   Target,
@@ -15,10 +14,15 @@ import {
   Building2,
   BarChart3,
   Play,
-  Pause,
-  CheckCircle,
-  Archive,
-  AlertTriangle,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  ShieldAlert,
+  Ban,
+  Flag,
+  History,
+  FileText,
+  UserCircle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -45,27 +49,33 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { proxyService } from '@/lib/api';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { proxyService, campaignsService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
+
+// Admin oversight status types
+type CampaignStatus = 'active' | 'paused' | 'completed' | 'archived' | 'suspended' | 'flagged';
+type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 interface Campaign {
   id: string;
   name: string;
   description?: string;
   type: 'marketing' | 'affiliate' | 'social' | 'email' | 'sms' | 'other';
-  status: 'draft' | 'active' | 'paused' | 'completed' | 'archived';
+  status: CampaignStatus;
   teamId: string;
   teamName?: string;
+  ownerName?: string;
+  ownerEmail?: string;
   channels: string[];
   utmParams: {
     source?: string;
@@ -86,6 +96,15 @@ interface Campaign {
     target: number;
     current: number;
   };
+  // Admin oversight fields
+  riskLevel?: RiskLevel;
+  reportCount?: number;
+  suspendedAt?: string;
+  suspendedBy?: string;
+  suspendReason?: string;
+  flaggedAt?: string;
+  flaggedBy?: string;
+  flagReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,17 +112,27 @@ interface Campaign {
 interface CampaignStats {
   totalCampaigns: number;
   activeCampaigns: number;
+  suspendedCampaigns: number;
+  flaggedCampaigns: number;
   totalClicks: number;
   totalConversions: number;
-  totalBudget: number;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  draft: { label: '草稿', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  active: { label: '进行中', color: 'text-green-600', bgColor: 'bg-green-100' },
-  paused: { label: '已暂停', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
-  completed: { label: '已完成', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-  archived: { label: '已归档', color: 'text-gray-500', bgColor: 'bg-gray-50' },
+// Admin oversight status config
+const STATUS_CONFIG: Record<CampaignStatus, { label: string; color: string; bgColor: string; icon: typeof Shield }> = {
+  active: { label: '正常', color: 'text-green-600', bgColor: 'bg-green-100', icon: ShieldCheck },
+  paused: { label: '已暂停', color: 'text-yellow-600', bgColor: 'bg-yellow-100', icon: Shield },
+  completed: { label: '已完成', color: 'text-blue-600', bgColor: 'bg-blue-100', icon: ShieldCheck },
+  archived: { label: '已归档', color: 'text-gray-500', bgColor: 'bg-gray-100', icon: Shield },
+  suspended: { label: '已停用', color: 'text-red-600', bgColor: 'bg-red-100', icon: ShieldX },
+  flagged: { label: '待审核', color: 'text-orange-600', bgColor: 'bg-orange-100', icon: ShieldAlert },
+};
+
+const RISK_CONFIG: Record<RiskLevel, { label: string; color: string; bgColor: string }> = {
+  low: { label: '低风险', color: 'text-green-600', bgColor: 'bg-green-100' },
+  medium: { label: '中风险', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
+  high: { label: '高风险', color: 'text-orange-600', bgColor: 'bg-orange-100' },
+  critical: { label: '严重', color: 'text-red-600', bgColor: 'bg-red-100' },
 };
 
 const TYPE_CONFIG: Record<string, { label: string }> = {
@@ -115,48 +144,69 @@ const TYPE_CONFIG: Record<string, { label: string }> = {
   other: { label: '其他' },
 };
 
-// Add campaign export columns
+// Export columns for admin oversight
 const campaignExportColumns = [
   { key: 'name', header: '活动名称' },
-  { key: 'status', header: '状态', formatter: (v: string) => STATUS_CONFIG[v]?.label || v },
+  { key: 'status', header: '状态', formatter: (v: string) => STATUS_CONFIG[v as CampaignStatus]?.label || v },
+  { key: 'riskLevel', header: '风险等级', formatter: (v?: string) => v ? RISK_CONFIG[v as RiskLevel]?.label : '-' },
   { key: 'type', header: '类型', formatter: (v: string) => TYPE_CONFIG[v]?.label || v },
   { key: 'teamName', header: '团队' },
+  { key: 'ownerName', header: '创建者' },
+  { key: 'reportCount', header: '举报次数' },
   { key: 'totalLinks', header: '链接数' },
   { key: 'totalClicks', header: '点击数' },
   { key: 'conversions', header: '转化数' },
   { key: 'budget', header: '预算', formatter: (v?: number) => v ? `¥${v}` : '-' },
-  { key: 'startDate', header: '开始日期', formatter: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
-  { key: 'endDate', header: '结束日期', formatter: (v?: string) => v ? new Date(v).toLocaleDateString() : '-' },
   { key: 'createdAt', header: '创建时间', formatter: (v: string) => new Date(v).toLocaleString() },
 ];
 
 export default function CampaignsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [riskFilter, setRiskFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [deleteCampaign, setDeleteCampaign] = useState<Campaign | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  // Admin action dialogs
+  const [suspendDialog, setSuspendDialog] = useState<{ open: boolean; campaign: Campaign | null; isBulk: boolean }>({
+    open: false,
+    campaign: null,
+    isBulk: false,
+  });
+  const [suspendReason, setSuspendReason] = useState('');
+  const [flagDialog, setFlagDialog] = useState<{ open: boolean; campaign: Campaign | null }>({
+    open: false,
+    campaign: null,
+  });
+  const [flagReason, setFlagReason] = useState('');
+
   const queryClient = useQueryClient();
 
-  // Stats query with mock fallback
+  // Stats query with admin oversight metrics
   const { data: stats, isLoading: statsLoading } = useQuery<CampaignStats>({
-    queryKey: ['campaign-stats'],
+    queryKey: ['campaign-stats-admin'],
     queryFn: async () => {
       try {
-        const res = await proxyService.getAnalyticsSummary();
-        return res.data;
+        const res = await campaignsService.getStats();
+        return res.data || {
+          totalCampaigns: 0,
+          activeCampaigns: 0,
+          suspendedCampaigns: 0,
+          flaggedCampaigns: 0,
+          totalClicks: 0,
+          totalConversions: 0,
+        };
       } catch {
-        // Mock data fallback
         return {
-          totalCampaigns: 156,
-          activeCampaigns: 42,
-          totalClicks: 892450,
-          totalConversions: 23890,
-          totalBudget: 458000,
+          totalCampaigns: 0,
+          activeCampaigns: 0,
+          suspendedCampaigns: 0,
+          flaggedCampaigns: 0,
+          totalClicks: 0,
+          totalConversions: 0,
         };
       }
     },
@@ -175,88 +225,75 @@ export default function CampaignsPage() {
     },
   });
 
-  // Campaigns list with mock fallback
+  // Campaigns list with admin oversight fields
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['campaigns', { page, statusFilter, typeFilter, teamFilter, search }],
+    queryKey: ['campaigns-admin', { page, statusFilter, riskFilter, typeFilter, teamFilter, search }],
     queryFn: async () => {
-      try {
-        const res = await proxyService.getCampaigns(teamFilter !== 'all' ? teamFilter : undefined, {
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-        });
-        return res.data;
-      } catch {
-        // Mock data fallback
-        const mockCampaigns: Campaign[] = Array.from({ length: 15 }, (_, i) => ({
-          id: `campaign-${i + 1}`,
-          name: `示例活动 ${i + 1}`,
-          description: i % 3 === 0 ? '这是一个营销活动的描述文字' : undefined,
-          type: ['marketing', 'social', 'email', 'affiliate'][i % 4] as Campaign['type'],
-          status: ['active', 'draft', 'paused', 'completed', 'archived'][i % 5] as Campaign['status'],
-          teamId: `team-${(i % 5) + 1}`,
-          teamName: `团队 ${(i % 5) + 1}`,
-          channels: ['email', 'social', 'paid'].slice(0, (i % 3) + 1),
-          utmParams: {
-            source: 'google',
-            medium: 'cpc',
-            campaign: `campaign_${i + 1}`,
-          },
-          startDate: new Date(Date.now() - i * 86400000 * 7).toISOString(),
-          endDate: i % 2 === 0 ? new Date(Date.now() + 30 * 86400000).toISOString() : undefined,
-          budget: i % 3 === 0 ? (i + 1) * 1000 : undefined,
-          tags: ['Q4', '促销', '新品'].slice(0, (i % 3) + 1),
-          totalLinks: Math.floor(Math.random() * 50) + 5,
-          totalClicks: Math.floor(Math.random() * 10000) + 500,
-          conversions: Math.floor(Math.random() * 500) + 20,
-          goal: i % 2 === 0 ? {
-            type: 'clicks' as const,
-            target: 10000,
-            current: Math.floor(Math.random() * 10000),
-          } : undefined,
-          createdAt: new Date(Date.now() - i * 86400000 * 3).toISOString(),
-          updatedAt: new Date(Date.now() - i * 86400000).toISOString(),
-        }));
+      const res = await campaignsService.getCampaigns({
+        page,
+        limit: 20,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        teamId: teamFilter !== 'all' ? teamFilter : undefined,
+      });
 
-        let filtered = mockCampaigns;
-        if (statusFilter !== 'all') {
-          filtered = filtered.filter((c) => c.status === statusFilter);
-        }
-        if (typeFilter !== 'all') {
-          filtered = filtered.filter((c) => c.type === typeFilter);
-        }
-        if (search) {
-          filtered = filtered.filter((c) =>
-            c.name.toLowerCase().includes(search.toLowerCase())
-          );
-        }
+      const rawItems = res.data?.items || res.data || [];
+      let items = Array.isArray(rawItems) ? rawItems : [];
 
-        return {
-          items: filtered.slice((page - 1) * 20, page * 20),
-          total: filtered.length,
-          page,
-          totalPages: Math.ceil(filtered.length / 20),
-        };
+      // Client-side filtering for fields API may not support
+      if (riskFilter !== 'all') {
+        items = items.filter((c: Campaign) => c.riskLevel === riskFilter);
       }
+      if (search) {
+        items = items.filter((c: Campaign) =>
+          (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+          (c.ownerName || '').toLowerCase().includes(search.toLowerCase()) ||
+          (c.teamName || '').toLowerCase().includes(search.toLowerCase())
+        );
+      }
+
+      return {
+        items,
+        total: res.data?.total || items.length,
+        page: res.data?.page || page,
+        totalPages: res.data?.totalPages || Math.ceil(items.length / 20),
+      };
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => proxyService.deleteCampaign(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      queryClient.invalidateQueries({ queryKey: ['campaign-stats'] });
-      setDeleteCampaign(null);
-    },
-  });
-
-  const bulkDeleteMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(ids.map((id) => proxyService.deleteCampaign(id)));
+  // Admin action mutations
+  const suspendMutation = useMutation({
+    mutationFn: async ({ ids, reason }: { ids: string[]; reason: string }) => {
+      await Promise.all(ids.map(id => campaignsService.suspendCampaign(id, reason)));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
-      queryClient.invalidateQueries({ queryKey: ['campaign-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['campaigns-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-stats-admin'] });
+      setSuspendDialog({ open: false, campaign: null, isBulk: false });
+      setSuspendReason('');
       setSelectedIds([]);
-      setBulkDeleteOpen(false);
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await campaignsService.resumeCampaign(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-stats-admin'] });
+    },
+  });
+
+  const flagMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      await campaignsService.flagCampaign(id, reason);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign-stats-admin'] });
+      setFlagDialog({ open: false, campaign: null });
+      setFlagReason('');
     },
   });
 
@@ -292,6 +329,7 @@ export default function CampaignsPage() {
     return Math.min(progress, 100);
   };
 
+  // Admin oversight stat cards
   const statCards = [
     {
       label: '总活动数',
@@ -301,23 +339,23 @@ export default function CampaignsPage() {
       bgColor: 'bg-blue-100',
     },
     {
-      label: '进行中',
+      label: '正常运行',
       value: stats?.activeCampaigns || 0,
       icon: Play,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
     {
-      label: '总点击',
-      value: stats?.totalClicks || 0,
-      icon: MousePointerClick,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      label: '已停用',
+      value: stats?.suspendedCampaigns || 0,
+      icon: ShieldX,
+      color: 'text-red-600',
+      bgColor: 'bg-red-100',
     },
     {
-      label: '总转化',
-      value: stats?.totalConversions || 0,
-      icon: TrendingUp,
+      label: '待审核',
+      value: stats?.flaggedCampaigns || 0,
+      icon: ShieldAlert,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100',
     },
@@ -353,8 +391,8 @@ export default function CampaignsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="flex items-center gap-2">
-            <Megaphone className="h-5 w-5" />
-            活动管理
+            <Shield className="h-5 w-5" />
+            活动监管
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -365,7 +403,7 @@ export default function CampaignsPage() {
               <ExportButton
                 data={data.items}
                 columns={campaignExportColumns}
-                filename="campaigns"
+                filename="campaigns-oversight"
               />
             )}
           </div>
@@ -375,7 +413,7 @@ export default function CampaignsPage() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="搜索活动名称..."
+                placeholder="搜索活动名称、创建者、团队..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -387,11 +425,24 @@ export default function CampaignsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="draft">草稿</SelectItem>
-                <SelectItem value="active">进行中</SelectItem>
+                <SelectItem value="active">正常</SelectItem>
                 <SelectItem value="paused">已暂停</SelectItem>
                 <SelectItem value="completed">已完成</SelectItem>
                 <SelectItem value="archived">已归档</SelectItem>
+                <SelectItem value="suspended">已停用</SelectItem>
+                <SelectItem value="flagged">待审核</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={riskFilter} onValueChange={setRiskFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue placeholder="风险等级" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部风险</SelectItem>
+                <SelectItem value="low">低风险</SelectItem>
+                <SelectItem value="medium">中风险</SelectItem>
+                <SelectItem value="high">高风险</SelectItem>
+                <SelectItem value="critical">严重</SelectItem>
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -430,10 +481,10 @@ export default function CampaignsPage() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setBulkDeleteOpen(true)}
+                onClick={() => setSuspendDialog({ open: true, campaign: null, isBulk: true })}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                批量删除
+                <Ban className="mr-2 h-4 w-4" />
+                批量停用
               </Button>
               <Button
                 variant="outline"
@@ -453,20 +504,20 @@ export default function CampaignsPage() {
                   <th className="p-3 w-10">
                     <Checkbox
                       checked={
-                        data?.items?.length > 0 &&
-                        selectedIds.length === data?.items?.length
+                        (data?.items?.length ?? 0) > 0 &&
+                        selectedIds.length === (data?.items?.length ?? 0)
                       }
                       onCheckedChange={handleSelectAll}
                     />
                   </th>
                   <th className="p-3 font-medium">活动名称</th>
                   <th className="p-3 font-medium">状态</th>
+                  <th className="p-3 font-medium">风险</th>
                   <th className="p-3 font-medium">类型</th>
-                  <th className="p-3 font-medium">团队</th>
+                  <th className="p-3 font-medium">团队/创建者</th>
                   <th className="p-3 font-medium text-right">链接</th>
                   <th className="p-3 font-medium text-right">点击</th>
-                  <th className="p-3 font-medium text-right">转化</th>
-                  <th className="p-3 font-medium">日期</th>
+                  <th className="p-3 font-medium">举报</th>
                   <th className="p-3 font-medium text-right">操作</th>
                 </tr>
               </thead>
@@ -485,9 +536,12 @@ export default function CampaignsPage() {
                   </tr>
                 ) : (
                   data?.items?.map((campaign: Campaign) => {
-                    const statusConfig = STATUS_CONFIG[campaign.status];
-                    const typeConfig = TYPE_CONFIG[campaign.type];
-                    const goalProgress = getGoalProgress(campaign);
+                    // Fallback for status - API may return different status values
+                    const normalizedStatus = campaign.status && STATUS_CONFIG[campaign.status] ? campaign.status : 'active';
+                    const statusConfig = STATUS_CONFIG[normalizedStatus];
+                    const riskConfig = campaign.riskLevel && RISK_CONFIG[campaign.riskLevel] ? RISK_CONFIG[campaign.riskLevel] : null;
+                    const typeConfig = TYPE_CONFIG[campaign.type] || TYPE_CONFIG.utm;
+                    const StatusIcon = statusConfig.icon;
 
                     return (
                       <tr
@@ -510,37 +564,42 @@ export default function CampaignsPage() {
                                 {campaign.description}
                               </p>
                             )}
-                            {goalProgress !== null && (
-                              <div className="mt-1 flex items-center gap-2">
-                                <div className="h-1.5 w-20 rounded-full bg-gray-100">
-                                  <div
-                                    className={`h-full rounded-full ${
-                                      goalProgress >= 100 ? 'bg-green-500' : 'bg-primary'
-                                    }`}
-                                    style={{ width: `${goalProgress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {goalProgress.toFixed(0)}%
-                                </span>
-                              </div>
-                            )}
                           </div>
                         </td>
                         <td className="p-3">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${statusConfig?.bgColor || 'bg-gray-100'} ${statusConfig?.color || 'text-gray-600'}`}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${statusConfig?.bgColor || 'bg-gray-100'} ${statusConfig?.color || 'text-gray-600'}`}
                           >
+                            <StatusIcon className="h-3 w-3" />
                             {statusConfig?.label || campaign.status}
                           </span>
+                        </td>
+                        <td className="p-3">
+                          {riskConfig ? (
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${riskConfig.bgColor} ${riskConfig.color}`}
+                            >
+                              {riskConfig.label}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </td>
                         <td className="p-3">
                           <Badge variant="outline">{typeConfig?.label || campaign.type}</Badge>
                         </td>
                         <td className="p-3">
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-sm">{campaign.teamName || '-'}</span>
+                          <div className="text-sm">
+                            <div className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3 text-muted-foreground" />
+                              <span>{campaign.teamName || '-'}</span>
+                            </div>
+                            {campaign.ownerName && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <UserCircle className="h-3 w-3" />
+                                <span>{campaign.ownerName}</span>
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="p-3 text-right font-medium">
@@ -549,18 +608,14 @@ export default function CampaignsPage() {
                         <td className="p-3 text-right font-medium">
                           {campaign.totalClicks.toLocaleString()}
                         </td>
-                        <td className="p-3 text-right font-medium">
-                          {campaign.conversions.toLocaleString()}
-                        </td>
                         <td className="p-3">
-                          <div className="text-sm">
-                            <p>{formatDate(campaign.startDate)}</p>
-                            {campaign.endDate && (
-                              <p className="text-xs text-muted-foreground">
-                                至 {formatDate(campaign.endDate)}
-                              </p>
-                            )}
-                          </div>
+                          {campaign.reportCount && campaign.reportCount > 0 ? (
+                            <Badge variant="destructive" className="text-xs">
+                              {campaign.reportCount}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -568,17 +623,42 @@ export default function CampaignsPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => setSelectedCampaign(campaign)}
+                              title="查看详情"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteCampaign(campaign)}
-                              className="text-red-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {campaign.status === 'suspended' ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => resumeMutation.mutate(campaign.id)}
+                                title="解除停用"
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSuspendDialog({ open: true, campaign, isBulk: false })}
+                                title="停用"
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Ban className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {campaign.status !== 'flagged' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setFlagDialog({ open: true, campaign })}
+                                title="标记可疑"
+                                className="text-orange-500 hover:text-orange-600"
+                              >
+                                <Flag className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -626,9 +706,10 @@ export default function CampaignsPage() {
           </SheetHeader>
           {selectedCampaign && (
             <Tabs defaultValue="info" className="mt-4">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="info">基本信息</TabsTrigger>
-                <TabsTrigger value="stats">统计数据</TabsTrigger>
+                <TabsTrigger value="security">安全信息</TabsTrigger>
+                <TabsTrigger value="audit">审计日志</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info" className="space-y-4 mt-4">
@@ -636,7 +717,7 @@ export default function CampaignsPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">状态</p>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
                         STATUS_CONFIG[selectedCampaign.status]?.bgColor || 'bg-gray-100'
                       } ${STATUS_CONFIG[selectedCampaign.status]?.color || 'text-gray-600'}`}
                     >
@@ -665,91 +746,33 @@ export default function CampaignsPage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">预算</p>
+                    <p className="text-sm text-muted-foreground">创建者</p>
                     <p className="font-medium flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />
-                      {formatCurrency(selectedCampaign.budget)}
+                      <UserCircle className="h-4 w-4" />
+                      {selectedCampaign.ownerName || '-'}
                     </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">开始日期</p>
+                    <p className="text-sm text-muted-foreground">预算</p>
                     <p className="font-medium flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      {formatDate(selectedCampaign.startDate)}
+                      <DollarSign className="h-4 w-4" />
+                      {formatCurrency(selectedCampaign.budget)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">结束日期</p>
+                    <p className="text-sm text-muted-foreground">日期范围</p>
                     <p className="font-medium flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {formatDate(selectedCampaign.endDate)}
+                      {formatDate(selectedCampaign.startDate)} - {formatDate(selectedCampaign.endDate)}
                     </p>
                   </div>
                 </div>
 
-                {selectedCampaign.channels.length > 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">渠道</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedCampaign.channels.map((channel) => (
-                        <Badge key={channel} variant="secondary">
-                          {channel}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedCampaign.tags.length > 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">标签</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedCampaign.tags.map((tag) => (
-                        <Badge key={tag} variant="outline">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* UTM Parameters */}
-                {Object.keys(selectedCampaign.utmParams).length > 0 && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">UTM 参数</p>
-                    <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
-                      {selectedCampaign.utmParams.source && (
-                        <p>utm_source: {selectedCampaign.utmParams.source}</p>
-                      )}
-                      {selectedCampaign.utmParams.medium && (
-                        <p>utm_medium: {selectedCampaign.utmParams.medium}</p>
-                      )}
-                      {selectedCampaign.utmParams.campaign && (
-                        <p>utm_campaign: {selectedCampaign.utmParams.campaign}</p>
-                      )}
-                      {selectedCampaign.utmParams.term && (
-                        <p>utm_term: {selectedCampaign.utmParams.term}</p>
-                      )}
-                      {selectedCampaign.utmParams.content && (
-                        <p>utm_content: {selectedCampaign.utmParams.content}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-muted-foreground">创建时间</p>
-                  <p className="text-sm">
-                    {new Date(selectedCampaign.createdAt).toLocaleString('zh-CN')}
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="stats" className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-4">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                   <Card>
                     <CardContent className="p-4 text-center">
                       <Link2 className="h-5 w-5 mx-auto text-blue-500" />
@@ -809,85 +832,277 @@ export default function CampaignsPage() {
                           style={{ width: `${getGoalProgress(selectedCampaign)}%` }}
                         />
                       </div>
-                      <p className="mt-2 text-sm text-center text-muted-foreground">
-                        完成 {getGoalProgress(selectedCampaign)?.toFixed(1)}%
-                      </p>
                     </CardContent>
                   </Card>
                 )}
+              </TabsContent>
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      转化率
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">
-                      {selectedCampaign.totalClicks > 0
-                        ? ((selectedCampaign.conversions / selectedCampaign.totalClicks) * 100).toFixed(2)
-                        : 0}
-                      %
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedCampaign.conversions} 转化 / {selectedCampaign.totalClicks} 点击
-                    </p>
-                  </CardContent>
-                </Card>
+              <TabsContent value="security" className="space-y-4 mt-4">
+                {/* Risk Level */}
+                <div className="rounded-lg border p-4">
+                  <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <ShieldAlert className="h-4 w-4" />
+                    风险评估
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">风险等级</p>
+                      {selectedCampaign.riskLevel ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                            RISK_CONFIG[selectedCampaign.riskLevel].bgColor
+                          } ${RISK_CONFIG[selectedCampaign.riskLevel].color}`}
+                        >
+                          {RISK_CONFIG[selectedCampaign.riskLevel].label}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">未评估</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">举报次数</p>
+                      <p className="font-medium">{selectedCampaign.reportCount || 0}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Suspension Info */}
+                {selectedCampaign.status === 'suspended' && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                    <h4 className="font-medium flex items-center gap-2 mb-3 text-red-700">
+                      <ShieldX className="h-4 w-4" />
+                      停用信息
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-red-600">停用时间:</span>
+                        <span>{selectedCampaign.suspendedAt ? new Date(selectedCampaign.suspendedAt).toLocaleString('zh-CN') : '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-red-600">操作者:</span>
+                        <span>{selectedCampaign.suspendedBy || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-red-600">原因:</span>
+                        <p className="mt-1 p-2 bg-white rounded">{selectedCampaign.suspendReason || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Flag Info */}
+                {selectedCampaign.status === 'flagged' && (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                    <h4 className="font-medium flex items-center gap-2 mb-3 text-orange-700">
+                      <Flag className="h-4 w-4" />
+                      待审核信息
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-orange-600">标记时间:</span>
+                        <span>{selectedCampaign.flaggedAt ? new Date(selectedCampaign.flaggedAt).toLocaleString('zh-CN') : '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-orange-600">标记者:</span>
+                        <span>{selectedCampaign.flaggedBy || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-orange-600">原因:</span>
+                        <p className="mt-1 p-2 bg-white rounded">{selectedCampaign.flagReason || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Admin Actions */}
+                <div className="rounded-lg border p-4">
+                  <h4 className="font-medium mb-3">管理操作</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCampaign.status === 'suspended' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => resumeMutation.mutate(selectedCampaign.id)}
+                        className="text-green-600"
+                      >
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        解除停用
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSuspendDialog({ open: true, campaign: selectedCampaign, isBulk: false })}
+                        className="text-red-600"
+                      >
+                        <Ban className="mr-2 h-4 w-4" />
+                        停用活动
+                      </Button>
+                    )}
+                    {selectedCampaign.status !== 'flagged' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFlagDialog({ open: true, campaign: selectedCampaign })}
+                        className="text-orange-600"
+                      >
+                        <Flag className="mr-2 h-4 w-4" />
+                        标记可疑
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="audit" className="space-y-4 mt-4">
+                <div className="rounded-lg border p-4">
+                  <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <History className="h-4 w-4" />
+                    操作记录
+                  </h4>
+                  <div className="space-y-3">
+                    {/* Mock audit logs */}
+                    {[
+                      { action: '活动创建', user: selectedCampaign.ownerEmail || 'unknown', time: selectedCampaign.createdAt },
+                      ...(selectedCampaign.flaggedAt ? [{ action: '标记为可疑', user: selectedCampaign.flaggedBy || 'system', time: selectedCampaign.flaggedAt, reason: selectedCampaign.flagReason }] : []),
+                      ...(selectedCampaign.suspendedAt ? [{ action: '停用活动', user: selectedCampaign.suspendedBy || 'admin', time: selectedCampaign.suspendedAt, reason: selectedCampaign.suspendReason }] : []),
+                    ].map((log, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+                        <FileText className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-sm">{log.action}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(log.time).toLocaleString('zh-CN')}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">操作者: {log.user}</p>
+                          {'reason' in log && log.reason && (
+                            <p className="text-xs mt-1 text-muted-foreground">原因: {log.reason}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteCampaign} onOpenChange={() => setDeleteCampaign(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              确认删除
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除活动 "{deleteCampaign?.name}" 吗？此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteCampaign && deleteMutation.mutate(deleteCampaign.id)}
-              className="bg-red-500 hover:bg-red-600"
+      {/* Suspend Dialog */}
+      <Dialog open={suspendDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setSuspendDialog({ open: false, campaign: null, isBulk: false });
+          setSuspendReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-5 w-5 text-red-500" />
+              {suspendDialog.isBulk ? '批量停用活动' : '停用活动'}
+            </DialogTitle>
+            <DialogDescription>
+              {suspendDialog.isBulk
+                ? `确定要停用选中的 ${selectedIds.length} 个活动吗？停用后活动将无法正常运行。`
+                : `确定要停用活动 "${suspendDialog.campaign?.name}" 吗？停用后活动将无法正常运行。`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="suspend-reason">停用原因 *</Label>
+              <Textarea
+                id="suspend-reason"
+                placeholder="请输入停用原因，将记录在审计日志中..."
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuspendDialog({ open: false, campaign: null, isBulk: false });
+                setSuspendReason('');
+              }}
             >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                const ids = suspendDialog.isBulk
+                  ? selectedIds
+                  : suspendDialog.campaign
+                  ? [suspendDialog.campaign.id]
+                  : [];
+                suspendMutation.mutate({ ids, reason: suspendReason });
+              }}
+              disabled={!suspendReason.trim()}
+            >
+              确认停用
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Bulk Delete Confirmation */}
-      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              批量删除确认
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除选中的 {selectedIds.length} 个活动吗？此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => bulkDeleteMutation.mutate(selectedIds)}
-              className="bg-red-500 hover:bg-red-600"
+      {/* Flag Dialog */}
+      <Dialog open={flagDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setFlagDialog({ open: false, campaign: null });
+          setFlagReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-orange-500" />
+              标记可疑活动
+            </DialogTitle>
+            <DialogDescription>
+              将活动 "{flagDialog.campaign?.name}" 标记为可疑，需要进一步审核。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="flag-reason">标记原因 *</Label>
+              <Textarea
+                id="flag-reason"
+                placeholder="请输入标记原因，例如：异常流量模式、可疑推广内容等..."
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFlagDialog({ open: false, campaign: null });
+                setFlagReason('');
+              }}
             >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                if (flagDialog.campaign) {
+                  flagMutation.mutate({ id: flagDialog.campaign.id, reason: flagReason });
+                }
+              }}
+              disabled={!flagReason.trim()}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              确认标记
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

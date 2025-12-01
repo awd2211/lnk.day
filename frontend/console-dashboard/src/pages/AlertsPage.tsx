@@ -76,6 +76,115 @@ interface AlertRule {
   createdAt: string;
 }
 
+// 后端 severity 到前端 type 的映射
+const severityToType = (severity: string): 'error' | 'warning' | 'info' => {
+  switch (severity) {
+    case 'critical':
+    case 'high':
+      return 'error';
+    case 'medium':
+      return 'warning';
+    case 'low':
+    default:
+      return 'info';
+  }
+};
+
+// 后端 severity 到前端 severity 的映射
+const backendSeverityToFrontend = (severity: string): 'info' | 'warning' | 'critical' => {
+  switch (severity) {
+    case 'critical':
+    case 'high':
+      return 'critical';
+    case 'medium':
+      return 'warning';
+    case 'low':
+    default:
+      return 'info';
+  }
+};
+
+// 转换后端 Alert 数据到前端格式
+const transformAlert = (backendAlert: any): Alert => {
+  // 从 metadata 中提取 metric 信息（如果有）
+  let metric: Alert['metric'] | undefined;
+  if (backendAlert.metadata?.metric) {
+    metric = backendAlert.metadata.metric;
+  } else if (backendAlert.rule?.conditions?.[0]) {
+    const cond = backendAlert.rule.conditions[0];
+    metric = {
+      name: cond.metric || '',
+      value: backendAlert.metadata?.currentValue || 0,
+      threshold: typeof cond.value === 'number' ? cond.value : 0,
+      unit: backendAlert.metadata?.unit || '',
+    };
+  }
+
+  return {
+    id: backendAlert.id,
+    type: severityToType(backendAlert.severity),
+    source: backendAlert.source || backendAlert.category || 'system',
+    title: backendAlert.title,
+    message: backendAlert.description || '',
+    metric,
+    status: backendAlert.status,
+    createdAt: backendAlert.createdAt,
+    acknowledgedAt: backendAlert.acknowledgedAt,
+    resolvedAt: backendAlert.resolvedAt,
+  };
+};
+
+// 转换后端 AlertRule 数据到前端格式
+const transformRule = (backendRule: any): AlertRule => {
+  const firstCondition = backendRule.conditions?.[0] || {};
+  return {
+    id: backendRule.id,
+    name: backendRule.name,
+    description: backendRule.description || '',
+    metric: firstCondition.metric || '',
+    condition: firstCondition.operator || 'gt',
+    threshold: typeof firstCondition.value === 'number' ? firstCondition.value : 0,
+    severity: backendSeverityToFrontend(backendRule.severity),
+    enabled: backendRule.enabled,
+    channels: (backendRule.notificationChannels || []) as ('email' | 'slack' | 'webhook')[],
+    cooldown: backendRule.cooldownSeconds || 300,
+    createdAt: backendRule.createdAt,
+  };
+};
+
+// 前端 severity 到后端 severity 的映射
+const frontendSeverityToBackend = (severity: 'info' | 'warning' | 'critical'): string => {
+  switch (severity) {
+    case 'critical':
+      return 'critical';
+    case 'warning':
+      return 'medium';
+    case 'info':
+    default:
+      return 'low';
+  }
+};
+
+// 转换前端 RuleFormData 到后端格式
+const transformRuleToBackend = (formData: RuleFormData): any => {
+  return {
+    name: formData.name,
+    description: formData.description,
+    type: 'threshold',
+    severity: frontendSeverityToBackend(formData.severity),
+    conditions: [
+      {
+        metric: formData.metric,
+        operator: formData.condition,
+        value: formData.threshold,
+      },
+    ],
+    notificationChannels: formData.channels,
+    cooldownSeconds: formData.cooldown,
+    enabled: true,
+  };
+};
+
 interface RuleFormData {
   name: string;
   description: string;
@@ -151,7 +260,8 @@ export default function AlertsPage() {
       const response = await alertsService.getAlerts({
         status: statusFilter === 'all' ? undefined : statusFilter
       });
-      return (response.data?.alerts || []) as Alert[];
+      const backendAlerts = response.data?.alerts || [];
+      return backendAlerts.map(transformAlert);
     },
   });
 
@@ -160,7 +270,8 @@ export default function AlertsPage() {
     queryKey: ['alert-rules'],
     queryFn: async () => {
       const response = await alertsService.getRules();
-      return (response.data?.rules || []) as AlertRule[];
+      const backendRules = response.data?.rules || [];
+      return backendRules.map(transformRule);
     },
   });
 
@@ -182,7 +293,7 @@ export default function AlertsPage() {
 
   // Create rule mutation
   const createRuleMutation = useMutation({
-    mutationFn: (data: RuleFormData) => alertsService.createRule(data),
+    mutationFn: (data: RuleFormData) => alertsService.createRule(transformRuleToBackend(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
       setCreateRuleOpen(false);
@@ -193,7 +304,7 @@ export default function AlertsPage() {
   // Update rule mutation
   const updateRuleMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: RuleFormData }) =>
-      alertsService.updateRule(id, data),
+      alertsService.updateRule(id, transformRuleToBackend(data)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
       setEditingRule(null);
@@ -264,7 +375,7 @@ export default function AlertsPage() {
     return new Date(date).toLocaleString('zh-CN');
   };
 
-  const activeCount = alerts?.filter((a) => a.status === 'active').length || 0;
+  const activeCount = alerts?.filter((a: Alert) => a.status === 'active').length || 0;
 
   const RuleFormContent = ({ isEdit = false }: { isEdit?: boolean }) => (
     <div className="space-y-4 py-4">
@@ -420,7 +531,7 @@ export default function AlertsPage() {
             <div>
               <p className="text-sm text-gray-500">已解决</p>
               <p className="text-2xl font-bold">
-                {alerts?.filter(a => a.status === 'resolved').length || 0}
+                {alerts?.filter((a: Alert) => a.status === 'resolved').length || 0}
               </p>
             </div>
           </div>
@@ -478,7 +589,7 @@ export default function AlertsPage() {
                 加载中...
               </div>
             ) : alerts?.length ? (
-              alerts.map((alert) => {
+              alerts.map((alert: Alert) => {
                 const TypeIcon = typeConfig[alert.type]?.icon || Info;
                 const SourceIcon = sourceConfig[alert.source]?.icon || Server;
 
@@ -596,7 +707,7 @@ export default function AlertsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {(rules || []).map((rule) => (
+                  {(rules || []).map((rule: AlertRule) => (
                     <tr key={rule.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <div>
@@ -624,7 +735,7 @@ export default function AlertsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex gap-1">
-                          {(rule.channels || []).map((c) => (
+                          {(rule.channels || []).map((c: string) => (
                             <Badge key={c} variant="outline" className="text-xs">
                               {c}
                             </Badge>

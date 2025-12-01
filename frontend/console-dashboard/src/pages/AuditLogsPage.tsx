@@ -168,6 +168,48 @@ export default function AuditLogsPage() {
     },
   });
 
+  // Transform backend data to frontend format
+  const transformLogs = (logs: any[]): AuditLog[] => {
+    return logs.map((log) => {
+      // Determine action category from action name
+      let actionCategory: AuditLog['actionCategory'] = 'system';
+      const action = log.action || '';
+      if (action.startsWith('auth.') || action.includes('login') || action.includes('logout')) {
+        actionCategory = 'auth';
+      } else if (action.startsWith('user.') || action.includes('user')) {
+        actionCategory = 'user';
+      } else if (action.startsWith('link.') || action.includes('link')) {
+        actionCategory = 'link';
+      } else if (action.includes('billing') || action.includes('subscription') || action.includes('payment')) {
+        actionCategory = 'billing';
+      } else if (action.includes('security') || action.includes('ban') || action.includes('block')) {
+        actionCategory = 'security';
+      }
+
+      return {
+        id: log.id,
+        timestamp: log.createdAt,
+        actor: {
+          id: log.actorId || '',
+          type: (log.actorType || 'system') as AuditLog['actor']['type'],
+          name: log.actorName || 'Unknown',
+          email: log.details?.email,
+          ip: log.ipAddress,
+        },
+        action: log.action,
+        actionCategory,
+        resource: {
+          type: log.targetType || '',
+          id: log.targetId,
+          name: log.targetName,
+        },
+        status: log.status as AuditLog['status'],
+        metadata: log.details,
+        changes: log.changes,
+      };
+    });
+  };
+
   // Fetch audit logs
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['audit-logs', { search, page, category: categoryFilter, actorType: actorTypeFilter, status: statusFilter, dateRange }],
@@ -178,13 +220,20 @@ export default function AuditLogsPage() {
           page,
           limit: 20,
           search: search || undefined,
-          category: categoryFilter !== 'all' ? categoryFilter : undefined,
           actorType: actorTypeFilter !== 'all' ? actorTypeFilter : undefined,
           status: statusFilter !== 'all' ? statusFilter : undefined,
           startDate,
           endDate,
         });
-        return res.data;
+        // Transform backend data to frontend format
+        const logs = res.data?.logs || [];
+        const transformedLogs = transformLogs(logs);
+        return {
+          items: transformedLogs,
+          total: res.data?.total || 0,
+          page: res.data?.page || 1,
+          totalPages: res.data?.totalPages || 1,
+        };
       } catch {
         // Mock data fallback
         const mockLogs: AuditLog[] = [

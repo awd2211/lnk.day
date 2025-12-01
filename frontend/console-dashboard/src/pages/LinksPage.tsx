@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
   ExternalLink,
-  Trash2,
   Copy,
   Check,
   ChevronLeft,
@@ -12,11 +11,19 @@ import {
   Link2,
   MousePointerClick,
   Ban,
-  ToggleLeft,
+  Shield,
   RefreshCw,
   Loader2,
-  BarChart3,
-  Clock,
+  AlertTriangle,
+  CheckCircle,
+  Flag,
+  MessageSquare,
+  History,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+  Building2,
+  User,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -25,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -48,10 +56,17 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { proxyService } from '@/lib/api';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { proxyService, linksService } from '@/lib/api';
 import { ExportButton } from '@/components/ExportDialog';
 
-type LinkStatus = 'active' | 'disabled' | 'expired' | 'blocked';
+type LinkStatus = 'active' | 'disabled' | 'expired' | 'blocked' | 'flagged';
+type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
 interface Link {
   id: string;
@@ -60,6 +75,8 @@ interface Link {
   title?: string;
   clicks: number;
   status: LinkStatus;
+  riskLevel?: RiskLevel;
+  reportCount?: number;
   createdAt: string;
   updatedAt?: string;
   expiresAt?: string;
@@ -71,11 +88,9 @@ interface Link {
     email: string;
   };
   tags?: string[];
-  utm?: {
-    source?: string;
-    medium?: string;
-    campaign?: string;
-  };
+  blockReason?: string;
+  blockedAt?: string;
+  blockedBy?: string;
 }
 
 interface LinksResponse {
@@ -90,26 +105,48 @@ interface LinkStats {
   activeLinks: number;
   totalClicks: number;
   blockedLinks: number;
+  flaggedLinks: number;
 }
 
-const STATUS_CONFIG: Record<LinkStatus, { label: string; color: string }> = {
-  active: { label: '正常', color: 'bg-green-100 text-green-700' },
-  disabled: { label: '已禁用', color: 'bg-gray-100 text-gray-700' },
-  expired: { label: '已过期', color: 'bg-yellow-100 text-yellow-700' },
-  blocked: { label: '已封禁', color: 'bg-red-100 text-red-700' },
+const STATUS_CONFIG: Record<LinkStatus, { label: string; color: string; icon: typeof Shield }> = {
+  active: { label: '正常', color: 'bg-green-100 text-green-700', icon: ShieldCheck },
+  disabled: { label: '已禁用', color: 'bg-gray-100 text-gray-700', icon: Shield },
+  expired: { label: '已过期', color: 'bg-yellow-100 text-yellow-700', icon: Shield },
+  blocked: { label: '已封禁', color: 'bg-red-100 text-red-700', icon: ShieldX },
+  flagged: { label: '待审核', color: 'bg-orange-100 text-orange-700', icon: ShieldAlert },
+};
+
+const RISK_CONFIG: Record<RiskLevel, { label: string; color: string }> = {
+  low: { label: '低风险', color: 'bg-green-100 text-green-700' },
+  medium: { label: '中风险', color: 'bg-yellow-100 text-yellow-700' },
+  high: { label: '高风险', color: 'bg-orange-100 text-orange-700' },
+  critical: { label: '严重', color: 'bg-red-100 text-red-700' },
 };
 
 export default function LinksPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('all');
+  const [riskLevel, setRiskLevel] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
   const [page, setPage] = useState(1);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<string | string[] | null>(null);
+
+  // 管理操作对话框
+  const [blockDialog, setBlockDialog] = useState<{ open: boolean; link: Link | null; isBulk: boolean }>({
+    open: false, link: null, isBulk: false
+  });
+  const [unblockDialog, setUnblockDialog] = useState<{ open: boolean; link: Link | null }>({
+    open: false, link: null
+  });
+  const [flagDialog, setFlagDialog] = useState<{ open: boolean; link: Link | null }>({
+    open: false, link: null
+  });
+  const [blockReason, setBlockReason] = useState('');
+  const [flagReason, setFlagReason] = useState('');
+
   const limit = 20;
 
   // Fetch teams for filter
@@ -118,109 +155,131 @@ export default function LinksPage() {
     queryFn: () => proxyService.getTeams({ limit: 100 }),
   });
 
+  // Create team name lookup map
+  const teamNameMap = useMemo(() => {
+    const teams = teamsData?.data?.items || teamsData?.data || [];
+    const map: Record<string, string> = {};
+    for (const team of teams) {
+      if (team.id && team.name) {
+        map[team.id] = team.name;
+      }
+    }
+    return map;
+  }, [teamsData]);
+
   // Fetch link stats
   const { data: stats } = useQuery<LinkStats>({
     queryKey: ['admin-link-stats'],
     queryFn: async () => {
-      // Mock stats - replace with API call
+      try {
+        const response = await linksService.getStats();
+        return response.data;
+      } catch {
+        return {
+          totalLinks: 0,
+          activeLinks: 0,
+          totalClicks: 0,
+          blockedLinks: 0,
+          flaggedLinks: 0,
+        };
+      }
+    },
+  });
+
+  // Normalize link data from API
+  const normalizeLink = (item: any): Link => {
+    // Map status
+    let linkStatus: LinkStatus = 'active';
+    if (item.status && ['active', 'disabled', 'expired', 'blocked', 'flagged'].includes(item.status)) {
+      linkStatus = item.status;
+    } else if (item.isActive === false || item.enabled === false) {
+      linkStatus = 'disabled';
+    } else if (item.isBlocked) {
+      linkStatus = 'blocked';
+    } else if (item.isFlagged) {
+      linkStatus = 'flagged';
+    } else if (item.expiresAt && new Date(item.expiresAt) < new Date()) {
+      linkStatus = 'expired';
+    }
+
+    return {
+      ...item,
+      status: linkStatus,
+      shortCode: item.shortCode || item.slug || item.id?.slice(0, 8),
+      teamName: item.teamName || teamNameMap[item.teamId] || (item.teamId ? `团队 ${item.teamId.slice(0, 8)}` : '-'),
+      createdBy: item.createdBy || (item.userId ? { id: item.userId, name: item.userName || `用户 ${item.userId.slice(0, 8)}`, email: item.userEmail || '' } : undefined),
+      clicks: item.clicks ?? item.clickCount ?? 0,
+    };
+  };
+
+  // Fetch links
+  const { data: linksData, isLoading, refetch } = useQuery({
+    queryKey: ['admin-links', teamId, status, riskLevel, search, page, teamNameMap],
+    queryFn: async () => {
+      const response = await linksService.getLinks({
+        teamId: teamId !== 'all' ? teamId : undefined,
+        status: status !== 'all' ? status : undefined,
+        search: search || undefined,
+        page,
+        limit,
+      });
+
+      const rawItems = response.data?.items || response.data?.links || response.data || [];
+      const items = Array.isArray(rawItems) ? rawItems.map(normalizeLink) : [];
+
+      // Client-side filtering for risk level if not supported by API
+      let filtered = items;
+      if (riskLevel !== 'all') {
+        filtered = filtered.filter(l => l.riskLevel === riskLevel);
+      }
+
       return {
-        totalLinks: 125430,
-        activeLinks: 98234,
-        totalClicks: 4532100,
-        blockedLinks: 156,
+        data: {
+          links: filtered,
+          total: response.data?.total || filtered.length,
+          page,
+          limit,
+        },
       };
     },
   });
 
-  // Fetch links
-  const { data: linksData, isLoading, refetch } = useQuery({
-    queryKey: ['admin-links', teamId, status, search, page],
-    queryFn: async () => {
-      if (teamId === 'all') {
-        // Mock data for all teams view
-        const mockLinks: Link[] = [
-          {
-            id: '1',
-            shortCode: 'abc123',
-            originalUrl: 'https://example.com/very-long-url-that-needs-to-be-shortened',
-            title: '示例链接',
-            clicks: 1234,
-            status: 'active',
-            createdAt: '2024-01-15T10:30:00Z',
-            teamId: 't1',
-            teamName: 'Marketing Team',
-            createdBy: { id: 'u1', name: 'John Doe', email: 'john@example.com' },
-            tags: ['marketing', 'campaign'],
-          },
-          {
-            id: '2',
-            shortCode: 'xyz789',
-            originalUrl: 'https://blog.example.com/article/12345',
-            title: '博客文章',
-            clicks: 567,
-            status: 'active',
-            createdAt: '2024-01-14T15:20:00Z',
-            teamId: 't2',
-            teamName: 'Content Team',
-            createdBy: { id: 'u2', name: 'Jane Smith', email: 'jane@example.com' },
-          },
-          {
-            id: '3',
-            shortCode: 'def456',
-            originalUrl: 'https://shop.example.com/product/special-offer',
-            clicks: 89,
-            status: 'blocked',
-            createdAt: '2024-01-13T09:00:00Z',
-            teamId: 't1',
-            teamName: 'Marketing Team',
-            createdBy: { id: 'u3', name: 'Bob Wilson', email: 'bob@example.com' },
-          },
-          {
-            id: '4',
-            shortCode: 'ghi012',
-            originalUrl: 'https://promo.example.com/winter-sale',
-            title: '冬季促销',
-            clicks: 2345,
-            status: 'expired',
-            createdAt: '2024-01-10T12:00:00Z',
-            expiresAt: '2024-01-20T00:00:00Z',
-            teamId: 't3',
-            teamName: 'Sales Team',
-            createdBy: { id: 'u1', name: 'John Doe', email: 'john@example.com' },
-          },
-        ];
-        return {
-          data: {
-            links: mockLinks.filter(
-              (l) =>
-                (status === 'all' || l.status === status) &&
-                (!search || l.shortCode.includes(search) || l.originalUrl.includes(search))
-            ),
-            total: mockLinks.length,
-            page: 1,
-            limit: 20,
-          },
-        };
-      }
-      return proxyService.getLinks(teamId, {
-        page,
-        limit,
-        status: status === 'all' ? undefined : status,
-      });
-    },
-  });
-
-  // Delete link mutation
-  const deleteLink = useMutation({
-    mutationFn: async (ids: string | string[]) => {
-      const idsArray = Array.isArray(ids) ? ids : [ids];
-      await Promise.all(idsArray.map((id) => proxyService.deleteLink(id)));
+  // 封禁链接
+  const blockLinkMutation = useMutation({
+    mutationFn: async ({ ids, reason }: { ids: string[]; reason: string }) => {
+      await Promise.all(ids.map(id => linksService.blockLink(id, reason)));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-links'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-link-stats'] });
+      setBlockDialog({ open: false, link: null, isBulk: false });
+      setBlockReason('');
       setSelectedIds([]);
-      setShowDeleteDialog(false);
-      setDeleteTarget(null);
+    },
+  });
+
+  // 解封链接
+  const unblockLinkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await linksService.unblockLink(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-links'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-link-stats'] });
+      setUnblockDialog({ open: false, link: null });
+    },
+  });
+
+  // 标记可疑
+  const flagLinkMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      await linksService.flagLink(id, reason);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-links'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-link-stats'] });
+      setFlagDialog({ open: false, link: null });
+      setFlagReason('');
     },
   });
 
@@ -233,17 +292,6 @@ export default function LinksPage() {
     navigator.clipboard.writeText(`https://lnk.day/${shortCode}`);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const handleDelete = (id: string | string[]) => {
-    setDeleteTarget(id);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = () => {
-    if (deleteTarget) {
-      deleteLink.mutate(deleteTarget);
-    }
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -271,6 +319,8 @@ export default function LinksPage() {
     { key: 'title', header: '标题' },
     { key: 'clicks', header: '点击数' },
     { key: 'status', header: '状态' },
+    { key: 'riskLevel', header: '风险等级' },
+    { key: 'reportCount', header: '举报次数' },
     { key: 'teamName', header: '团队' },
     { key: 'createdBy', header: '创建者' },
     { key: 'createdAt', header: '创建时间' },
@@ -283,6 +333,8 @@ export default function LinksPage() {
       title: link.title || '',
       clicks: link.clicks,
       status: STATUS_CONFIG[link.status]?.label || link.status,
+      riskLevel: link.riskLevel ? RISK_CONFIG[link.riskLevel]?.label : '-',
+      reportCount: link.reportCount || 0,
       teamName: link.teamName || '',
       createdBy: link.createdBy?.name || link.createdBy?.email || '',
       createdAt: format(new Date(link.createdAt), 'yyyy-MM-dd HH:mm'),
@@ -291,8 +343,19 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-lg bg-blue-100 p-2">
+          <Shield className="h-6 w-6 text-blue-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">链接监管</h1>
+          <p className="text-sm text-gray-500">监控平台链接安全，审核可疑内容，封禁违规链接</p>
+        </div>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-blue-100 p-3">
@@ -307,10 +370,10 @@ export default function LinksPage() {
         <div className="rounded-lg bg-white p-6 shadow">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-green-100 p-3">
-              <ToggleLeft className="h-6 w-6 text-green-600" />
+              <ShieldCheck className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">活跃链接</p>
+              <p className="text-sm text-gray-500">正常链接</p>
               <p className="text-2xl font-bold">{stats?.activeLinks?.toLocaleString() || 0}</p>
             </div>
           </div>
@@ -323,6 +386,17 @@ export default function LinksPage() {
             <div>
               <p className="text-sm text-gray-500">总点击量</p>
               <p className="text-2xl font-bold">{stats?.totalClicks?.toLocaleString() || 0}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg bg-white p-6 shadow">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-orange-100 p-3">
+              <ShieldAlert className="h-6 w-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">待审核</p>
+              <p className="text-2xl font-bold">{stats?.flaggedLinks?.toLocaleString() || 0}</p>
             </div>
           </div>
         </div>
@@ -377,6 +451,18 @@ export default function LinksPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={riskLevel} onValueChange={(value) => { setRiskLevel(value); setPage(1); }}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="风险等级" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部风险</SelectItem>
+              {Object.entries(RISK_CONFIG).map(([key, config]) => (
+                <SelectItem key={key} value={key}>{config.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -387,10 +473,10 @@ export default function LinksPage() {
                 variant="outline"
                 size="sm"
                 className="text-red-600"
-                onClick={() => handleDelete(selectedIds)}
+                onClick={() => setBlockDialog({ open: true, link: null, isBulk: true })}
               >
-                <Trash2 className="mr-1 h-4 w-4" />
-                批量删除
+                <Ban className="mr-1 h-4 w-4" />
+                批量封禁
               </Button>
             </>
           )}
@@ -401,8 +487,8 @@ export default function LinksPage() {
           <ExportButton
             data={prepareExportData()}
             columns={exportColumns}
-            filename="links"
-            title="导出链接数据"
+            filename="links-oversight"
+            title="导出链接监管数据"
           />
         </div>
       </div>
@@ -427,19 +513,19 @@ export default function LinksPage() {
                   原始URL
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-                  团队 / 创建者
+                  所属 / 创建者
                 </th>
                 <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
-                  点击数
+                  点击 / 举报
+                </th>
+                <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
+                  风险等级
                 </th>
                 <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
                   状态
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-                  创建时间
-                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">
-                  操作
+                  管理操作
                 </th>
               </tr>
             </thead>
@@ -457,85 +543,155 @@ export default function LinksPage() {
                   </td>
                 </tr>
               ) : (
-                links.map((link) => (
-                  <tr key={link.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4">
-                      <Checkbox
-                        checked={selectedIds.includes(link.id)}
-                        onCheckedChange={(checked) => handleSelectOne(link.id, !!checked)}
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm text-blue-600">
-                          /{link.shortCode}
-                        </span>
-                        <button
-                          onClick={() => handleCopy(link.shortCode, link.id)}
-                          className="text-gray-400 hover:text-gray-600"
+                links.map((link) => {
+                  // Fallback for status - API may return different status values
+                  const normalizedStatus = link.status && STATUS_CONFIG[link.status] ? link.status : 'active';
+                  const statusConfig = STATUS_CONFIG[normalizedStatus];
+                  const StatusIcon = statusConfig.icon;
+                  return (
+                    <tr key={link.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <Checkbox
+                          checked={selectedIds.includes(link.id)}
+                          onCheckedChange={(checked) => handleSelectOne(link.id, !!checked)}
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-blue-600">
+                            /{link.shortCode}
+                          </span>
+                          <button
+                            onClick={() => handleCopy(link.shortCode, link.id)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {copiedId === link.id ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        {link.title && (
+                          <p className="mt-1 text-xs text-gray-500">{link.title}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <a
+                          href={link.originalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600"
                         >
-                          {copiedId === link.id ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
+                          <span className="max-w-xs truncate">{link.originalUrl}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="flex items-center gap-1 text-sm font-medium">
+                              <Building2 className="h-3 w-3 text-gray-400" />
+                              {link.teamName || '-'}
+                            </p>
+                            <p className="flex items-center gap-1 text-xs text-gray-500">
+                              <User className="h-3 w-3" />
+                              {link.createdBy?.name || link.createdBy?.email || '-'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div>
+                          <span className="font-medium">{link.clicks.toLocaleString()}</span>
+                          {(link.reportCount ?? 0) > 0 && (
+                            <div className="flex items-center justify-center gap-1 text-orange-600">
+                              <Flag className="h-3 w-3" />
+                              <span className="text-xs">{link.reportCount} 举报</span>
+                            </div>
                           )}
-                        </button>
-                      </div>
-                      {link.title && (
-                        <p className="mt-1 text-xs text-gray-500">{link.title}</p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <a
-                        href={link.originalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-sm text-gray-600 hover:text-blue-600"
-                      >
-                        <span className="max-w-xs truncate">{link.originalUrl}</span>
-                        <ExternalLink className="h-3 w-3 shrink-0" />
-                      </a>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-sm font-medium">{link.teamName || '-'}</p>
-                        <p className="text-xs text-gray-500">
-                          {link.createdBy?.name || link.createdBy?.email || '-'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="font-medium">{link.clicks.toLocaleString()}</span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <Badge className={STATUS_CONFIG[link.status]?.color}>
-                        {STATUS_CONFIG[link.status]?.label}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {format(new Date(link.createdAt), 'yyyy/MM/dd', { locale: zhCN })}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedLink(link)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600"
-                          onClick={() => handleDelete(link.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {link.riskLevel && RISK_CONFIG[link.riskLevel] && (
+                          <Badge className={RISK_CONFIG[link.riskLevel].color}>
+                            {RISK_CONFIG[link.riskLevel].label}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <Badge className={`${statusConfig.color} flex items-center gap-1 justify-center`}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig.label}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <TooltipProvider>
+                          <div className="flex items-center justify-end gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setSelectedLink(link)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>查看详情</TooltipContent>
+                            </Tooltip>
+
+                            {link.status !== 'flagged' && link.status !== 'blocked' && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-orange-600"
+                                    onClick={() => setFlagDialog({ open: true, link })}
+                                  >
+                                    <Flag className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>标记可疑</TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {link.status !== 'blocked' ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600"
+                                    onClick={() => setBlockDialog({ open: true, link, isBulk: false })}
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>封禁链接</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-green-600"
+                                    onClick={() => setUnblockDialog({ open: true, link })}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>解除封禁</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TooltipProvider>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -571,28 +727,119 @@ export default function LinksPage() {
         )}
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      {/* Block Confirmation Dialog */}
+      <Dialog open={blockDialog.open} onOpenChange={(open) => setBlockDialog({ ...blockDialog, open })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Ban className="h-5 w-5" />
+              {blockDialog.isBulk ? '批量封禁链接' : '封禁链接'}
+            </DialogTitle>
             <DialogDescription>
-              {Array.isArray(deleteTarget)
-                ? `确定要删除选中的 ${deleteTarget.length} 个链接吗？此操作不可恢复。`
-                : '确定要删除此链接吗？此操作不可恢复。'}
+              {blockDialog.isBulk
+                ? `确定要封禁选中的 ${selectedIds.length} 个链接吗？封禁后用户将无法访问这些链接。`
+                : `确定要封禁链接 /${blockDialog.link?.shortCode} 吗？封禁后用户将无法访问此链接。`
+              }
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">封禁原因 *</label>
+              <Textarea
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="请输入封禁原因，将记录在审计日志中..."
+                className="mt-1"
+              />
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" onClick={() => setBlockDialog({ open: false, link: null, isBulk: false })}>
               取消
             </Button>
             <Button
               variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteLink.isPending}
+              onClick={() => blockLinkMutation.mutate({
+                ids: blockDialog.isBulk ? selectedIds : [blockDialog.link!.id],
+                reason: blockReason
+              })}
+              disabled={blockLinkMutation.isPending || !blockReason.trim()}
             >
-              {deleteLink.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              确认删除
+              {blockLinkMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认封禁
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unblock Confirmation Dialog */}
+      <Dialog open={unblockDialog.open} onOpenChange={(open) => setUnblockDialog({ ...unblockDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              解除封禁
+            </DialogTitle>
+            <DialogDescription>
+              确定要解除链接 /{unblockDialog.link?.shortCode} 的封禁状态吗？解除后用户可以正常访问此链接。
+            </DialogDescription>
+          </DialogHeader>
+          {unblockDialog.link?.blockReason && (
+            <div className="rounded-lg bg-gray-50 p-3">
+              <p className="text-sm text-gray-500">原封禁原因：</p>
+              <p className="text-sm">{unblockDialog.link.blockReason}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnblockDialog({ open: false, link: null })}>
+              取消
+            </Button>
+            <Button
+              onClick={() => unblockLinkMutation.mutate(unblockDialog.link!.id)}
+              disabled={unblockLinkMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {unblockLinkMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认解封
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Flag Dialog */}
+      <Dialog open={flagDialog.open} onOpenChange={(open) => setFlagDialog({ ...flagDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <Flag className="h-5 w-5" />
+              标记可疑链接
+            </DialogTitle>
+            <DialogDescription>
+              将链接 /{flagDialog.link?.shortCode} 标记为可疑，等待进一步审核。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">可疑原因 *</label>
+              <Textarea
+                value={flagReason}
+                onChange={(e) => setFlagReason(e.target.value)}
+                placeholder="请描述为什么认为此链接可疑..."
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFlagDialog({ open: false, link: null })}>
+              取消
+            </Button>
+            <Button
+              onClick={() => flagLinkMutation.mutate({ id: flagDialog.link!.id, reason: flagReason })}
+              disabled={flagLinkMutation.isPending || !flagReason.trim()}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {flagLinkMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认标记
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -609,9 +856,10 @@ export default function LinksPage() {
           </SheetHeader>
           {selectedLink && (
             <Tabs defaultValue="info" className="mt-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="info">基本信息</TabsTrigger>
-                <TabsTrigger value="analytics">分析数据</TabsTrigger>
+                <TabsTrigger value="security">安全信息</TabsTrigger>
+                <TabsTrigger value="audit">审计日志</TabsTrigger>
               </TabsList>
               <TabsContent value="info" className="space-y-4 mt-4">
                 <div>
@@ -656,27 +904,16 @@ export default function LinksPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm text-gray-500">状态</label>
-                    <div className="mt-1">
-                      <Badge className={STATUS_CONFIG[selectedLink.status]?.color}>
-                        {STATUS_CONFIG[selectedLink.status]?.label}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-500">点击次数</label>
-                    <p className="mt-1 text-lg font-bold">{selectedLink.clicks.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm text-gray-500">团队</label>
-                    <p className="mt-1 font-medium">{selectedLink.teamName || '-'}</p>
+                    <label className="text-sm text-gray-500">所属团队</label>
+                    <p className="mt-1 flex items-center gap-1 font-medium">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                      {selectedLink.teamName || '-'}
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm text-gray-500">创建者</label>
-                    <p className="mt-1 font-medium">
+                    <p className="mt-1 flex items-center gap-1 font-medium">
+                      <User className="h-4 w-4 text-gray-400" />
                       {selectedLink.createdBy?.name || selectedLink.createdBy?.email || '-'}
                     </p>
                   </div>
@@ -684,76 +921,131 @@ export default function LinksPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className="text-sm text-gray-500">点击次数</label>
+                    <p className="mt-1 text-lg font-bold">{selectedLink.clicks.toLocaleString()}</p>
+                  </div>
+                  <div>
                     <label className="text-sm text-gray-500">创建时间</label>
                     <p className="mt-1">
                       {format(new Date(selectedLink.createdAt), 'yyyy/MM/dd HH:mm')}
                     </p>
                   </div>
-                  {selectedLink.expiresAt && (
-                    <div>
-                      <label className="text-sm text-gray-500">过期时间</label>
-                      <p className="mt-1">
-                        {format(new Date(selectedLink.expiresAt), 'yyyy/MM/dd HH:mm')}
-                      </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="security" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-500">状态</label>
+                    <div className="mt-1">
+                      {(() => {
+                        const config = STATUS_CONFIG[selectedLink.status] || STATUS_CONFIG.active;
+                        return (
+                          <Badge className={config.color}>
+                            {config.label}
+                          </Badge>
+                        );
+                      })()}
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-500">风险等级</label>
+                    <div className="mt-1">
+                      {(() => {
+                        const riskConfig = selectedLink.riskLevel && RISK_CONFIG[selectedLink.riskLevel];
+                        if (riskConfig) {
+                          return (
+                            <Badge className={riskConfig.color}>
+                              {riskConfig.label}
+                            </Badge>
+                          );
+                        }
+                        return <span className="text-gray-400">-</span>;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-500">举报次数</label>
+                  <p className="mt-1 flex items-center gap-2">
+                    <Flag className="h-4 w-4 text-orange-500" />
+                    <span className="font-medium">{selectedLink.reportCount || 0} 次</span>
+                  </p>
+                </div>
+
+                {selectedLink.status === 'blocked' && (
+                  <div className="rounded-lg bg-red-50 p-4">
+                    <p className="text-sm font-medium text-red-700">封禁信息</p>
+                    <p className="mt-1 text-sm text-red-600">{selectedLink.blockReason}</p>
+                    <p className="mt-2 text-xs text-red-500">
+                      封禁时间: {selectedLink.blockedAt ? format(new Date(selectedLink.blockedAt), 'yyyy/MM/dd HH:mm') : '-'}
+                    </p>
+                    <p className="text-xs text-red-500">
+                      操作人: {selectedLink.blockedBy || '-'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  {selectedLink.status !== 'blocked' ? (
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedLink(null);
+                        setBlockDialog({ open: true, link: selectedLink, isBulk: false });
+                      }}
+                    >
+                      <Ban className="mr-2 h-4 w-4" />
+                      封禁此链接
+                    </Button>
+                  ) : (
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        setSelectedLink(null);
+                        setUnblockDialog({ open: true, link: selectedLink });
+                      }}
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      解除封禁
+                    </Button>
                   )}
                 </div>
-
-                {selectedLink.tags && selectedLink.tags.length > 0 && (
-                  <div>
-                    <label className="text-sm text-gray-500">标签</label>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {selectedLink.tags.map((tag) => (
-                        <Badge key={tag} variant="outline">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {selectedLink.utm && (
-                  <div>
-                    <label className="text-sm text-gray-500">UTM 参数</label>
-                    <div className="mt-1 rounded border p-3 text-sm">
-                      {selectedLink.utm.source && (
-                        <p>Source: {selectedLink.utm.source}</p>
-                      )}
-                      {selectedLink.utm.medium && (
-                        <p>Medium: {selectedLink.utm.medium}</p>
-                      )}
-                      {selectedLink.utm.campaign && (
-                        <p>Campaign: {selectedLink.utm.campaign}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
               </TabsContent>
-              <TabsContent value="analytics" className="space-y-4 mt-4">
-                <div className="rounded-lg border p-4">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <BarChart3 className="h-5 w-5" />
-                    <span>点击趋势</span>
+
+              <TabsContent value="audit" className="space-y-4 mt-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 rounded-lg border p-3">
+                    <History className="h-5 w-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">链接创建</p>
+                      <p className="text-xs text-gray-500">
+                        {format(new Date(selectedLink.createdAt), 'yyyy/MM/dd HH:mm')}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        创建者: {selectedLink.createdBy?.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-4 h-40 flex items-center justify-center text-gray-400">
-                    图表区域（需要集成分析 API）
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-lg border p-4">
-                    <p className="text-sm text-gray-500">今日点击</p>
-                    <p className="text-2xl font-bold">-</p>
-                  </div>
-                  <div className="rounded-lg border p-4">
-                    <p className="text-sm text-gray-500">本周点击</p>
-                    <p className="text-2xl font-bold">-</p>
-                  </div>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-sm text-gray-500 mb-2">来源分布</p>
-                  <p className="text-gray-400 text-center py-4">
-                    需要集成分析 API
-                  </p>
+                  {selectedLink.status === 'blocked' && selectedLink.blockedAt && (
+                    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3">
+                      <Ban className="h-5 w-5 text-red-500 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-700">链接被封禁</p>
+                        <p className="text-xs text-red-600">
+                          {format(new Date(selectedLink.blockedAt), 'yyyy/MM/dd HH:mm')}
+                        </p>
+                        <p className="text-xs text-red-600">
+                          操作人: {selectedLink.blockedBy}
+                        </p>
+                        <p className="text-xs text-red-600 mt-1">
+                          原因: {selectedLink.blockReason}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

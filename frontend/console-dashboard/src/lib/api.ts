@@ -308,26 +308,38 @@ export const domainsService = {
 
 // QR Codes
 export const qrCodesService = {
+  getStats: () => api.get('/proxy/qrcodes/stats'),
   getQRCodes: (params?: { page?: number; limit?: number; style?: string; teamId?: string }) =>
     api.get('/proxy/qrcodes', { params }),
   getQRCode: (id: string) => api.get(`/proxy/qrcodes/${id}`),
   deleteQRCode: (id: string) => api.delete(`/proxy/qrcodes/${id}`),
+  blockQRCode: (id: string, reason: string) => api.post(`/proxy/qrcodes/${id}/block`, { reason }),
+  unblockQRCode: (id: string) => api.post(`/proxy/qrcodes/${id}/unblock`),
+  flagQRCode: (id: string, reason: string) => api.post(`/proxy/qrcodes/${id}/flag`, { reason }),
 };
 
 // Deep Links
 export const deepLinksService = {
+  getStats: () => api.get('/proxy/deeplinks/stats'),
   getDeepLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string }) =>
     api.get('/proxy/deeplinks', { params }),
   getDeepLink: (id: string) => api.get(`/proxy/deeplinks/${id}`),
   deleteDeepLink: (id: string) => api.delete(`/proxy/deeplinks/${id}`),
+  blockDeepLink: (id: string, reason: string) => api.post(`/proxy/deeplinks/${id}/block`, { reason }),
+  unblockDeepLink: (id: string) => api.post(`/proxy/deeplinks/${id}/unblock`),
+  flagDeepLink: (id: string, reason: string) => api.post(`/proxy/deeplinks/${id}/flag`, { reason }),
 };
 
 // Landing Pages
 export const landingPagesService = {
+  getStats: () => api.get('/proxy/pages/stats'),
   getPages: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }) =>
     api.get('/proxy/pages', { params }),
   getPage: (id: string) => api.get(`/proxy/pages/${id}`),
   deletePage: (id: string) => api.delete(`/proxy/pages/${id}`),
+  blockPage: (id: string, reason: string) => api.post(`/proxy/pages/${id}/block`, { reason }),
+  unblockPage: (id: string) => api.post(`/proxy/pages/${id}/unblock`),
+  flagPage: (id: string, reason: string) => api.post(`/proxy/pages/${id}/flag`, { reason }),
 };
 
 // Role Management
@@ -378,6 +390,16 @@ export const integrationsService = {
     api.get(`/proxy/integrations/${id}/logs`, { params }),
 };
 
+// Integration Platform Config (Admin)
+export const integrationConfigService = {
+  getConfigs: () => api.get('/system/integrations'),
+  getConfig: (id: string) => api.get(`/system/integrations/${id}`),
+  getStats: () => api.get('/system/integrations/stats'),
+  updateConfig: (id: string, data: any) => api.put(`/system/integrations/${id}`, data),
+  toggleConfig: (id: string, enabled: boolean) =>
+    api.patch(`/system/integrations/${id}/toggle`, { enabled }),
+};
+
 // Notifications
 export const notificationsService = {
   getStats: () => api.get('/proxy/notifications/stats'),
@@ -401,4 +423,28 @@ export const notificationsService = {
   toggleChannel: (id: string, enabled: boolean) =>
     api.patch(`/proxy/notifications/channels/${id}`, { enabled }),
   testChannel: (id: string) => api.post(`/proxy/notifications/channels/${id}/test`),
+};
+
+// Campaigns
+export const campaignsService = {
+  getStats: () => api.get('/proxy/campaigns/stats'),
+  getCampaigns: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }) =>
+    api.get('/proxy/campaigns', { params }),
+  getCampaign: (id: string) => api.get(`/proxy/campaigns/${id}`),
+  deleteCampaign: (id: string) => api.delete(`/proxy/campaigns/${id}`),
+  suspendCampaign: (id: string, reason: string) => api.post(`/proxy/campaigns/${id}/suspend`, { reason }),
+  resumeCampaign: (id: string) => api.post(`/proxy/campaigns/${id}/resume`),
+  flagCampaign: (id: string, reason: string) => api.post(`/proxy/campaigns/${id}/flag`, { reason }),
+};
+
+// Links (Admin)
+export const linksService = {
+  getStats: () => api.get('/proxy/links/stats'),
+  getLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string; search?: string }) =>
+    api.get('/proxy/links', { params }),
+  getLink: (id: string) => api.get(`/proxy/links/${id}`),
+  deleteLink: (id: string) => api.delete(`/proxy/links/${id}`),
+  blockLink: (id: string, reason: string) => api.post(`/proxy/links/${id}/block`, { reason }),
+  unblockLink: (id: string) => api.post(`/proxy/links/${id}/unblock`),
+  flagLink: (id: string, reason: string) => api.post(`/proxy/links/${id}/flag`, { reason }),
 };

@@ -16,6 +16,12 @@ import {
   ShoppingBag,
   Users,
   BarChart3,
+  Key,
+  Eye,
+  EyeOff,
+  Save,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -53,7 +59,29 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { integrationsService } from '@/lib/api';
+import { integrationsService, integrationConfigService } from '@/lib/api';
+
+// ============ 类型定义 ============
+
+interface IntegrationConfig {
+  id: string;
+  type: 'zapier' | 'hubspot' | 'salesforce' | 'shopify';
+  name: string;
+  description: string;
+  enabled: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  webhookSecret?: string;
+  apiKey?: string;
+  apiSecret?: string;
+  scopes?: string[];
+  callbackUrl?: string;
+  webhookUrl?: string;
+  settings?: Record<string, any>;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface Integration {
   id: string;
@@ -88,7 +116,406 @@ const integrationTypes = [
   { type: 'shopify', name: 'Shopify', icon: ShoppingBag, color: 'bg-green-600', description: '电商平台集成' },
 ];
 
-export default function IntegrationsPage() {
+// ============ 平台配置 Tab ============
+
+function PlatformConfigTab() {
+  const queryClient = useQueryClient();
+  const [selectedConfig, setSelectedConfig] = useState<IntegrationConfig | null>(null);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
+  const [formData, setFormData] = useState<Partial<IntegrationConfig>>({});
+
+  const { data: configsData, isLoading, refetch } = useQuery({
+    queryKey: ['integration-configs'],
+    queryFn: () => integrationConfigService.getConfigs(),
+  });
+
+  const { data: configStatsData } = useQuery({
+    queryKey: ['integration-config-stats'],
+    queryFn: () => integrationConfigService.getStats(),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      integrationConfigService.updateConfig(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integration-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['integration-config-stats'] });
+      setShowConfigDialog(false);
+      setSelectedConfig(null);
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      integrationConfigService.toggleConfig(id, enabled),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integration-configs'] });
+      queryClient.invalidateQueries({ queryKey: ['integration-config-stats'] });
+    },
+  });
+
+  const configs: IntegrationConfig[] = configsData?.data || [];
+  const configStats = configStatsData?.data || { total: 0, enabled: 0, disabled: 0, byType: {} };
+
+  const getTypeInfo = (type: string) => {
+    return integrationTypes.find(t => t.type === type) ?? integrationTypes[0]!;
+  };
+
+  const openConfigDialog = (config: IntegrationConfig) => {
+    setSelectedConfig(config);
+    setFormData({
+      clientId: config.clientId || '',
+      clientSecret: config.clientSecret || '',
+      webhookSecret: config.webhookSecret || '',
+      apiKey: config.apiKey || '',
+      apiSecret: config.apiSecret || '',
+      callbackUrl: config.callbackUrl || '',
+      webhookUrl: config.webhookUrl || '',
+      scopes: config.scopes || [],
+      settings: config.settings || {},
+    });
+    setShowSecrets({});
+    setShowConfigDialog(true);
+  };
+
+  const handleSave = () => {
+    if (selectedConfig) {
+      updateMutation.mutate({
+        id: selectedConfig.id,
+        data: formData,
+      });
+    }
+  };
+
+  const toggleSecret = (field: string) => {
+    setShowSecrets(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleString('zh-CN');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">总平台数</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{configStats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">已启用</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{configStats.enabled}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">已禁用</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-400">{configStats.disabled}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Platform Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {isLoading ? (
+          <div className="col-span-2 flex justify-center py-8">
+            <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+          </div>
+        ) : configs.length === 0 ? (
+          <div className="col-span-2 text-center py-8 text-gray-500">
+            <Settings className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p>暂无集成平台配置</p>
+          </div>
+        ) : (
+          configs.map((config) => {
+            const typeInfo = getTypeInfo(config.type);
+            const Icon = typeInfo.icon;
+            const isConfigured = !!(config.clientId || config.apiKey);
+            return (
+              <Card key={config.id} className="relative">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-lg ${typeInfo.color}`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{config.name}</CardTitle>
+                        <CardDescription>{config.description}</CardDescription>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={config.enabled}
+                      onCheckedChange={(enabled) =>
+                        toggleMutation.mutate({ id: config.id, enabled })
+                      }
+                      disabled={!isConfigured}
+                    />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Status */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">状态:</span>
+                      {config.enabled ? (
+                        <Badge className="bg-green-100 text-green-800">
+                          <Power className="w-3 h-3 mr-1" />
+                          已启用
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <PowerOff className="w-3 h-3 mr-1" />
+                          已禁用
+                        </Badge>
+                      )}
+                      {!isConfigured && (
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-300">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          未配置
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* OAuth Info */}
+                    <div className="text-sm space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-500">Client ID:</span>
+                        <span className="font-mono text-xs">
+                          {config.clientId ? `${config.clientId.substring(0, 8)}...` : '未设置'}
+                        </span>
+                      </div>
+                      {config.scopes && config.scopes.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-gray-500">Scopes:</span>
+                          {config.scopes.slice(0, 3).map((scope, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">
+                              {scope}
+                            </Badge>
+                          ))}
+                          {config.scopes.length > 3 && (
+                            <span className="text-xs text-gray-400">
+                              +{config.scopes.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Last Updated */}
+                    <div className="text-xs text-gray-400">
+                      最后更新: {formatDate(config.updatedAt)}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => openConfigDialog(config)}
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        配置
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Config Dialog */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              配置 {selectedConfig && getTypeInfo(selectedConfig.type).name}
+            </DialogTitle>
+            <DialogDescription>
+              设置 OAuth 凭证和 API 密钥，以启用此集成平台
+            </DialogDescription>
+          </DialogHeader>
+          {selectedConfig && (
+            <div className="space-y-6">
+              {/* OAuth Credentials */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-gray-700">OAuth 凭证</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label>Client ID</Label>
+                    <Input
+                      value={formData.clientId || ''}
+                      onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                      placeholder="输入 Client ID"
+                    />
+                  </div>
+                  <div>
+                    <Label>Client Secret</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type={showSecrets.clientSecret ? 'text' : 'password'}
+                        value={formData.clientSecret || ''}
+                        onChange={(e) => setFormData({ ...formData, clientSecret: e.target.value })}
+                        placeholder="输入 Client Secret"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleSecret('clientSecret')}
+                      >
+                        {showSecrets.clientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Platform-specific fields */}
+              {selectedConfig.type === 'zapier' && (
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm text-gray-700">Zapier 配置</h4>
+                  <div>
+                    <Label>Webhook Secret</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type={showSecrets.webhookSecret ? 'text' : 'password'}
+                        value={formData.webhookSecret || ''}
+                        onChange={(e) => setFormData({ ...formData, webhookSecret: e.target.value })}
+                        placeholder="输入 Webhook Secret"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => toggleSecret('webhookSecret')}
+                      >
+                        {showSecrets.webhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedConfig.type === 'shopify' && (
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm text-gray-700">Shopify 配置</h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label>API Key</Label>
+                      <Input
+                        value={formData.apiKey || ''}
+                        onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                        placeholder="输入 API Key"
+                      />
+                    </div>
+                    <div>
+                      <Label>API Secret</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type={showSecrets.apiSecret ? 'text' : 'password'}
+                          value={formData.apiSecret || ''}
+                          onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
+                          placeholder="输入 API Secret"
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => toggleSecret('apiSecret')}
+                        >
+                          {showSecrets.apiSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* URLs */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-gray-700">回调 URL</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <Label>OAuth Callback URL</Label>
+                    <Input
+                      value={formData.callbackUrl || ''}
+                      onChange={(e) => setFormData({ ...formData, callbackUrl: e.target.value })}
+                      placeholder="https://your-domain.com/auth/callback"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      在第三方平台配置此 URL 作为 OAuth 回调地址
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Webhook URL</Label>
+                    <Input
+                      value={formData.webhookUrl || ''}
+                      onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
+                      placeholder="https://your-domain.com/webhooks/integration"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Scopes */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-sm text-gray-700">权限范围 (Scopes)</h4>
+                <Textarea
+                  value={(formData.scopes || []).join('\n')}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      scopes: e.target.value.split('\n').filter(s => s.trim()),
+                    })
+                  }
+                  placeholder="每行一个 scope"
+                  rows={4}
+                />
+                <p className="text-xs text-gray-500">
+                  每行输入一个权限范围，例如: read_products, write_orders
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSave} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              保存配置
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ============ 用户连接 Tab ============
+
+function UserConnectionsTab() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -185,23 +612,11 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">第三方集成</h1>
-          <p className="text-gray-500">管理 Zapier、HubSpot、Salesforce、Shopify 等平台的集成连接</p>
-        </div>
-        <Button onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          刷新
-        </Button>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">总集成数</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">总连接数</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -290,6 +705,10 @@ export default function IntegrationsPage() {
                 <option key={t.type} value={t.type}>{t.name}</option>
               ))}
             </select>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              刷新
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -304,7 +723,8 @@ export default function IntegrationsPage() {
           ) : integrations.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Plug className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>暂无集成连接</p>
+              <p>暂无用户集成连接</p>
+              <p className="text-sm mt-2">用户在 User Portal 中连接第三方平台后会显示在此处</p>
             </div>
           ) : (
             <Table>
@@ -563,6 +983,46 @@ export default function IntegrationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ============ 主组件 ============
+
+export default function IntegrationsPage() {
+  const queryClient = useQueryClient();
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">第三方集成</h1>
+          <p className="text-gray-500">管理集成平台配置和用户连接</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="config" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="config">
+            <Settings className="w-4 h-4 mr-2" />
+            平台配置
+          </TabsTrigger>
+          <TabsTrigger value="connections">
+            <Plug className="w-4 h-4 mr-2" />
+            用户连接
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="config">
+          <PlatformConfigTab />
+        </TabsContent>
+
+        <TabsContent value="connections">
+          <UserConnectionsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
