@@ -147,3 +147,14 @@ export function useUpdateTeam() {
     },
   });
 }
+
+export function useDeleteTeam() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (teamId: string) => userService.deleteTeam(teamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team'] });
+    },
+  });
+}

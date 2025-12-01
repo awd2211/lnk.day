@@ -462,6 +462,7 @@ export const userService = {
   resendTeamInvitation: (teamId: string, invitationId: string) =>
     api.post(`/api/v1/teams/${teamId}/invitations/${invitationId}/resend`),
   updateTeam: (teamId: string, data: any) => api.patch(`/api/v1/teams/${teamId}`, data),
+  deleteTeam: (teamId: string) => api.delete(`/api/v1/teams/${teamId}`),
 };
 
 // Campaign API uses the same api-gateway

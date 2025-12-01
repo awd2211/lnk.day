@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users, UserPlus, Settings, CreditCard, Building } from 'lucide-react';
 
 import Layout from '@/components/Layout';
@@ -25,6 +26,7 @@ import {
   useCancelInvitation,
   useResendInvitation,
   useUpdateTeam,
+  useDeleteTeam,
 } from '@/hooks/useTeam';
 
 const PLAN_LABELS: Record<string, string> = {
@@ -44,7 +46,9 @@ export default function TeamPage() {
   const [teamName, setTeamName] = useState('');
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [showDeleteTeamDialog, setShowDeleteTeamDialog] = useState(false);
 
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Queries
@@ -65,6 +69,7 @@ export default function TeamPage() {
   const cancelInvitation = useCancelInvitation();
   const resendInvitation = useResendInvitation();
   const updateTeam = useUpdateTeam();
+  const deleteTeam = useDeleteTeam();
 
   // Get current user from auth context
   const { user } = useAuth();
@@ -160,6 +165,23 @@ export default function TeamPage() {
       toast({ title: '保存失败', variant: 'destructive' });
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    if (!team) return;
+    try {
+      await deleteTeam.mutateAsync(team.id);
+      setShowDeleteTeamDialog(false);
+      toast({ title: '团队已删除', description: '您已成功删除团队' });
+      // 删除团队后跳转到首页
+      window.location.href = '/';
+    } catch (error: any) {
+      toast({
+        title: '删除失败',
+        description: error.response?.data?.message || '无法删除团队，请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -365,7 +387,11 @@ export default function TeamPage() {
                     <p className="text-sm text-muted-foreground">
                       删除团队后，所有团队数据将被永久删除且无法恢复。
                     </p>
-                    <Button variant="destructive" disabled>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowDeleteTeamDialog(true)}
+                      disabled={!isAdmin}
+                    >
                       删除团队
                     </Button>
                   </div>
@@ -391,7 +417,9 @@ export default function TeamPage() {
                         {team ? PLAN_LABELS[team.plan] : '---'}
                       </p>
                     </div>
-                    <Button variant="outline">升级计划</Button>
+                    <Button variant="outline" onClick={() => navigate('/billing')}>
+                      升级计划
+                    </Button>
                   </div>
                 </div>
 
@@ -443,6 +471,18 @@ export default function TeamPage() {
         confirmText="移除"
         onConfirm={handleRemoveMember}
         isLoading={removeMember.isPending}
+        variant="destructive"
+      />
+
+      {/* Delete Team Confirm Dialog */}
+      <ConfirmDialog
+        open={showDeleteTeamDialog}
+        onOpenChange={setShowDeleteTeamDialog}
+        title="删除团队"
+        description={`确定要删除团队 "${team?.name}" 吗？此操作无法撤销，所有团队数据（包括链接、成员、统计数据等）都将被永久删除。`}
+        confirmText="删除团队"
+        onConfirm={handleDeleteTeam}
+        isLoading={deleteTeam.isPending}
         variant="destructive"
       />
     </Layout>
