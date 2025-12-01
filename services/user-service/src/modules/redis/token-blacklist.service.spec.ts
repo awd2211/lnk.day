@@ -126,4 +126,40 @@ describe('TokenBlacklistService', () => {
       await service.removeFromBlacklist('test-token');
     });
   });
+
+  describe('checkRedisConnection on startup', () => {
+    it('should fall back to local cache when Redis ping fails on startup', async () => {
+      const failingRedis = {
+        ping: jest.fn().mockRejectedValue(new Error('Redis not available')),
+        setex: jest.fn(),
+        exists: jest.fn(),
+        del: jest.fn(),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          TokenBlacklistService,
+          {
+            provide: REDIS_INJECTION_TOKEN,
+            useValue: failingRedis,
+          },
+        ],
+      }).compile();
+
+      const serviceWithFailingRedis = module.get<TokenBlacklistService>(TokenBlacklistService);
+
+      // Wait for async checkRedisConnection to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Service should use local cache, not Redis
+      await serviceWithFailingRedis.addToBlacklist('test-token');
+      const isBlacklisted = await serviceWithFailingRedis.isBlacklisted('test-token');
+
+      // Should work with local cache
+      expect(isBlacklisted).toBe(true);
+      // Redis methods should not have been called after ping failed
+      expect(failingRedis.setex).not.toHaveBeenCalled();
+      expect(failingRedis.exists).not.toHaveBeenCalled();
+    });
+  });
 });
