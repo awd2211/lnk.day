@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 // ScheduleModule 暂时禁用，与多个 @Global() 模块存在冲突
 // import { ScheduleModule } from '@nestjs/schedule';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import * as Joi from 'joi';
 import {
   MetricsModule,
@@ -48,6 +49,24 @@ import { UserSagaModule } from './saga/saga.module';
         abortEarly: false,
       },
     }),
+    // Rate limiting - 防止暴力破解
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000, // 1 second
+        limit: 10,
+      },
+      {
+        name: 'medium',
+        ttl: 60000, // 1 minute
+        limit: 60,
+      },
+      {
+        name: 'long',
+        ttl: 3600000, // 1 hour
+        limit: 600,
+      },
+    ]),
     // ScheduleModule.forRoot(), // 暂时禁用
     MetricsModule.forRoot({
       serviceName: 'user-service',
@@ -96,6 +115,10 @@ import { UserSagaModule } from './saga/saga.module';
     UserSagaModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: MetricsInterceptor,

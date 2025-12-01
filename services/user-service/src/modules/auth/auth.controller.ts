@@ -15,6 +15,7 @@ import {
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -32,6 +33,7 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: '用户注册' })
   @ApiResponse({ status: 201, description: '注册成功' })
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 每分钟最多3次注册
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
@@ -40,6 +42,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '用户登录' })
   @ApiResponse({ status: 200, description: '登录成功' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 每分钟最多5次登录尝试
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -90,6 +93,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '忘记密码 - 发送重置邮件' })
   @ApiResponse({ status: 200, description: '重置邮件已发送 (如果邮箱存在)' })
+  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 每5分钟最多3次
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto.email);
   }
@@ -99,6 +103,7 @@ export class AuthController {
   @ApiOperation({ summary: '重置密码' })
   @ApiResponse({ status: 200, description: '密码重置成功' })
   @ApiResponse({ status: 400, description: '重置链接无效或已过期' })
+  @Throttle({ default: { limit: 5, ttl: 300000 } }) // 每5分钟最多5次
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(
       resetPasswordDto.token,

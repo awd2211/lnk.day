@@ -52,15 +52,32 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // 检查账户是否被锁定
+    if (this.userService.isAccountLocked(user)) {
+      const remainingMinutes = this.userService.getRemainingLockTime(user);
+      throw new UnauthorizedException(
+        `账户已被锁定，请在 ${remainingMinutes} 分钟后重试`,
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
       user.password,
     );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      // 记录登录失败
+      const result = await this.userService.recordFailedLogin(user.id);
+      if (result.locked) {
+        throw new UnauthorizedException(
+          `密码错误次数过多，账户已锁定 ${result.lockMinutes} 分钟`,
+        );
+      }
+      throw new UnauthorizedException(
+        `密码错误，还剩 ${result.remainingAttempts} 次尝试机会`,
+      );
     }
 
-    // 更新最后登录时间
+    // 更新最后登录时间 (会自动重置失败计数)
     await this.userService.updateLastLogin(user.id);
 
     const tokens = await this.generateTokensWithPermissions(user.id, user.email, user.teamId);

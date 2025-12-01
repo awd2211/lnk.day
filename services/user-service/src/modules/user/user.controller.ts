@@ -6,11 +6,12 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader, ApiQuery } from '@nestjs/swagger';
 
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -43,7 +44,15 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取当前用户信息' })
   getMe(@CurrentUser() user: AuthenticatedUser) {
-    return this.userService.findOne(user.sub);
+    return this.userService.findOne(user.id);
+  }
+
+  @Put('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '更新当前用户信息' })
+  updateMe(@CurrentUser() user: AuthenticatedUser, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.update(user.id, updateUserDto);
   }
 
   @Get(':id')
@@ -85,6 +94,32 @@ export class UserController {
       changePasswordDto.newPassword,
     );
     return { message: '密码修改成功' };
+  }
+
+  @Post('check-password-strength')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '检查密码强度' })
+  checkPasswordStrength(@Body() body: { password: string }) {
+    return this.userService.checkPasswordStrength(body.password);
+  }
+
+  // ========== 邮箱验证 API ==========
+
+  @Post('send-verification-email')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '发送邮箱验证邮件' })
+  async sendVerificationEmail(@CurrentUser() user: AuthenticatedUser) {
+    return this.userService.sendEmailVerification(user.id);
+  }
+
+  @Get('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '验证邮箱' })
+  @ApiQuery({ name: 'token', description: '验证 token', required: true })
+  async verifyEmail(@Query('token') token: string) {
+    return this.userService.verifyEmail(token);
   }
 
   // ========== 内部服务 API ==========

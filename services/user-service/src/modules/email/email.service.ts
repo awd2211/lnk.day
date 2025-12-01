@@ -51,6 +51,26 @@ export class EmailService {
     }
   }
 
+  async sendEmailVerificationEmail(to: string, verificationToken: string): Promise<void> {
+    const verifyLink = `${this.configService.get('FRONTEND_URL', 'http://localhost:60010')}/verify-email?token=${verificationToken}`;
+
+    try {
+      await axios.post(`${this.notificationServiceUrl}/email/send`, {
+        to,
+        subject: '验证您的邮箱 - lnk.day',
+        template: 'email-verification',
+        data: {
+          verifyLink,
+          expiresIn: '24小时',
+        },
+      });
+
+      this.logger.log(`Email verification sent to ${to}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to send email verification: ${error.message}`);
+    }
+  }
+
   async sendSecurityAlertEmail(
     to: string,
     alertType: string,

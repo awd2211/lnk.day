@@ -69,7 +69,22 @@ export class User {
   emailVerifiedAt?: Date;
 
   @Column({ nullable: true })
+  @Exclude()
+  emailVerificationToken?: string;
+
+  @Column({ nullable: true })
+  @Exclude()
+  emailVerificationTokenExpiresAt?: Date;
+
+  @Column({ nullable: true })
   lastLoginAt?: Date;
+
+  // 登录安全 - 账户锁定
+  @Column({ default: 0 })
+  failedLoginAttempts: number;
+
+  @Column({ nullable: true })
+  lockedUntil?: Date;
 
   @CreateDateColumn()
   createdAt: Date;
