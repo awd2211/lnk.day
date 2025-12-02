@@ -58,6 +58,16 @@ export class TemplatesService {
     private readonly bioLinkTemplateRepo: Repository<BioLinkTemplatePreset>,
     @InjectRepository(QRStylePreset)
     private readonly qrStyleRepo: Repository<QRStylePreset>,
+    @InjectRepository(DeepLinkTemplatePreset)
+    private readonly deepLinkTemplateRepo: Repository<DeepLinkTemplatePreset>,
+    @InjectRepository(WebhookTemplatePreset)
+    private readonly webhookTemplateRepo: Repository<WebhookTemplatePreset>,
+    @InjectRepository(RedirectRuleTemplatePreset)
+    private readonly redirectRuleTemplateRepo: Repository<RedirectRuleTemplatePreset>,
+    @InjectRepository(SeoTemplatePreset)
+    private readonly seoTemplateRepo: Repository<SeoTemplatePreset>,
+    @InjectRepository(ReportTemplatePreset)
+    private readonly reportTemplateRepo: Repository<ReportTemplatePreset>,
   ) {}
 
   // ==================== Link Templates ====================
@@ -532,15 +542,435 @@ export class TemplatesService {
     return { created: created.length, styles: created };
   }
 
+  // ==================== DeepLink Templates ====================
+
+  async findAllDeepLinkTemplates(options: QueryOptions) {
+    const { search, category, status, page = 1, limit = 20 } = options;
+    const where: any = {};
+
+    if (search) {
+      where.name = Like(`%${search}%`);
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    const [items, total] = await this.deepLinkTemplateRepo.findAndCount({
+      where,
+      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneDeepLinkTemplate(id: string) {
+    const template = await this.deepLinkTemplateRepo.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('DeepLink template not found');
+    }
+    return template;
+  }
+
+  async createDeepLinkTemplate(dto: CreateDeepLinkTemplateDto) {
+    const template = this.deepLinkTemplateRepo.create(dto);
+    return this.deepLinkTemplateRepo.save(template);
+  }
+
+  async updateDeepLinkTemplate(id: string, dto: UpdateDeepLinkTemplateDto) {
+    const template = await this.findOneDeepLinkTemplate(id);
+    Object.assign(template, dto);
+    return this.deepLinkTemplateRepo.save(template);
+  }
+
+  async removeDeepLinkTemplate(id: string) {
+    const template = await this.findOneDeepLinkTemplate(id);
+    await this.deepLinkTemplateRepo.remove(template);
+    return { success: true };
+  }
+
+  async toggleDeepLinkTemplate(id: string) {
+    const template = await this.findOneDeepLinkTemplate(id);
+    template.isActive = !template.isActive;
+    return this.deepLinkTemplateRepo.save(template);
+  }
+
+  async getDeepLinkCategories() {
+    return [
+      { value: 'social', label: '社交平台' },
+      { value: 'commerce', label: '电商应用' },
+      { value: 'media', label: '媒体应用' },
+      { value: 'utility', label: '工具应用' },
+      { value: 'custom', label: '自定义' },
+    ];
+  }
+
+  // ==================== Webhook Templates ====================
+
+  async findAllWebhookTemplates(options: QueryOptions & { platform?: string }) {
+    const { search, category, platform, status, page = 1, limit = 20 } = options;
+    const where: any = {};
+
+    if (search) {
+      where.name = Like(`%${search}%`);
+    }
+    if (category) {
+      where.platform = category; // category maps to platform for webhooks
+    }
+    if (platform) {
+      where.platform = platform;
+    }
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    const [items, total] = await this.webhookTemplateRepo.findAndCount({
+      where,
+      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneWebhookTemplate(id: string) {
+    const template = await this.webhookTemplateRepo.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('Webhook template not found');
+    }
+    return template;
+  }
+
+  async createWebhookTemplate(dto: CreateWebhookTemplateDto) {
+    const template = this.webhookTemplateRepo.create(dto);
+    return this.webhookTemplateRepo.save(template);
+  }
+
+  async updateWebhookTemplate(id: string, dto: UpdateWebhookTemplateDto) {
+    const template = await this.findOneWebhookTemplate(id);
+    Object.assign(template, dto);
+    return this.webhookTemplateRepo.save(template);
+  }
+
+  async removeWebhookTemplate(id: string) {
+    const template = await this.findOneWebhookTemplate(id);
+    await this.webhookTemplateRepo.remove(template);
+    return { success: true };
+  }
+
+  async toggleWebhookTemplate(id: string) {
+    const template = await this.findOneWebhookTemplate(id);
+    template.isActive = !template.isActive;
+    return this.webhookTemplateRepo.save(template);
+  }
+
+  async getWebhookPlatforms() {
+    return [
+      { value: 'slack', label: 'Slack' },
+      { value: 'discord', label: 'Discord' },
+      { value: 'teams', label: 'Microsoft Teams' },
+      { value: 'custom', label: '自定义' },
+    ];
+  }
+
+  // ==================== Redirect Rule Templates ====================
+
+  async findAllRedirectRuleTemplates(options: QueryOptions) {
+    const { search, category, status, page = 1, limit = 20 } = options;
+    const where: any = {};
+
+    if (search) {
+      where.name = Like(`%${search}%`);
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    const [items, total] = await this.redirectRuleTemplateRepo.findAndCount({
+      where,
+      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneRedirectRuleTemplate(id: string) {
+    const template = await this.redirectRuleTemplateRepo.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('Redirect rule template not found');
+    }
+    return template;
+  }
+
+  async createRedirectRuleTemplate(dto: CreateRedirectRuleTemplateDto) {
+    const template = this.redirectRuleTemplateRepo.create(dto);
+    return this.redirectRuleTemplateRepo.save(template);
+  }
+
+  async updateRedirectRuleTemplate(id: string, dto: UpdateRedirectRuleTemplateDto) {
+    const template = await this.findOneRedirectRuleTemplate(id);
+    Object.assign(template, dto);
+    return this.redirectRuleTemplateRepo.save(template);
+  }
+
+  async removeRedirectRuleTemplate(id: string) {
+    const template = await this.findOneRedirectRuleTemplate(id);
+    await this.redirectRuleTemplateRepo.remove(template);
+    return { success: true };
+  }
+
+  async toggleRedirectRuleTemplate(id: string) {
+    const template = await this.findOneRedirectRuleTemplate(id);
+    template.isActive = !template.isActive;
+    return this.redirectRuleTemplateRepo.save(template);
+  }
+
+  async getRedirectRuleCategories() {
+    return [
+      { value: 'ab_test', label: 'A/B 测试' },
+      { value: 'geo', label: '地理位置' },
+      { value: 'device', label: '设备类型' },
+      { value: 'time', label: '时间规则' },
+      { value: 'custom', label: '自定义' },
+    ];
+  }
+
+  // ==================== SEO Templates ====================
+
+  async findAllSeoTemplates(options: QueryOptions) {
+    const { search, category, status, page = 1, limit = 20 } = options;
+    const where: any = {};
+
+    if (search) {
+      where.name = Like(`%${search}%`);
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    const [items, total] = await this.seoTemplateRepo.findAndCount({
+      where,
+      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneSeoTemplate(id: string) {
+    const template = await this.seoTemplateRepo.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('SEO template not found');
+    }
+    return template;
+  }
+
+  async createSeoTemplate(dto: CreateSeoTemplateDto) {
+    const template = this.seoTemplateRepo.create(dto);
+    return this.seoTemplateRepo.save(template);
+  }
+
+  async updateSeoTemplate(id: string, dto: UpdateSeoTemplateDto) {
+    const template = await this.findOneSeoTemplate(id);
+    Object.assign(template, dto);
+    return this.seoTemplateRepo.save(template);
+  }
+
+  async removeSeoTemplate(id: string) {
+    const template = await this.findOneSeoTemplate(id);
+    await this.seoTemplateRepo.remove(template);
+    return { success: true };
+  }
+
+  async toggleSeoTemplate(id: string) {
+    const template = await this.findOneSeoTemplate(id);
+    template.isActive = !template.isActive;
+    return this.seoTemplateRepo.save(template);
+  }
+
+  async getSeoCategories() {
+    return [
+      { value: 'general', label: '通用' },
+      { value: 'landing_page', label: '落地页' },
+      { value: 'bio_link', label: 'Bio Link' },
+      { value: 'product', label: '产品页' },
+      { value: 'article', label: '文章' },
+      { value: 'profile', label: '个人主页' },
+    ];
+  }
+
+  // ==================== Report Templates ====================
+
+  async findAllReportTemplates(options: QueryOptions) {
+    const { search, category, status, page = 1, limit = 20 } = options;
+    const where: any = {};
+
+    if (search) {
+      where.name = Like(`%${search}%`);
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (status) {
+      where.isActive = status === 'active';
+    }
+
+    const [items, total] = await this.reportTemplateRepo.findAndCount({
+      where,
+      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findOneReportTemplate(id: string) {
+    const template = await this.reportTemplateRepo.findOne({ where: { id } });
+    if (!template) {
+      throw new NotFoundException('Report template not found');
+    }
+    return template;
+  }
+
+  async createReportTemplate(dto: CreateReportTemplateDto) {
+    const template = this.reportTemplateRepo.create(dto);
+    return this.reportTemplateRepo.save(template);
+  }
+
+  async updateReportTemplate(id: string, dto: UpdateReportTemplateDto) {
+    const template = await this.findOneReportTemplate(id);
+    Object.assign(template, dto);
+    return this.reportTemplateRepo.save(template);
+  }
+
+  async removeReportTemplate(id: string) {
+    const template = await this.findOneReportTemplate(id);
+    await this.reportTemplateRepo.remove(template);
+    return { success: true };
+  }
+
+  async toggleReportTemplate(id: string) {
+    const template = await this.findOneReportTemplate(id);
+    template.isActive = !template.isActive;
+    return this.reportTemplateRepo.save(template);
+  }
+
+  async getReportCategories() {
+    return [
+      { value: 'traffic', label: '流量报告' },
+      { value: 'conversion', label: '转化报告' },
+      { value: 'engagement', label: '互动报告' },
+      { value: 'comparison', label: '对比报告' },
+      { value: 'custom', label: '自定义' },
+    ];
+  }
+
+  async getAvailableMetrics() {
+    return [
+      { value: 'clicks', label: '点击数' },
+      { value: 'unique_visitors', label: '独立访客' },
+      { value: 'conversions', label: '转化数' },
+      { value: 'conversion_rate', label: '转化率' },
+      { value: 'bounce_rate', label: '跳出率' },
+      { value: 'avg_time_on_page', label: '平均停留时间' },
+      { value: 'page_views', label: '页面浏览' },
+      { value: 'referrers', label: '来源' },
+    ];
+  }
+
+  async getAvailableDimensions() {
+    return [
+      { value: 'date', label: '日期' },
+      { value: 'country', label: '国家' },
+      { value: 'city', label: '城市' },
+      { value: 'device', label: '设备' },
+      { value: 'browser', label: '浏览器' },
+      { value: 'os', label: '操作系统' },
+      { value: 'referrer', label: '来源' },
+      { value: 'campaign', label: '活动' },
+    ];
+  }
+
   // ==================== Global Stats ====================
 
   async getTemplateStats() {
-    const [linkCount, utmCount, campaignCount, bioLinkCount, qrCount] = await Promise.all([
+    const [
+      linkCount,
+      utmCount,
+      campaignCount,
+      bioLinkCount,
+      qrCount,
+      deepLinkCount,
+      webhookCount,
+      redirectRuleCount,
+      seoCount,
+      reportCount,
+    ] = await Promise.all([
       this.linkTemplateRepo.count(),
       this.utmTemplateRepo.count(),
       this.campaignTemplateRepo.count(),
       this.bioLinkTemplateRepo.count(),
       this.qrStyleRepo.count(),
+      this.deepLinkTemplateRepo.count(),
+      this.webhookTemplateRepo.count(),
+      this.redirectRuleTemplateRepo.count(),
+      this.seoTemplateRepo.count(),
+      this.reportTemplateRepo.count(),
     ]);
 
     return {
@@ -549,7 +979,13 @@ export class TemplatesService {
       campaign: campaignCount,
       bioLink: bioLinkCount,
       qr: qrCount,
-      total: linkCount + utmCount + campaignCount + bioLinkCount + qrCount,
+      deepLink: deepLinkCount,
+      webhook: webhookCount,
+      redirectRule: redirectRuleCount,
+      seo: seoCount,
+      report: reportCount,
+      total: linkCount + utmCount + campaignCount + bioLinkCount + qrCount +
+             deepLinkCount + webhookCount + redirectRuleCount + seoCount + reportCount,
     };
   }
 }
