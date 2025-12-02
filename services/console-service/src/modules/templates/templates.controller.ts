@@ -26,6 +26,16 @@ import {
   UpdateBioLinkTemplateDto,
   CreateQRStyleDto,
   UpdateQRStyleDto,
+  CreateDeepLinkTemplateDto,
+  UpdateDeepLinkTemplateDto,
+  CreateWebhookTemplateDto,
+  UpdateWebhookTemplateDto,
+  CreateRedirectRuleTemplateDto,
+  UpdateRedirectRuleTemplateDto,
+  CreateSeoTemplateDto,
+  UpdateSeoTemplateDto,
+  CreateReportTemplateDto,
+  UpdateReportTemplateDto,
 } from './dto';
 import { CurrentUser } from '@lnk/nestjs-common';
 
