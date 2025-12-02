@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -14,6 +15,12 @@ import {
   Sparkles,
   Clock,
   TrendingUp,
+  Smartphone,
+  Webhook,
+  GitBranch,
+  FileSearch,
+  BarChart3,
+  ArrowRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -382,19 +389,60 @@ export default function TemplatesPage() {
     </button>
   );
 
+  // Template type navigation
+  const templateTypes = [
+    { title: '链接模板', description: '链接配置预设', href: '/templates', icon: Link2, active: true },
+    { title: 'DeepLink 模板', description: 'iOS/Android 深度链接配置', href: '/templates/deeplinks', icon: Smartphone },
+    { title: 'Webhook 模板', description: 'Slack/Discord/Teams 通知', href: '/templates/webhooks', icon: Webhook },
+    { title: '重定向规则', description: 'A/B 测试、地理位置规则', href: '/templates/redirect-rules', icon: GitBranch },
+    { title: 'SEO 模板', description: 'OG 标签、Meta 配置', href: '/templates/seo', icon: FileSearch },
+    { title: '报告模板', description: '分析报告配置', href: '/templates/reports', icon: BarChart3 },
+  ];
+
   return (
     <Layout>
       <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">链接模板</h1>
-            <p className="text-muted-foreground">创建可复用的链接配置模板</p>
+            <h1 className="text-2xl font-bold">模板中心</h1>
+            <p className="text-muted-foreground">创建可复用的配置模板</p>
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            新建模板
+            新建链接模板
           </Button>
+        </div>
+
+        {/* Template type navigation */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {templateTypes.map((type) => (
+            <Link
+              key={type.href}
+              to={type.href}
+              className={cn(
+                'flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/50',
+                type.active && 'border-primary bg-primary/5'
+              )}
+            >
+              <div className={cn(
+                'flex h-10 w-10 items-center justify-center rounded-lg',
+                type.active ? 'bg-primary text-primary-foreground' : 'bg-muted'
+              )}>
+                <type.icon className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">{type.title}</p>
+                <p className="text-xs text-muted-foreground">{type.description}</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t pt-6">
+          <h2 className="text-lg font-semibold mb-4">链接模板</h2>
         </div>
 
         {/* Quick access cards */}

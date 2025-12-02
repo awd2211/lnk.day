@@ -32,6 +32,11 @@ export interface Scope {
 /**
  * 统一 JWT Payload 结构
  * 支持普通用户和平台管理员两种类型
+ *
+ * 设计原则：
+ * - Token 只存储角色，不存储完整权限列表（减小 Token 体积）
+ * - 权限由服务端根据角色实时计算（支持热更新）
+ * - 权限版本号用于失效旧 Token
  */
 export interface UnifiedJwtPayload {
   // === 基础字段 ===
@@ -50,15 +55,25 @@ export interface UnifiedJwtPayload {
   /** 作用域定义 */
   scope: Scope;
 
-  // === 角色与权限 ===
+  // === 角色 ===
   /**
    * 角色
    * - 普通用户: OWNER | ADMIN | MEMBER | VIEWER
    * - 管理员: SUPER_ADMIN | ADMIN | OPERATOR
    */
   role: string;
-  /** 权限列表 */
-  permissions: string[];
+
+  /**
+   * 自定义角色 ID（如果使用自定义角色）
+   * 当设置此字段时，权限从自定义角色获取而非预设角色
+   */
+  customRoleId?: string;
+
+  /**
+   * 权限列表（可选，向后兼容）
+   * @deprecated 推荐使用服务端实时计算权限，不在 Token 中存储
+   */
+  permissions?: string[];
 
   // === 权限版本（用于实时失效）===
   /** 权限版本号，变更时递增 */

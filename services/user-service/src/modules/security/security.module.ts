@@ -5,9 +5,18 @@ import { SecurityController } from './security.controller';
 import { SecurityService } from './security.service';
 import { UserSession } from './entities/user-session.entity';
 import { SecurityEvent } from './entities/security-event.entity';
+import { BlockedIp } from './entities/blocked-ip.entity';
+import { SecuritySettings } from './entities/security-settings.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserSession, SecurityEvent])],
+  imports: [
+    TypeOrmModule.forFeature([
+      UserSession,
+      SecurityEvent,
+      BlockedIp,
+      SecuritySettings,
+    ]),
+  ],
   controllers: [SecurityController],
   providers: [SecurityService],
   exports: [SecurityService],

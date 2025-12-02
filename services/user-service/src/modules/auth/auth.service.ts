@@ -93,53 +93,64 @@ export class AuthService {
   }
 
   /**
-   * 生成包含权限信息的统一格式 JWT
+   * 生成精简 JWT（不包含权限列表）
    *
-   * 新版统一格式包含：
+   * 设计原则：
+   * - Token 只存储角色，不存储完整权限列表（减小 Token 体积）
+   * - 权限由服务端根据角色实时计算（支持热更新）
+   * - 权限版本号用于失效旧 Token
+   *
+   * JWT payload 包含：
    * - type: 'user' 标识普通用户（区别于 'admin' 管理员）
    * - scope: 访问范围（team 或 personal）
-   * - role: 团队角色
-   * - permissions: 权限列表
+   * - role: 团队角色（权限从角色实时计算）
+   * - customRoleId: 自定义角色 ID（如果使用自定义角色）
+   * - pv: 权限版本号（用于实时失效）
    */
   private async generateTokensWithPermissions(userId: string, email: string, teamId?: string) {
-    // 获取用户的团队成员身份和权限
+    // 获取用户的团队成员身份
     let teamRole: string = TeamRole.MEMBER;
-    let permissions: string[] = [];
+    let customRoleId: string | undefined;
     let scope: Scope;
+    let permissionVersion = 1;
 
     if (teamId) {
       const membership = await this.teamService.getUserTeamMembership(userId, teamId);
       if (membership) {
-        // membership.teamRole 是 TeamMemberRole 类型，值与 TeamRole 相同
         teamRole = membership.teamRole || TeamRole.MEMBER;
-        permissions = membership.permissions;
+        // 如果使用自定义角色
+        if (membership.customRoleId) {
+          customRoleId = membership.customRoleId;
+        }
+        // 获取权限版本号（如果有）
+        if (membership.permissionVersion) {
+          permissionVersion = membership.permissionVersion;
+        }
       }
       scope = {
         level: 'team',
         teamId,
       };
     } else {
-      // 没有团队的用户作为个人工作区，给予 OWNER 角色和权限
+      // 没有团队的用户作为个人工作区，给予 OWNER 角色
       teamRole = TeamRole.OWNER;
-      permissions = PRESET_ROLE_PERMISSIONS.OWNER || [];
       scope = {
         level: 'personal',
         teamId: userId, // 个人工作区使用 userId 作为隔离标识
       };
     }
 
-    // 构建统一格式的 JWT payload
+    // 构建精简的 JWT payload（不包含 permissions）
     const payload: Omit<UnifiedJwtPayload, 'iat' | 'exp'> = {
       sub: userId,
       email,
       type: 'user',
       scope,
       role: teamRole,
-      permissions,
-      // 向后兼容：保留旧字段
-      teamId: teamId || null,
-      teamRole,
-    } as any;
+      pv: permissionVersion,
+      // 自定义角色 ID（可选）
+      ...(customRoleId && { customRoleId }),
+    };
 
     const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
     const refreshExpiresIn = this.configService.get('JWT_REFRESH_EXPIRES_IN', '30d');
@@ -147,7 +158,7 @@ export class AuthService {
     return {
       accessToken: this.jwtService.sign(payload, { expiresIn: accessExpiresIn }),
       refreshToken: this.jwtService.sign(
-        { sub: userId, email }, // refresh token 不包含权限，刷新时重新获取
+        { sub: userId, email },
         { expiresIn: refreshExpiresIn },
       ),
       expiresIn: this.parseExpiresIn(accessExpiresIn),

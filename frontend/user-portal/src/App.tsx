@@ -53,6 +53,11 @@ const SecuritySettingsPage = lazy(() => import('@/pages/SecuritySettingsPage'));
 const TenantSettingsPage = lazy(() => import('@/pages/TenantSettingsPage'));
 const CommentsPage = lazy(() => import('@/pages/CommentsPage'));
 const SeoManagerPage = lazy(() => import('@/pages/SeoManagerPage'));
+const DeepLinkTemplatesPage = lazy(() => import('@/pages/DeepLinkTemplatesPage'));
+const WebhookTemplatesPage = lazy(() => import('@/pages/WebhookTemplatesPage'));
+const RedirectRuleTemplatesPage = lazy(() => import('@/pages/RedirectRuleTemplatesPage'));
+const SeoTemplatesPage = lazy(() => import('@/pages/SeoTemplatesPage'));
+const ReportTemplatesPage = lazy(() => import('@/pages/ReportTemplatesPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -459,6 +464,46 @@ function App() {
             element={
               <ProtectedRoute>
                 <SeoManagerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/deeplinks"
+            element={
+              <ProtectedRoute>
+                <DeepLinkTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/webhooks"
+            element={
+              <ProtectedRoute>
+                <WebhookTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/redirect-rules"
+            element={
+              <ProtectedRoute>
+                <RedirectRuleTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/seo"
+            element={
+              <ProtectedRoute>
+                <SeoTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/reports"
+            element={
+              <ProtectedRoute>
+                <ReportTemplatesPage />
               </ProtectedRoute>
             }
           />

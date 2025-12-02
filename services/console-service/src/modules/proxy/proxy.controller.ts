@@ -17,13 +17,17 @@ export class ProxyController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   getUsers(
     @Headers('authorization') auth: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
-    return this.proxyService.getUsers({ page, limit, search }, auth);
+    return this.proxyService.getUsers({ page, limit, search, sortBy, sortOrder }, auth);
   }
 
   @Get('users/:id')
@@ -49,8 +53,16 @@ export class ProxyController {
   @ApiOperation({ summary: '获取团队列表' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  getTeams(@Headers('authorization') auth: string, @Query('page') page?: number, @Query('limit') limit?: number) {
-    return this.proxyService.getTeams({ page, limit }, auth);
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
+  getTeams(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.proxyService.getTeams({ page, limit, sortBy, sortOrder }, auth);
   }
 
   @Get('teams/:id')
@@ -807,15 +819,15 @@ export class ProxyController {
   }
 
   @Get('billing/plans')
-  @ApiOperation({ summary: '获取订阅计划列表' })
-  getPlans(@Headers('authorization') auth: string) {
-    return this.proxyService.getPlans(auth);
+  @ApiOperation({ summary: '获取订阅计划列表 (旧版)' })
+  getBillingPlans(@Headers('authorization') auth: string) {
+    return this.proxyService.getBillingPlans(auth);
   }
 
   @Put('billing/plans/:id')
-  @ApiOperation({ summary: '更新订阅计划' })
-  updatePlan(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: any) {
-    return this.proxyService.updatePlan(id, data, auth);
+  @ApiOperation({ summary: '更新订阅计划 (旧版)' })
+  updateBillingPlan(@Headers('authorization') auth: string, @Param('id') id: string, @Body() data: any) {
+    return this.proxyService.updateBillingPlan(id, data, auth);
   }
 
   // ==================== API Keys ====================
@@ -1274,6 +1286,15 @@ export class ProxyController {
     return this.proxyService.getNotificationChannels(auth);
   }
 
+  @Post('notifications/channels')
+  @ApiOperation({ summary: '创建通知渠道' })
+  createNotificationChannel(
+    @Headers('authorization') auth: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.createNotificationChannel(data, auth);
+  }
+
   @Get('notifications/channels/:id')
   @ApiOperation({ summary: '获取通知渠道详情' })
   getNotificationChannel(@Headers('authorization') auth: string, @Param('id') id: string) {
@@ -1302,8 +1323,12 @@ export class ProxyController {
 
   @Post('notifications/channels/:id/test')
   @ApiOperation({ summary: '测试通知渠道' })
-  testNotificationChannel(@Headers('authorization') auth: string, @Param('id') id: string) {
-    return this.proxyService.testNotificationChannel(id, auth);
+  testNotificationChannel(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data?: { recipient?: string },
+  ) {
+    return this.proxyService.testNotificationChannel(id, data?.recipient, auth);
   }
 
   // ==================== SSO Configuration ====================
@@ -1702,14 +1727,18 @@ export class ProxyController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'teamId', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
   getFolders(
     @Headers('authorization') auth: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('teamId') teamId?: string,
     @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
-    return this.proxyService.getFolders({ page, limit, teamId, search }, auth);
+    return this.proxyService.getFolders({ page, limit, teamId, search, sortBy, sortOrder }, auth);
   }
 
   // ==================== Realtime Analytics ====================
@@ -1747,5 +1776,307 @@ export class ProxyController {
     @Query('interval') interval?: string,
   ) {
     return this.proxyService.getRealtimeTimeline({ minutes, interval }, auth);
+  }
+
+  // ==================== Comments Management ====================
+  @Get('comments/stats')
+  @ApiOperation({ summary: '获取评论统计' })
+  getCommentsStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getCommentsStats(auth);
+  }
+
+  @Get('comments')
+  @ApiOperation({ summary: '获取评论列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getComments(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getComments({ page, limit, status, search }, auth);
+  }
+
+  @Post('comments/:id/moderate')
+  @ApiOperation({ summary: '审核评论' })
+  moderateComment(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { action: 'approve' | 'reject' | 'spam'; reason?: string },
+  ) {
+    return this.proxyService.moderateComment(id, data, auth);
+  }
+
+  @Post('comments/batch-moderate')
+  @ApiOperation({ summary: '批量审核评论' })
+  batchModerateComments(
+    @Headers('authorization') auth: string,
+    @Body() data: { ids: string[]; action: 'approve' | 'reject' | 'spam' },
+  ) {
+    return this.proxyService.batchModerateComments(data, auth);
+  }
+
+  @Delete('comments/:id')
+  @ApiOperation({ summary: '删除评论' })
+  deleteComment(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.deleteComment(id, auth);
+  }
+
+  // ==================== SEO Management ====================
+  @Get('seo/settings')
+  @ApiOperation({ summary: '获取SEO设置' })
+  getSeoSettings(@Headers('authorization') auth: string) {
+    return this.proxyService.getSeoSettings(auth);
+  }
+
+  @Put('seo/settings')
+  @ApiOperation({ summary: '更新SEO设置' })
+  updateSeoSettings(@Headers('authorization') auth: string, @Body() data: any) {
+    return this.proxyService.updateSeoSettings(data, auth);
+  }
+
+  @Get('seo/pages')
+  @ApiOperation({ summary: '获取页面SEO列表' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'type', required: false })
+  getSeoPages(
+    @Headers('authorization') auth: string,
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+  ) {
+    return this.proxyService.getSeoPages({ search, type }, auth);
+  }
+
+  @Put('seo/pages/:id')
+  @ApiOperation({ summary: '更新页面SEO' })
+  updatePageSeo(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.updatePageSeo(id, data, auth);
+  }
+
+  @Get('seo/issues')
+  @ApiOperation({ summary: '获取SEO问题列表' })
+  getSeoIssues(@Headers('authorization') auth: string) {
+    return this.proxyService.getSeoIssues(auth);
+  }
+
+  @Get('seo/stats')
+  @ApiOperation({ summary: '获取SEO统计' })
+  getSeoStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getSeoStats(auth);
+  }
+
+  @Post('seo/optimize')
+  @ApiOperation({ summary: '批量优化SEO' })
+  batchOptimizeSeo(@Headers('authorization') auth: string) {
+    return this.proxyService.batchOptimizeSeo(auth);
+  }
+
+  // ==================== Security Management (Settings, Sessions, IP Blocking) ====================
+  @Get('security/settings')
+  @ApiOperation({ summary: '获取安全设置' })
+  getSecuritySettings(@Headers('authorization') auth: string) {
+    return this.proxyService.getSecuritySettings(auth);
+  }
+
+  @Put('security/settings')
+  @ApiOperation({ summary: '更新安全设置' })
+  updateSecuritySettings(@Headers('authorization') auth: string, @Body() data: any) {
+    return this.proxyService.updateSecuritySettings(data, auth);
+  }
+
+  @Get('security/blocked-ips')
+  @ApiOperation({ summary: '获取封禁IP列表' })
+  getBlockedIps(@Headers('authorization') auth: string) {
+    return this.proxyService.getBlockedIps(auth);
+  }
+
+  @Post('security/blocked-ips')
+  @ApiOperation({ summary: '添加封禁IP' })
+  addBlockedIp(
+    @Headers('authorization') auth: string,
+    @Body() data: { ip: string; reason: string; permanent: boolean },
+  ) {
+    return this.proxyService.addBlockedIp(data, auth);
+  }
+
+  @Delete('security/blocked-ips/:id')
+  @ApiOperation({ summary: '解封IP' })
+  removeBlockedIp(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.removeBlockedIp(id, auth);
+  }
+
+  @Get('security/sessions')
+  @ApiOperation({ summary: '获取活跃会话' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  getActiveSessions(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('userId') userId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.proxyService.getActiveSessions({ page, limit, userId, search }, auth);
+  }
+
+  @Delete('security/sessions/:id')
+  @ApiOperation({ summary: '终止会话' })
+  terminateSession(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.terminateSession(id, auth);
+  }
+
+  @Get('security/platform-stats')
+  @ApiOperation({ summary: '获取平台安全统计' })
+  getPlatformSecurityStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getPlatformSecurityStats(auth);
+  }
+
+  @Get('security/platform-events')
+  @ApiOperation({ summary: '获取平台安全事件' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiQuery({ name: 'severity', required: false, type: String })
+  getPlatformSecurityEvents(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('userId') userId?: string,
+    @Query('type') type?: string,
+    @Query('severity') severity?: string,
+  ) {
+    return this.proxyService.getPlatformSecurityEvents({ page, limit, userId, type, severity }, auth);
+  }
+
+  // ==================== Plan Management ====================
+  @Get('plans/stats')
+  @ApiOperation({ summary: '获取套餐统计' })
+  getPlanStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getPlanStats(auth);
+  }
+
+  @Get('plans')
+  @ApiOperation({ summary: '获取所有套餐' })
+  @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
+  getPlans(
+    @Headers('authorization') auth: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.proxyService.getPlans(includeInactive === 'true', auth);
+  }
+
+  @Get('plans/:id')
+  @ApiOperation({ summary: '获取套餐详情' })
+  getPlan(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.getPlan(id, auth);
+  }
+
+  @Post('plans')
+  @ApiOperation({ summary: '创建套餐' })
+  createPlan(@Headers('authorization') auth: string, @Body() data: any) {
+    return this.proxyService.createPlan(data, auth);
+  }
+
+  @Put('plans/:id')
+  @ApiOperation({ summary: '更新套餐' })
+  updatePlan(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.updatePlan(id, data, auth);
+  }
+
+  @Delete('plans/:id')
+  @ApiOperation({ summary: '删除套餐' })
+  deletePlan(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.deletePlan(id, auth);
+  }
+
+  @Patch('plans/:id/toggle')
+  @ApiOperation({ summary: '切换套餐激活状态' })
+  togglePlanActive(@Headers('authorization') auth: string, @Param('id') id: string) {
+    return this.proxyService.togglePlanActive(id, auth);
+  }
+
+  @Post('plans/:id/duplicate')
+  @ApiOperation({ summary: '复制套餐' })
+  duplicatePlan(
+    @Headers('authorization') auth: string,
+    @Param('id') id: string,
+    @Body() data: { code: string; name: string },
+  ) {
+    return this.proxyService.duplicatePlan(id, data, auth);
+  }
+
+  @Put('plans/sort-order')
+  @ApiOperation({ summary: '更新套餐排序' })
+  updatePlanSortOrder(
+    @Headers('authorization') auth: string,
+    @Body() orders: { id: string; sortOrder: number }[],
+  ) {
+    return this.proxyService.updatePlanSortOrder(orders, auth);
+  }
+
+  @Post('plans/refresh-cache')
+  @ApiOperation({ summary: '刷新套餐缓存' })
+  refreshPlanCache(@Headers('authorization') auth: string) {
+    return this.proxyService.refreshPlanCache(auth);
+  }
+
+  // ==================== Quota Management ====================
+  @Get('quotas/stats')
+  @ApiOperation({ summary: '获取配额统计' })
+  getQuotaStats(@Headers('authorization') auth: string) {
+    return this.proxyService.getQuotaStats(auth);
+  }
+
+  @Get('quotas')
+  @ApiOperation({ summary: '获取团队配额列表' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'plan', required: false })
+  getQuotas(
+    @Headers('authorization') auth: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('plan') plan?: string,
+  ) {
+    return this.proxyService.getQuotas({ page, limit, search, plan }, auth);
+  }
+
+  @Get('quotas/:teamId')
+  @ApiOperation({ summary: '获取团队配额详情' })
+  getTeamQuota(@Headers('authorization') auth: string, @Param('teamId') teamId: string) {
+    return this.proxyService.getTeamQuota(teamId, auth);
+  }
+
+  @Put('quotas/:teamId')
+  @ApiOperation({ summary: '更新团队配额 (管理员)' })
+  updateTeamQuotaAdmin(
+    @Headers('authorization') auth: string,
+    @Param('teamId') teamId: string,
+    @Body() data: any,
+  ) {
+    return this.proxyService.updateTeamQuotaAdmin(teamId, data, auth);
+  }
+
+  @Post('quotas/:teamId/reset')
+  @ApiOperation({ summary: '重置团队配额' })
+  resetTeamQuota(@Headers('authorization') auth: string, @Param('teamId') teamId: string) {
+    return this.proxyService.resetTeamQuota(teamId, auth);
   }
 }

@@ -13,6 +13,7 @@ import {
   LoggerModule,
 } from '@lnk/nestjs-common';
 import { DeepLinkModule } from './modules/deeplink/deeplink.module';
+import { DeepLinkTemplateModule } from './modules/template/template.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { HealthModule } from './modules/health/health.module';
       }),
     }),
     DeepLinkModule,
+    DeepLinkTemplateModule,
     HealthModule,
   ],
   providers: [

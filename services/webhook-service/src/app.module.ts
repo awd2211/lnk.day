@@ -15,6 +15,7 @@ import {
 } from '@lnk/nestjs-common';
 
 import { WebhookModule } from './modules/webhook/webhook.module';
+import { WebhookTemplateModule } from './modules/template/template.module';
 import { HealthModule } from './modules/health/health.module';
 import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
@@ -51,6 +52,7 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
       }),
     }),
     WebhookModule,
+    WebhookTemplateModule,
     HealthModule,
     RabbitMQModule,
   ],

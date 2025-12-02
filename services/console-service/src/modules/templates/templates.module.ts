@@ -8,6 +8,11 @@ import {
   CampaignTemplatePreset,
   BioLinkTemplatePreset,
   QRStylePreset,
+  DeepLinkTemplatePreset,
+  WebhookTemplatePreset,
+  RedirectRuleTemplatePreset,
+  SeoTemplatePreset,
+  ReportTemplatePreset,
 } from './entities';
 
 @Module({
@@ -18,6 +23,11 @@ import {
       CampaignTemplatePreset,
       BioLinkTemplatePreset,
       QRStylePreset,
+      DeepLinkTemplatePreset,
+      WebhookTemplatePreset,
+      RedirectRuleTemplatePreset,
+      SeoTemplatePreset,
+      ReportTemplatePreset,
     ]),
   ],
   controllers: [TemplatesController],

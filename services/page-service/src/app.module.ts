@@ -16,6 +16,7 @@ import { PageModule } from './modules/page/page.module';
 import { TemplateModule } from './modules/template/template.module';
 import { BioLinkModule } from './modules/bio-link/bio-link.module';
 import { SeoModule } from './modules/seo/seo.module';
+import { SeoTemplateModule } from './modules/seo-template/seo-template.module';
 import { HealthModule } from './modules/health/health.module';
 
 @Module({
@@ -51,6 +52,7 @@ import { HealthModule } from './modules/health/health.module';
     TemplateModule,
     BioLinkModule,
     SeoModule,
+    SeoTemplateModule,
     HealthModule,
   ],
   providers: [

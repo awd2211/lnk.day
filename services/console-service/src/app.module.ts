@@ -19,7 +19,9 @@ import { HealthModule } from './modules/health/health.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { AutomationModule } from './modules/automation/automation.module';
+import { AutomationTemplateModule } from './modules/automation-template/automation-template.module';
 import { TemplatesModule } from './modules/templates/templates.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -90,7 +92,9 @@ import { TemplatesModule } from './modules/templates/templates.module';
     AuditModule,
     AlertsModule,
     AutomationModule,
+    AutomationTemplateModule,
     TemplatesModule,
+    RabbitMQModule,
   ],
   providers: [
     {

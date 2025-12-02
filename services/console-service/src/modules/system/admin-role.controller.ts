@@ -7,15 +7,19 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AdminRoleService, CreateAdminRoleDto, UpdateAdminRoleDto } from './admin-role.service';
+import { LogAudit } from '../audit/decorators/audit-log.decorator';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 
 @ApiTags('system/roles')
 @Controller('system/roles')
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
+@UseInterceptors(AuditLogInterceptor)
 export class AdminRoleController {
   constructor(private readonly roleService: AdminRoleService) {}
 
@@ -59,6 +63,12 @@ export class AdminRoleController {
       },
     },
   })
+  @LogAudit({
+    action: 'admin.role.create',
+    targetType: 'admin_role',
+    getTarget: (result) => result?.role ? { id: result.role.id, name: result.role.name } : null,
+    detailFields: ['name', 'permissions'],
+  })
   async create(@Body() dto: CreateAdminRoleDto) {
     const role = await this.roleService.create(dto);
     return { role };
@@ -67,6 +77,13 @@ export class AdminRoleController {
   @Put(':id')
   @ApiOperation({ summary: '更新角色' })
   @ApiParam({ name: 'id', description: '角色 ID' })
+  @LogAudit({
+    action: 'admin.role.update',
+    targetType: 'admin_role',
+    targetIdParam: 'id',
+    getTarget: (result) => result?.role ? { id: result.role.id, name: result.role.name } : null,
+    detailFields: ['name', 'permissions'],
+  })
   async update(@Param('id') id: string, @Body() dto: UpdateAdminRoleDto) {
     const role = await this.roleService.update(id, dto);
     return { role };
@@ -75,6 +92,11 @@ export class AdminRoleController {
   @Delete(':id')
   @ApiOperation({ summary: '删除角色' })
   @ApiParam({ name: 'id', description: '角色 ID' })
+  @LogAudit({
+    action: 'admin.role.delete',
+    targetType: 'admin_role',
+    targetIdParam: 'id',
+  })
   async delete(@Param('id') id: string) {
     await this.roleService.delete(id);
     return { success: true };
@@ -92,6 +114,13 @@ export class AdminRoleController {
       },
     },
   })
+  @LogAudit({
+    action: 'admin.role.duplicate',
+    targetType: 'admin_role',
+    targetIdParam: 'id',
+    getTarget: (result) => result?.role ? { id: result.role.id, name: result.role.name } : null,
+    detailFields: ['name'],
+  })
   async duplicate(@Param('id') id: string, @Body() body: { name: string }) {
     const role = await this.roleService.duplicate(id, body.name);
     return { role };
@@ -99,6 +128,10 @@ export class AdminRoleController {
 
   @Post('initialize')
   @ApiOperation({ summary: '初始化默认角色（仅在首次设置时使用）' })
+  @LogAudit({
+    action: 'admin.role.initialize',
+    targetType: 'admin_role',
+  })
   async initializeDefaults() {
     await this.roleService.initializeDefaultRoles();
     return { success: true, message: '默认角色初始化完成' };

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 export interface SeoMeta {
   title: string;
@@ -75,12 +76,25 @@ export interface SeoInput {
 }
 
 @Injectable()
-export class SeoService {
+export class SeoService implements OnModuleInit {
   private readonly logger = new Logger(SeoService.name);
-  private readonly defaultSiteName = 'lnk.day';
-  private readonly defaultTwitterSite = '@lnkday';
-  private readonly defaultImage = 'https://lnk.day/og-image.png';
-  private readonly baseUrl = process.env.BASE_URL || 'https://lnk.day';
+  private readonly defaultSiteName: string;
+  private readonly defaultTwitterSite: string;
+  private readonly defaultImage: string;
+  private readonly baseUrl: string;
+
+  constructor(private readonly configService: ConfigService) {
+    const brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+    this.defaultSiteName = brandName;
+    this.defaultTwitterSite = this.configService.get('TWITTER_SITE', '@lnkday');
+    this.defaultImage = this.configService.get('DEFAULT_OG_IMAGE', `https://${brandDomain}/og-image.png`);
+    this.baseUrl = this.configService.get('BASE_URL', `https://${brandDomain}`);
+  }
+
+  onModuleInit() {
+    // ConfigService injected
+  }
 
   /**
    * Generate complete SEO data for a page

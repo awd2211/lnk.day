@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository, In, LessThanOrEqual } from 'typeorm';
 import { customAlphabet } from 'nanoid';
 import * as bcrypt from 'bcrypt';
@@ -25,6 +26,7 @@ const EVERY_MINUTE = 60 * 1000;
 export class LinkService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LinkService.name);
   private scheduledLinksInterval: NodeJS.Timeout | null = null;
+  private readonly defaultDomain: string;
 
   constructor(
     @InjectRepository(Link)
@@ -36,7 +38,10 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
     private readonly securityService: SecurityService,
     @Inject(forwardRef(() => FolderService))
     private readonly folderService: FolderService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.defaultDomain = this.configService.get('DEFAULT_DOMAIN', 'lnk.day');
+  }
 
   onModuleInit() {
     // 启动定时任务：每分钟检查计划链接
@@ -95,7 +100,7 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
       shortCode,
       userId,
       teamId,
-      domain: createLinkDto.domain || 'lnk.day',
+      domain: createLinkDto.domain || this.defaultDomain,
       settings,
     });
 
@@ -511,7 +516,7 @@ export class LinkService implements OnModuleInit, OnModuleDestroy {
           tags: linkData.tags || [],
           userId,
           teamId,
-          domain: 'lnk.day',
+          domain: this.defaultDomain,
         });
 
         const savedLink = await this.linkRepository.save(link);

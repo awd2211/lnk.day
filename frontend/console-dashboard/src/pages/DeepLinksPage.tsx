@@ -20,6 +20,9 @@ import {
   Building2,
   UserCircle,
   RefreshCw,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -157,8 +160,20 @@ export default function DeepLinksPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [riskFilter, setRiskFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedDeepLink, setSelectedDeepLink] = useState<DeepLink | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   // Admin action dialogs
   const [blockDialog, setBlockDialog] = useState<{ open: boolean; deepLink: DeepLink | null; isBulk: boolean }>({
@@ -244,12 +259,14 @@ export default function DeepLinksPage() {
 
   // Fetch deep links with admin oversight fields
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['deeplinks-admin', { search, page, statusFilter, riskFilter, teamNameMap }],
+    queryKey: ['deeplinks-admin', { search, page, statusFilter, riskFilter, sortBy, sortOrder, teamNameMap }],
     queryFn: async () => {
       const response = await deepLinksService.getDeepLinks({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit: 20,
+        sortBy,
+        sortOrder,
       });
 
       const rawItems = response.data?.items || response.data || [];
@@ -496,13 +513,45 @@ export default function DeepLinksPage() {
                       onCheckedChange={handleSelectAll}
                     />
                   </th>
-                  <th className="p-3 font-medium">名称</th>
-                  <th className="p-3 font-medium">状态</th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      名称
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      状态
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
                   <th className="p-3 font-medium">风险</th>
                   <th className="p-3 font-medium">团队/创建者</th>
                   <th className="p-3 font-medium">平台</th>
-                  <th className="p-3 font-medium">点击分布</th>
-                  <th className="p-3 font-medium">举报</th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('clickCount')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      点击分布
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('reportCount')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      举报
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
                   <th className="p-3 font-medium text-right">操作</th>
                 </tr>
               </thead>

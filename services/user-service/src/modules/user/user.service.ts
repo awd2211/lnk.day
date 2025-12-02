@@ -27,8 +27,53 @@ export class UserService {
     return this.userRepository.save(user);
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userRepository.find();
+  async findAll(options?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{ items: User[]; total: number; page: number; limit: number; totalPages: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.userRepository.createQueryBuilder('user');
+
+    if (options?.search) {
+      queryBuilder.andWhere(
+        '(user.name ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${options.search}%` }
+      );
+    }
+
+    // Handle sorting
+    if (options?.sortBy) {
+      const sortColumn = this.getSortColumn(options.sortBy);
+      queryBuilder.orderBy(`user.${sortColumn}`, options.sortOrder || 'DESC');
+    } else {
+      queryBuilder.orderBy('user.createdAt', 'DESC');
+    }
+
+    const [items, total] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  private getSortColumn(sortBy: string): string {
+    const sortMap: Record<string, string> = {
+      name: 'name',
+      email: 'email',
+      status: 'status',
+      plan: 'plan',
+      linkCount: 'linkCount',
+      createdAt: 'createdAt',
+      lastLoginAt: 'lastLoginAt',
+    };
+    return sortMap[sortBy] || 'createdAt';
   }
 
   async findOne(id: string): Promise<User> {

@@ -40,15 +40,17 @@ export class PreviewService {
   private readonly logger = new Logger(PreviewService.name);
   private readonly userAgent: string;
   private readonly timeout: number;
+  private readonly brandDomain: string;
 
   constructor(
     @InjectRepository(LinkPreview)
     private readonly previewRepository: Repository<LinkPreview>,
     private readonly configService: ConfigService,
   ) {
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
     this.userAgent = this.configService.get(
       'PREVIEW_USER_AGENT',
-      'Mozilla/5.0 (compatible; lnk.day/1.0; +https://lnk.day)',
+      `Mozilla/5.0 (compatible; ${this.brandDomain}/1.0; +https://${this.brandDomain})`,
     );
     this.timeout = this.configService.get('PREVIEW_TIMEOUT', 10000);
   }

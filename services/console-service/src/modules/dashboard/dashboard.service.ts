@@ -6,6 +6,15 @@ import axios, { AxiosInstance } from 'axios';
 
 interface ServiceEndpoints {
   analyticsService: string;
+  userService: string;
+  linkService: string;
+  campaignService: string;
+  qrService: string;
+  pageService: string;
+  deeplinkService: string;
+  notificationService: string;
+  domainService: string;
+  redirectService: string;
 }
 
 export interface ActivityItem {
@@ -41,6 +50,15 @@ export class DashboardService {
 
     this.endpoints = {
       analyticsService: this.configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
+      userService: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+      linkService: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+      campaignService: this.configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'),
+      qrService: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
+      pageService: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+      deeplinkService: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'),
+      notificationService: this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020'),
+      domainService: this.configService.get('DOMAIN_SERVICE_URL', 'http://localhost:60014'),
+      redirectService: this.configService.get('REDIRECT_SERVICE_URL', 'http://localhost:60080'),
     };
   }
 
@@ -228,16 +246,16 @@ export class DashboardService {
     overall: 'healthy' | 'degraded' | 'unhealthy';
   }> {
     const services = [
-      { name: 'user-service', url: 'http://localhost:60002/api/v1/health' },
-      { name: 'link-service', url: 'http://localhost:60003/api/v1/health' },
-      { name: 'analytics-service', url: 'http://localhost:60050/health' },
-      { name: 'campaign-service', url: 'http://localhost:60004/api/v1/health' },
-      { name: 'qr-service', url: 'http://localhost:60005/api/v1/health' },
-      { name: 'page-service', url: 'http://localhost:60007/api/v1/health' },
-      { name: 'deeplink-service', url: 'http://localhost:60008/api/v1/health' },
-      { name: 'notification-service', url: 'http://localhost:60020/api/v1/health' },
-      { name: 'domain-service', url: 'http://localhost:60014/api/v1/health' },
-      { name: 'redirect-service', url: 'http://localhost:60080/health' },
+      { name: 'user-service', url: `${this.endpoints.userService}/api/v1/health` },
+      { name: 'link-service', url: `${this.endpoints.linkService}/api/v1/health` },
+      { name: 'analytics-service', url: `${this.endpoints.analyticsService}/health` },
+      { name: 'campaign-service', url: `${this.endpoints.campaignService}/api/v1/health` },
+      { name: 'qr-service', url: `${this.endpoints.qrService}/api/v1/health` },
+      { name: 'page-service', url: `${this.endpoints.pageService}/api/v1/health` },
+      { name: 'deeplink-service', url: `${this.endpoints.deeplinkService}/api/v1/health` },
+      { name: 'notification-service', url: `${this.endpoints.notificationService}/api/v1/health` },
+      { name: 'domain-service', url: `${this.endpoints.domainService}/api/v1/health` },
+      { name: 'redirect-service', url: `${this.endpoints.redirectService}/health` },
     ];
 
     const results = await Promise.all(

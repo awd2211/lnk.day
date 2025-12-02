@@ -14,6 +14,8 @@ import SystemPage from '@/pages/SystemPage';
 import LoginPage from '@/pages/LoginPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import AcceptInvitePage from '@/pages/AcceptInvitePage';
+import VerifyEmailPage from '@/pages/VerifyEmailPage';
 import SubscriptionsPage from '@/pages/SubscriptionsPage';
 import ContentModerationPage from '@/pages/ContentModerationPage';
 import AlertsPage from '@/pages/AlertsPage';
@@ -47,6 +49,11 @@ import RedirectRulesPage from '@/pages/RedirectRulesPage';
 import TagsPage from '@/pages/TagsPage';
 import FoldersPage from '@/pages/FoldersPage';
 import RealtimePage from '@/pages/RealtimePage';
+import CommentsPage from '@/pages/CommentsPage';
+import SeoManagerPage from '@/pages/SeoManagerPage';
+import SecurityPage from '@/pages/SecurityPage';
+import PlansPage from '@/pages/PlansPage';
+import AdminsPage from '@/pages/AdminsPage';
 
 function App() {
   return (
@@ -54,6 +61,8 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
@@ -79,6 +88,7 @@ function App() {
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="system" element={<SystemPage />} />
         <Route path="admin-roles" element={<AdminRolesPage />} />
+        <Route path="admins" element={<AdminsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="profile" element={<AdminProfilePage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
@@ -99,6 +109,10 @@ function App() {
         <Route path="tags" element={<TagsPage />} />
         <Route path="folders" element={<FoldersPage />} />
         <Route path="realtime" element={<RealtimePage />} />
+        <Route path="comments" element={<CommentsPage />} />
+        <Route path="seo-manager" element={<SeoManagerPage />} />
+        <Route path="security" element={<SecurityPage />} />
+        <Route path="plans" element={<PlansPage />} />
       </Route>
     </Routes>
   );

@@ -55,9 +55,13 @@ export class OpenApiService {
   private readonly logger = new Logger(OpenApiService.name);
   private readonly usageCache: Map<string, number> = new Map();
   private readonly USER_SERVICE_URL: string;
+  private readonly brandName: string;
+  private readonly brandDomain: string;
 
   constructor(private readonly configService: ConfigService) {
     this.USER_SERVICE_URL = this.configService.get('USER_SERVICE_URL', 'http://localhost:60002');
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
   }
 
   // ==================== API Key 验证 ====================
@@ -264,21 +268,21 @@ export class OpenApiService {
     return {
       openapi: '3.0.0',
       info: {
-        title: 'lnk.day Open API',
+        title: `${this.brandName} Open API`,
         version: '1.0.0',
         description: 'Enterprise link management API',
         contact: {
           name: 'API Support',
-          email: 'api@lnk.day',
+          email: `api@${this.brandDomain}`,
         },
       },
       servers: [
         {
-          url: this.configService.get('API_BASE_URL', 'https://api.lnk.day'),
+          url: this.configService.get('API_BASE_URL', `https://api.${this.brandDomain}`),
           description: 'Production server',
         },
         {
-          url: 'https://sandbox.api.lnk.day',
+          url: this.configService.get('API_SANDBOX_URL', `https://sandbox.api.${this.brandDomain}`),
           description: 'Sandbox server',
         },
       ],

@@ -22,9 +22,10 @@ async function bootstrap() {
     }),
   );
 
+  const brandName = process.env.BRAND_NAME || 'lnk.day';
   const config = new DocumentBuilder()
     .setTitle('Domain Service API')
-    .setDescription('Custom domain management for lnk.day')
+    .setDescription(`Custom domain management for ${brandName}`)
     .setVersion('1.0')
     .addBearerAuth()
     .build();

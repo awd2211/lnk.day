@@ -118,7 +118,12 @@ export default function NotificationsPage() {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showChannelDialog, setShowChannelDialog] = useState(false);
   const [showBroadcastDialog, setShowBroadcastDialog] = useState(false);
+  const [showAddChannelDialog, setShowAddChannelDialog] = useState(false);
+  const [showTestDialog, setShowTestDialog] = useState(false);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [testChannelId, setTestChannelId] = useState<string | null>(null);
   const [broadcastData, setBroadcastData] = useState({ subject: '', content: '', type: 'email' });
+  const [newChannelType, setNewChannelType] = useState<string>('email');
 
   // Fetch notification logs
   const { data: logsData, isLoading: logsLoading, refetch: refetchLogs } = useQuery({
@@ -190,7 +195,40 @@ export default function NotificationsPage() {
   });
 
   const testChannelMutation = useMutation({
-    mutationFn: (id: string) => notificationsService.testChannel(id),
+    mutationFn: ({ id, recipient }: { id: string; recipient?: string }) =>
+      notificationsService.testChannel(id, recipient),
+    onSuccess: (response) => {
+      setShowTestDialog(false);
+      setTestRecipient('');
+      setTestChannelId(null);
+      queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
+      if (response.data?.success) {
+        alert(response.data.message || '测试成功');
+      } else {
+        alert(response.data?.message || '测试失败');
+      }
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.message || '测试失败');
+    },
+  });
+
+  const createChannelMutation = useMutation({
+    mutationFn: (data: { type: string; name: string; config: Record<string, any> }) =>
+      notificationsService.createChannel(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
+      setShowAddChannelDialog(false);
+    },
+  });
+
+  const updateChannelMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<NotificationChannel> }) =>
+      notificationsService.updateChannel(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-channels'] });
+      setShowChannelDialog(false);
+    },
   });
 
   const logs = logsData?.data?.items || [];
@@ -515,11 +553,28 @@ export default function NotificationsPage() {
 
         {/* Channels Tab */}
         <TabsContent value="channels" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">配置各种通知渠道的发送参数</p>
+            <Button onClick={() => setShowAddChannelDialog(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              添加渠道
+            </Button>
+          </div>
           <Card>
             <CardContent className="pt-6">
               {channelsLoading ? (
                 <div className="flex justify-center py-8">
                   <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              ) : channels.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Settings className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-2">暂无通知渠道</p>
+                  <p className="text-sm mb-4">点击"添加渠道"按钮创建邮件、短信等通知渠道</p>
+                  <Button onClick={() => setShowAddChannelDialog(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加渠道
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -561,8 +616,15 @@ export default function NotificationsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => testChannelMutation.mutate(channel.id)}
-                              disabled={!channel.enabled}
+                              onClick={() => {
+                                if (channel.type === 'email') {
+                                  setTestChannelId(channel.id);
+                                  setShowTestDialog(true);
+                                } else {
+                                  testChannelMutation.mutate({ id: channel.id });
+                                }
+                              }}
+                              disabled={testChannelMutation.isPending}
                             >
                               <TestTube className="w-4 h-4 mr-1" />
                               测试
@@ -731,30 +793,82 @@ export default function NotificationsPage() {
               {selectedChannel.type === 'email' && (
                 <>
                   <div>
-                    <Label>SMTP 服务器</Label>
-                    <Input defaultValue={selectedChannel.config?.host} placeholder="smtp.example.com" />
+                    <Label>邮件服务商</Label>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 mt-1"
+                      defaultValue={selectedChannel.config?.provider || 'smtp'}
+                    >
+                      <option value="smtp">SMTP</option>
+                      <option value="mailgun">Mailgun</option>
+                      <option value="sendgrid">SendGrid</option>
+                      <option value="ses">AWS SES</option>
+                    </select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label>端口</Label>
-                      <Input defaultValue={selectedChannel.config?.port} placeholder="587" />
+                      <Label>发件人名称</Label>
+                      <Input defaultValue={selectedChannel.config?.fromName} placeholder={SHORT_LINK_DOMAIN} />
                     </div>
                     <div>
-                      <Label>加密方式</Label>
-                      <select className="w-full border rounded-md px-3 py-2">
-                        <option value="tls">TLS</option>
-                        <option value="ssl">SSL</option>
-                        <option value="none">无</option>
-                      </select>
+                      <Label>发件人邮箱</Label>
+                      <Input defaultValue={selectedChannel.config?.fromEmail} placeholder={`noreply@${SHORT_LINK_DOMAIN}`} />
                     </div>
                   </div>
-                  <div>
-                    <Label>发件人邮箱</Label>
-                    <Input defaultValue={selectedChannel.config?.from} placeholder="noreply@example.com" />
+                  {/* SMTP 配置 */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-medium mb-3">SMTP 配置</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>SMTP 服务器</Label>
+                        <Input defaultValue={selectedChannel.config?.smtp?.host} placeholder="smtp.example.com" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>端口</Label>
+                          <Input defaultValue={selectedChannel.config?.smtp?.port || 587} placeholder="587" type="number" />
+                        </div>
+                        <div className="flex items-center gap-2 pt-6">
+                          <Switch defaultChecked={selectedChannel.config?.smtp?.secure !== false} />
+                          <Label className="font-normal">启用 TLS/SSL</Label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>用户名</Label>
+                          <Input defaultValue={selectedChannel.config?.smtp?.user} placeholder="SMTP 用户名" />
+                        </div>
+                        <div>
+                          <Label>密码</Label>
+                          <Input type="password" defaultValue={selectedChannel.config?.smtp?.pass} placeholder="SMTP 密码" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label>发件人名称</Label>
-                    <Input defaultValue={selectedChannel.config?.fromName} placeholder={SHORT_LINK_DOMAIN} />
+                  {/* Mailgun 配置 (可选) */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-medium mb-3">Mailgun 配置 (如使用 Mailgun)</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>API Key</Label>
+                        <Input type="password" defaultValue={selectedChannel.config?.mailgun?.apiKey} placeholder="key-xxxxxxxx" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>域名</Label>
+                          <Input defaultValue={selectedChannel.config?.mailgun?.domain} placeholder="mg.example.com" />
+                        </div>
+                        <div>
+                          <Label>区域</Label>
+                          <select
+                            className="w-full border rounded-md px-3 py-2"
+                            defaultValue={selectedChannel.config?.mailgun?.region || 'us'}
+                          >
+                            <option value="us">US</option>
+                            <option value="eu">EU</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -877,6 +991,292 @@ export default function NotificationsPage() {
             >
               <Send className="w-4 h-4 mr-2" />
               发送
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Channel Dialog */}
+      <Dialog open={showAddChannelDialog} onOpenChange={setShowAddChannelDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>添加通知渠道</DialogTitle>
+            <DialogDescription>
+              选择渠道类型并配置发送参数
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>渠道类型</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                {channelTypes.filter(t => t.type !== 'push').map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <button
+                      key={type.type}
+                      type="button"
+                      className={`p-4 rounded-lg border-2 text-center transition-all ${
+                        newChannelType === type.type
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setNewChannelType(type.type)}
+                    >
+                      <div className={`inline-flex p-2 rounded-lg ${type.color} mb-2`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="text-sm font-medium">{type.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {newChannelType === 'email' && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium">邮件渠道配置</h4>
+                <div>
+                  <Label>邮件服务商</Label>
+                  <select id="email-provider" className="w-full border rounded-md px-3 py-2 mt-1">
+                    <option value="smtp">SMTP</option>
+                    <option value="mailgun">Mailgun</option>
+                    <option value="sendgrid">SendGrid</option>
+                    <option value="ses">AWS SES</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>发件人名称</Label>
+                    <Input id="email-fromName" placeholder={SHORT_LINK_DOMAIN} />
+                  </div>
+                  <div>
+                    <Label>发件人邮箱</Label>
+                    <Input id="email-fromEmail" placeholder={`noreply@${SHORT_LINK_DOMAIN}`} />
+                  </div>
+                </div>
+                {/* SMTP 配置 */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h5 className="font-medium text-sm">SMTP 配置</h5>
+                  <div>
+                    <Label>SMTP 服务器</Label>
+                    <Input id="smtp-host" placeholder="smtp.example.com" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>端口</Label>
+                      <Input id="smtp-port" type="number" defaultValue="587" />
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <Switch id="smtp-secure" defaultChecked />
+                      <Label htmlFor="smtp-secure" className="font-normal">启用 TLS/SSL</Label>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>用户名</Label>
+                      <Input id="smtp-user" placeholder="SMTP 用户名" />
+                    </div>
+                    <div>
+                      <Label>密码</Label>
+                      <Input id="smtp-pass" type="password" placeholder="SMTP 密码" />
+                    </div>
+                  </div>
+                </div>
+                {/* Mailgun 配置 */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h5 className="font-medium text-sm">Mailgun 配置 (如使用 Mailgun)</h5>
+                  <div>
+                    <Label>API Key</Label>
+                    <Input id="mailgun-apiKey" type="password" placeholder="key-xxxxxxxx" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>域名</Label>
+                      <Input id="mailgun-domain" placeholder="mg.example.com" />
+                    </div>
+                    <div>
+                      <Label>区域</Label>
+                      <select id="mailgun-region" className="w-full border rounded-md px-3 py-2">
+                        <option value="us">US</option>
+                        <option value="eu">EU</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {newChannelType === 'sms' && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium">短信渠道配置</h4>
+                <div>
+                  <Label>短信服务商</Label>
+                  <select id="sms-provider" className="w-full border rounded-md px-3 py-2 mt-1">
+                    <option value="aliyun">阿里云短信</option>
+                    <option value="tencent">腾讯云短信</option>
+                    <option value="twilio">Twilio</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Access Key ID</Label>
+                  <Input id="sms-accessKeyId" type="password" placeholder="••••••••" />
+                </div>
+                <div>
+                  <Label>Access Key Secret</Label>
+                  <Input id="sms-accessKeySecret" type="password" placeholder="••••••••" />
+                </div>
+                <div>
+                  <Label>签名</Label>
+                  <Input id="sms-signName" placeholder={SHORT_LINK_DOMAIN} />
+                </div>
+              </div>
+            )}
+
+            {newChannelType === 'slack' && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium">Slack 渠道配置</h4>
+                <div>
+                  <Label>Webhook URL</Label>
+                  <Input id="slack-webhookUrl" placeholder="https://hooks.slack.com/services/..." />
+                </div>
+                <div>
+                  <Label>默认频道</Label>
+                  <Input id="slack-channel" placeholder="#general" />
+                </div>
+              </div>
+            )}
+
+            {newChannelType === 'webhook' && (
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium">Webhook 渠道配置</h4>
+                <div>
+                  <Label>Webhook URL</Label>
+                  <Input id="webhook-url" placeholder="https://example.com/webhook" />
+                </div>
+                <div>
+                  <Label>请求头 (JSON)</Label>
+                  <Textarea
+                    id="webhook-headers"
+                    rows={3}
+                    className="font-mono text-sm"
+                    placeholder='{"Authorization": "Bearer xxx"}'
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddChannelDialog(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                const typeInfo = channelTypes.find(t => t.type === newChannelType);
+                const config: Record<string, any> = {};
+
+                if (newChannelType === 'email') {
+                  config.provider = (document.getElementById('email-provider') as HTMLSelectElement)?.value || 'smtp';
+                  config.fromName = (document.getElementById('email-fromName') as HTMLInputElement)?.value || '';
+                  config.fromEmail = (document.getElementById('email-fromEmail') as HTMLInputElement)?.value || '';
+                  config.smtp = {
+                    host: (document.getElementById('smtp-host') as HTMLInputElement)?.value || '',
+                    port: parseInt((document.getElementById('smtp-port') as HTMLInputElement)?.value || '587'),
+                    secure: (document.getElementById('smtp-secure') as HTMLInputElement)?.checked ?? true,
+                    user: (document.getElementById('smtp-user') as HTMLInputElement)?.value || '',
+                    pass: (document.getElementById('smtp-pass') as HTMLInputElement)?.value || '',
+                  };
+                  config.mailgun = {
+                    apiKey: (document.getElementById('mailgun-apiKey') as HTMLInputElement)?.value || '',
+                    domain: (document.getElementById('mailgun-domain') as HTMLInputElement)?.value || '',
+                    region: (document.getElementById('mailgun-region') as HTMLSelectElement)?.value || 'us',
+                  };
+                } else if (newChannelType === 'sms') {
+                  config.provider = (document.getElementById('sms-provider') as HTMLSelectElement)?.value || 'aliyun';
+                  config.accessKeyId = (document.getElementById('sms-accessKeyId') as HTMLInputElement)?.value || '';
+                  config.accessKeySecret = (document.getElementById('sms-accessKeySecret') as HTMLInputElement)?.value || '';
+                  config.signName = (document.getElementById('sms-signName') as HTMLInputElement)?.value || '';
+                } else if (newChannelType === 'slack') {
+                  config.webhookUrl = (document.getElementById('slack-webhookUrl') as HTMLInputElement)?.value || '';
+                  config.channel = (document.getElementById('slack-channel') as HTMLInputElement)?.value || '';
+                } else if (newChannelType === 'webhook') {
+                  config.url = (document.getElementById('webhook-url') as HTMLInputElement)?.value || '';
+                  try {
+                    config.headers = JSON.parse((document.getElementById('webhook-headers') as HTMLTextAreaElement)?.value || '{}');
+                  } catch {
+                    config.headers = {};
+                  }
+                }
+
+                createChannelMutation.mutate({
+                  type: newChannelType,
+                  name: typeInfo?.name || newChannelType,
+                  config,
+                });
+              }}
+              disabled={createChannelMutation.isPending}
+            >
+              {createChannelMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              创建渠道
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Email Dialog */}
+      <Dialog open={showTestDialog} onOpenChange={(open) => {
+        setShowTestDialog(open);
+        if (!open) {
+          setTestRecipient('');
+          setTestChannelId(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>发送测试邮件</DialogTitle>
+            <DialogDescription>
+              输入收件人邮箱地址，系统将发送一封测试邮件以验证配置是否正确。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="test-recipient">收件人邮箱</Label>
+              <Input
+                id="test-recipient"
+                type="email"
+                placeholder="your@email.com"
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTestDialog(false)}>
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                if (testChannelId && testRecipient) {
+                  testChannelMutation.mutate({ id: testChannelId, recipient: testRecipient });
+                }
+              }}
+              disabled={!testRecipient || testChannelMutation.isPending}
+            >
+              {testChannelMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  发送中...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  发送测试邮件
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

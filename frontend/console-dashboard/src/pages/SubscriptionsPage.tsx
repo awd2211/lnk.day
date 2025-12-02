@@ -19,6 +19,9 @@ import {
   Receipt,
   AlertTriangle,
   XCircle,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -123,7 +126,19 @@ export default function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
   const [changePlanOpen, setChangePlanOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [extendTrialOpen, setExtendTrialOpen] = useState(false);
@@ -144,7 +159,7 @@ export default function SubscriptionsPage() {
 
   // Fetch subscriptions
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', { search, page, plan: planFilter, status: statusFilter }],
+    queryKey: ['subscriptions', { search, page, plan: planFilter, status: statusFilter, sortBy, sortOrder }],
     queryFn: async () => {
       const response = await subscriptionsService.getSubscriptions({
         search: search || undefined,
@@ -152,6 +167,8 @@ export default function SubscriptionsPage() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit: 20,
+        sortBy,
+        sortOrder,
       });
       return response.data;
     },
@@ -400,12 +417,52 @@ export default function SubscriptionsPage() {
           <table className="w-full">
             <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">用户</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">套餐</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">金额</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('userName')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    用户
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('plan')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    套餐
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('amount')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    金额
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">周期</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">到期时间</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('currentPeriodEnd')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    到期时间
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">操作</th>
               </tr>
             </thead>

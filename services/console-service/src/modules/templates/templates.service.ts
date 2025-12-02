@@ -7,6 +7,11 @@ import {
   CampaignTemplatePreset,
   BioLinkTemplatePreset,
   QRStylePreset,
+  DeepLinkTemplatePreset,
+  WebhookTemplatePreset,
+  RedirectRuleTemplatePreset,
+  SeoTemplatePreset,
+  ReportTemplatePreset,
 } from './entities';
 import {
   CreateLinkTemplateDto,
@@ -20,6 +25,16 @@ import {
   UpdateBioLinkTemplateDto,
   CreateQRStyleDto,
   UpdateQRStyleDto,
+  CreateDeepLinkTemplateDto,
+  UpdateDeepLinkTemplateDto,
+  CreateWebhookTemplateDto,
+  UpdateWebhookTemplateDto,
+  CreateRedirectRuleTemplateDto,
+  UpdateRedirectRuleTemplateDto,
+  CreateSeoTemplateDto,
+  UpdateSeoTemplateDto,
+  CreateReportTemplateDto,
+  UpdateReportTemplateDto,
 } from './dto';
 
 interface QueryOptions {

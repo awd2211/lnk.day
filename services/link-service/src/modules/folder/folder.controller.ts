@@ -6,10 +6,11 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import {
   JwtAuthGuard,
@@ -21,6 +22,7 @@ import {
   ScopedTeamId,
   AuthenticatedUser,
   isPlatformAdmin,
+  AdminOnly,
 } from '@lnk/nestjs-common';
 import { FolderService } from './folder.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
@@ -121,5 +123,41 @@ export class FolderController {
   async recalculateLinkCounts(@ScopedTeamId() teamId: string) {
     await this.folderService.recalculateLinkCounts(teamId);
     return { success: true, message: '链接数量已重新计算' };
+  }
+
+  // ==================== Admin Endpoints ====================
+
+  @Get('admin/all')
+  @AdminOnly()
+  @ApiOperation({ summary: '获取所有文件夹（管理员）' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'teamId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
+  findAllAdmin(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('teamId') teamId?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.folderService.findAllAdmin({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+      teamId,
+      search,
+      sortBy,
+      sortOrder,
+    });
+  }
+
+  @Get('admin/stats')
+  @AdminOnly()
+  @ApiOperation({ summary: '获取文件夹统计（管理员）' })
+  getStats() {
+    return this.folderService.getStats();
   }
 }

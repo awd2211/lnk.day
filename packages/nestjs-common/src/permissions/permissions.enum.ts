@@ -122,56 +122,105 @@ export enum AdminPermission {
   // ========== 管理员管理 ==========
   ADMIN_ADMINS_VIEW = 'admin:admins:view',
   ADMIN_ADMINS_MANAGE = 'admin:admins:manage',
+
+  // ========== 安全管理 ==========
+  ADMIN_SECURITY_VIEW = 'admin:security:view',
+  ADMIN_SECURITY_MANAGE = 'admin:security:manage',
 }
 
 // ============================================================================
-// 角色权限模板
+// 权限继承链（核心改进）
 // ============================================================================
 
 /**
- * 团队角色权限模板
+ * 基础只读权限（VIEWER 角色）
  */
-export const TEAM_ROLE_PERMISSIONS: Record<string, Permission[]> = {
-  OWNER: Object.values(Permission), // 所有权限
+const VIEWER_PERMISSIONS: Permission[] = [
+  Permission.LINKS_VIEW,
+  Permission.ANALYTICS_VIEW,
+  Permission.QR_VIEW,
+  Permission.PAGES_VIEW,
+  Permission.CAMPAIGNS_VIEW,
+  Permission.DEEPLINKS_VIEW,
+  Permission.DOMAINS_VIEW,
+  Permission.TEAM_VIEW,
+];
 
-  ADMIN: [
-    Permission.LINKS_VIEW, Permission.LINKS_CREATE, Permission.LINKS_EDIT, Permission.LINKS_DELETE, Permission.LINKS_BULK_EDIT,
-    Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT, Permission.ANALYTICS_ADVANCED,
-    Permission.QR_VIEW, Permission.QR_CREATE, Permission.QR_EDIT, Permission.QR_DELETE, Permission.QR_BATCH,
-    Permission.PAGES_VIEW, Permission.PAGES_CREATE, Permission.PAGES_EDIT, Permission.PAGES_DELETE, Permission.PAGES_PUBLISH,
-    Permission.CAMPAIGNS_VIEW, Permission.CAMPAIGNS_CREATE, Permission.CAMPAIGNS_EDIT, Permission.CAMPAIGNS_DELETE,
-    Permission.DEEPLINKS_VIEW, Permission.DEEPLINKS_CREATE, Permission.DEEPLINKS_EDIT, Permission.DEEPLINKS_DELETE,
-    Permission.DOMAINS_VIEW, Permission.DOMAINS_ADD, Permission.DOMAINS_CONFIGURE,
-    Permission.INTEGRATIONS_VIEW, Permission.INTEGRATIONS_MANAGE, Permission.API_KEYS_VIEW, Permission.WEBHOOKS_VIEW, Permission.WEBHOOKS_MANAGE,
-    Permission.TEAM_VIEW, Permission.TEAM_INVITE,
-    Permission.BILLING_VIEW,
-    Permission.SETTINGS_VIEW, Permission.SETTINGS_EDIT,
-  ],
+/**
+ * MEMBER 新增权限（继承 VIEWER）
+ */
+const MEMBER_ADDITIONAL: Permission[] = [
+  Permission.LINKS_CREATE,
+  Permission.LINKS_EDIT,
+  Permission.QR_CREATE,
+  Permission.QR_EDIT,
+  Permission.PAGES_CREATE,
+  Permission.PAGES_EDIT,
+  Permission.CAMPAIGNS_CREATE,
+  Permission.DEEPLINKS_CREATE,
+  Permission.DEEPLINKS_EDIT,
+  Permission.INTEGRATIONS_VIEW,
+  Permission.SETTINGS_VIEW,
+];
 
-  MEMBER: [
-    Permission.LINKS_VIEW, Permission.LINKS_CREATE, Permission.LINKS_EDIT,
-    Permission.ANALYTICS_VIEW,
-    Permission.QR_VIEW, Permission.QR_CREATE, Permission.QR_EDIT,
-    Permission.PAGES_VIEW, Permission.PAGES_CREATE, Permission.PAGES_EDIT,
-    Permission.CAMPAIGNS_VIEW, Permission.CAMPAIGNS_CREATE,
-    Permission.DEEPLINKS_VIEW, Permission.DEEPLINKS_CREATE, Permission.DEEPLINKS_EDIT,
-    Permission.DOMAINS_VIEW,
-    Permission.INTEGRATIONS_VIEW,
-    Permission.TEAM_VIEW,
-    Permission.SETTINGS_VIEW,
-  ],
+/**
+ * ADMIN 新增权限（继承 MEMBER）
+ */
+const ADMIN_ADDITIONAL: Permission[] = [
+  Permission.LINKS_DELETE,
+  Permission.LINKS_BULK_EDIT,
+  Permission.ANALYTICS_EXPORT,
+  Permission.ANALYTICS_ADVANCED,
+  Permission.QR_DELETE,
+  Permission.QR_BATCH,
+  Permission.PAGES_DELETE,
+  Permission.PAGES_PUBLISH,
+  Permission.CAMPAIGNS_EDIT,
+  Permission.CAMPAIGNS_DELETE,
+  Permission.DEEPLINKS_DELETE,
+  Permission.DOMAINS_ADD,
+  Permission.DOMAINS_CONFIGURE,
+  Permission.INTEGRATIONS_MANAGE,
+  Permission.API_KEYS_VIEW,
+  Permission.WEBHOOKS_VIEW,
+  Permission.WEBHOOKS_MANAGE,
+  Permission.TEAM_INVITE,
+  Permission.BILLING_VIEW,
+  Permission.SETTINGS_EDIT,
+];
 
-  VIEWER: [
-    Permission.LINKS_VIEW,
-    Permission.ANALYTICS_VIEW,
-    Permission.QR_VIEW,
-    Permission.PAGES_VIEW,
-    Permission.CAMPAIGNS_VIEW,
-    Permission.DEEPLINKS_VIEW,
-    Permission.DOMAINS_VIEW,
-    Permission.TEAM_VIEW,
-  ],
-};
+/**
+ * OWNER 新增权限（继承 ADMIN）
+ */
+const OWNER_ADDITIONAL: Permission[] = [
+  Permission.DOMAINS_REMOVE,
+  Permission.API_KEYS_MANAGE,
+  Permission.TEAM_REMOVE,
+  Permission.TEAM_ROLES_MANAGE,
+  Permission.BILLING_MANAGE,
+];
+
+/**
+ * 构建继承链权限
+ */
+function buildInheritedPermissions(): Record<string, Permission[]> {
+  const viewer = [...VIEWER_PERMISSIONS];
+  const member = [...viewer, ...MEMBER_ADDITIONAL];
+  const admin = [...member, ...ADMIN_ADDITIONAL];
+  const owner = [...admin, ...OWNER_ADDITIONAL];
+
+  return {
+    VIEWER: viewer,
+    MEMBER: member,
+    ADMIN: admin,
+    OWNER: owner,
+  };
+}
+
+/**
+ * 团队角色权限模板（使用继承链）
+ */
+export const TEAM_ROLE_PERMISSIONS: Record<string, Permission[]> = buildInheritedPermissions();
 
 /**
  * 管理员角色权限模板
@@ -195,6 +244,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     AdminPermission.ADMIN_SYSTEM_LOGS,
     AdminPermission.ADMIN_BILLING_VIEW,
     AdminPermission.ADMIN_ADMINS_VIEW,
+    AdminPermission.ADMIN_SECURITY_VIEW,
   ],
 
   OPERATOR: [
@@ -209,6 +259,60 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
  * @deprecated 使用 TEAM_ROLE_PERMISSIONS 替代
  */
 export const PRESET_ROLE_PERMISSIONS = TEAM_ROLE_PERMISSIONS;
+
+// ============================================================================
+// 权限继承工具函数
+// ============================================================================
+
+/**
+ * 获取角色的所有权限（包含继承）
+ */
+export function getRolePermissions(role: string): Permission[] {
+  return TEAM_ROLE_PERMISSIONS[role] || [];
+}
+
+/**
+ * 检查角色是否拥有指定权限
+ */
+export function roleHasPermission(role: string, permission: Permission): boolean {
+  const permissions = getRolePermissions(role);
+  return permissions.includes(permission);
+}
+
+/**
+ * 获取角色继承链
+ */
+export function getRoleInheritanceChain(role: string): string[] {
+  const chain: string[] = [];
+  const roles = ['VIEWER', 'MEMBER', 'ADMIN', 'OWNER'];
+  const index = roles.indexOf(role);
+
+  if (index >= 0) {
+    for (let i = 0; i <= index; i++) {
+      chain.push(roles[i]);
+    }
+  }
+
+  return chain;
+}
+
+/**
+ * 获取角色相对于基础角色新增的权限
+ */
+export function getAdditionalPermissions(role: string): Permission[] {
+  switch (role) {
+    case 'VIEWER':
+      return VIEWER_PERMISSIONS;
+    case 'MEMBER':
+      return MEMBER_ADDITIONAL;
+    case 'ADMIN':
+      return ADMIN_ADDITIONAL;
+    case 'OWNER':
+      return OWNER_ADDITIONAL;
+    default:
+      return [];
+  }
+}
 
 // ============================================================================
 // 权限分组（用于 UI 显示）
@@ -402,6 +506,14 @@ export const ADMIN_PERMISSION_GROUPS = {
     permissions: [
       { key: AdminPermission.ADMIN_ADMINS_VIEW, name: '查看管理员', description: '查看管理员列表' },
       { key: AdminPermission.ADMIN_ADMINS_MANAGE, name: '管理管理员', description: '创建和编辑管理员' },
+    ],
+  },
+  security: {
+    name: '安全管理',
+    icon: 'shield-check',
+    permissions: [
+      { key: AdminPermission.ADMIN_SECURITY_VIEW, name: '查看安全设置', description: '查看平台安全配置、会话、事件' },
+      { key: AdminPermission.ADMIN_SECURITY_MANAGE, name: '管理安全设置', description: '修改安全策略、封禁 IP、终止会话' },
     ],
   },
 };

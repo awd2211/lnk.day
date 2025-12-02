@@ -3,3 +3,8 @@ export * from './utm-template-preset.entity';
 export * from './campaign-template-preset.entity';
 export * from './bio-link-template-preset.entity';
 export * from './qr-style-preset.entity';
+export * from './deeplink-template-preset.entity';
+export * from './webhook-template-preset.entity';
+export * from './redirect-rule-template-preset.entity';
+export * from './seo-template-preset.entity';
+export * from './report-template-preset.entity';

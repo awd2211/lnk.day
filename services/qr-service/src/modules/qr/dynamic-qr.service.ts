@@ -342,7 +342,7 @@ export class DynamicQrService {
     const redirectUrl = `${baseUrl}/q/${qr.shortCode}`;
 
     return this.qrService.generate(redirectUrl, {
-      ...qr.qrOptions,
+      ...(qr.qrOptions as any),
       errorCorrectionLevel: 'H',
     }) as Promise<Buffer>;
   }

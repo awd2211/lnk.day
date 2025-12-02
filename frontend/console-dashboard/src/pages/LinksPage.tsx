@@ -24,6 +24,7 @@ import {
   ShieldX,
   Building2,
   User,
+  ArrowUpDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -131,7 +132,19 @@ export default function LinksPage() {
   const [riskLevel, setRiskLevel] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedLink, setSelectedLink] = useState<Link | null>(null);
 
@@ -215,7 +228,7 @@ export default function LinksPage() {
 
   // Fetch links
   const { data: linksData, isLoading, refetch } = useQuery({
-    queryKey: ['admin-links', teamId, status, riskLevel, search, page, teamNameMap],
+    queryKey: ['admin-links', teamId, status, riskLevel, search, page, sortBy, sortOrder, teamNameMap],
     queryFn: async () => {
       const response = await linksService.getLinks({
         teamId: teamId !== 'all' ? teamId : undefined,
@@ -223,6 +236,8 @@ export default function LinksPage() {
         search: search || undefined,
         page,
         limit,
+        sortBy,
+        sortOrder,
       });
 
       const rawItems = response.data?.items || response.data?.links || response.data || [];
@@ -508,7 +523,13 @@ export default function LinksPage() {
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
-                  短链接
+                  <button
+                    onClick={() => handleSort('shortCode')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    短链接
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
                   原始URL
@@ -517,13 +538,25 @@ export default function LinksPage() {
                   所属 / 创建者
                 </th>
                 <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
-                  点击 / 举报
+                  <button
+                    onClick={() => handleSort('clicks')}
+                    className="flex items-center gap-1 hover:text-gray-700 mx-auto"
+                  >
+                    点击 / 举报
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
                   风险等级
                 </th>
                 <th className="px-6 py-3 text-center text-sm font-medium text-gray-500">
-                  状态
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-gray-700 mx-auto"
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">
                   管理操作

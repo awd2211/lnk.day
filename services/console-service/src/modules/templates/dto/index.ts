@@ -3,3 +3,8 @@ export * from './utm-template.dto';
 export * from './campaign-template.dto';
 export * from './bio-link-template.dto';
 export * from './qr-style.dto';
+export * from './deeplink-template.dto';
+export * from './webhook-template.dto';
+export * from './redirect-rule-template.dto';
+export * from './seo-template.dto';
+export * from './report-template.dto';

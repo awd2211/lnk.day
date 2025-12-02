@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as QRCode from 'qrcode';
 import sharp from 'sharp';
 import PDFDocument from 'pdfkit';
@@ -65,6 +66,12 @@ const DEFAULT_STYLES: QrStyle[] = [
 
 @Injectable()
 export class QrService {
+  private readonly brandName: string;
+
+  constructor(private readonly configService: ConfigService) {
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+  }
+
   async generate(url: string, options: QrOptions = {}): Promise<Buffer | string> {
     const {
       size = 300,
@@ -184,7 +191,7 @@ export class QrService {
     const eps = `%!PS-Adobe-3.0 EPSF-3.0
 %%BoundingBox: 0 0 ${size} ${size}
 %%HiResBoundingBox: 0 0 ${size}.000000 ${size}.000000
-%%Creator: lnk.day QR Service
+%%Creator: ${this.brandName} QR Service
 %%Title: QR Code
 %%EndComments
 %%BeginProlog

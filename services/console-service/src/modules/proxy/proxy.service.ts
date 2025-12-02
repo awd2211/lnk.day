@@ -11,11 +11,10 @@ export class ProxyService {
   private readonly serviceUrls: Record<ServiceName, string>;
 
   constructor(private readonly configService: ConfigService) {
+    // 不在这里设置默认的 x-internal-api-key，而是在 forward() 方法中按需添加
+    // 这样当传入 Authorization header 时，可以避免发送内部 API key
     this.httpClient = axios.create({
       timeout: 30000,
-      headers: {
-        'x-internal-api-key': this.configService.get('INTERNAL_API_KEY'),
-      },
     });
 
     this.serviceUrls = {
@@ -51,11 +50,19 @@ export class ProxyService {
     }
 
     const url = `${baseUrl}${path}`;
+
+    // 如果有 Authorization header，不使用内部 API key，让目标服务验证用户 token
+    // 这样管理员的实际身份会被正确识别（而不是变成 "system"）
+    const finalHeaders: Record<string, string> = { ...headers };
+    if (!finalHeaders['Authorization'] && !finalHeaders['authorization']) {
+      finalHeaders['x-internal-api-key'] = this.configService.get('INTERNAL_API_KEY') || '';
+    }
+
     const config: AxiosRequestConfig = {
       method,
       url,
       params,
-      headers: { ...headers },
+      headers: finalHeaders,
     };
 
     if (data && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
@@ -149,7 +156,7 @@ export class ProxyService {
   }
 
   // User Service Proxies
-  async getUsers(params?: { page?: number; limit?: number; search?: string }, auth?: string): Promise<any> {
+  async getUsers(params?: { page?: number; limit?: number; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }, auth?: string): Promise<any> {
     const result = await this.forward('user', '/users', { params, headers: auth ? { Authorization: auth } : {} });
     return this.normalizeListResponse(result, params);
   }
@@ -166,7 +173,7 @@ export class ProxyService {
     return this.forward('user', `/users/${id}`, { method: 'DELETE', headers: auth ? { Authorization: auth } : {} });
   }
 
-  async getTeams(params?: { page?: number; limit?: number }, auth?: string): Promise<any> {
+  async getTeams(params?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }, auth?: string): Promise<any> {
     const result = await this.forward('user', '/teams', { params, headers: auth ? { Authorization: auth } : {} });
     return this.normalizeListResponse(result, params);
   }
@@ -778,13 +785,13 @@ export class ProxyService {
     });
   }
 
-  async getPlans(auth?: string): Promise<any> {
+  async getBillingPlans(auth?: string): Promise<any> {
     return this.forward('user', '/billing/plans', {
       headers: auth ? { Authorization: auth } : {},
     });
   }
 
-  async updatePlan(id: string, data: any, auth?: string): Promise<any> {
+  async updateBillingPlan(id: string, data: any, auth?: string): Promise<any> {
     return this.forward('user', `/billing/plans/${id}`, {
       method: 'PUT',
       data,
@@ -1154,6 +1161,14 @@ export class ProxyService {
     });
   }
 
+  async createNotificationChannel(data: any, auth?: string): Promise<any> {
+    return this.forward('notification', '/notifications/channels', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
   async getNotificationChannel(id: string, auth?: string): Promise<any> {
     return this.forward('notification', `/notifications/channels/${id}`, {
       headers: auth ? { Authorization: auth } : {},
@@ -1176,9 +1191,10 @@ export class ProxyService {
     });
   }
 
-  async testNotificationChannel(id: string, auth?: string): Promise<any> {
+  async testNotificationChannel(id: string, recipient?: string, auth?: string): Promise<any> {
     return this.forward('notification', `/notifications/channels/${id}/test`, {
       method: 'POST',
+      data: recipient ? { recipient } : {},
       headers: auth ? { Authorization: auth } : {},
     });
   }
@@ -1706,7 +1722,8 @@ export class ProxyService {
   // ==================== Folders Stats ====================
   async getFolderStats(auth?: string): Promise<any> {
     try {
-      return await this.forward('link', '/folders/stats', { headers: auth ? { Authorization: auth } : {} });
+      // Use admin endpoint to get stats across all teams
+      return await this.forward('link', '/folders/admin/stats', { headers: auth ? { Authorization: auth } : {} });
     } catch {
       return {
         totalFolders: 0,
@@ -1717,9 +1734,10 @@ export class ProxyService {
     }
   }
 
-  async getFolders(params?: { page?: number; limit?: number; teamId?: string; search?: string }, auth?: string): Promise<any> {
+  async getFolders(params?: { page?: number; limit?: number; teamId?: string; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }, auth?: string): Promise<any> {
     try {
-      const result = await this.forward('link', '/folders', { params, headers: auth ? { Authorization: auth } : {} });
+      // Use admin endpoint to get all folders across all teams
+      const result = await this.forward('link', '/folders/admin/all', { params, headers: auth ? { Authorization: auth } : {} });
       const items = result?.items || result?.folders || result?.data || [];
       const enrichedItems = await this.enrichWithTeamNames(items, auth);
       return {
@@ -1771,5 +1789,339 @@ export class ProxyService {
     } catch {
       return { points: [] };
     }
+  }
+
+  // ==================== Comments Management ====================
+  async getCommentsStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('page', '/comments/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalComments: 0,
+        pendingComments: 0,
+        approvedComments: 0,
+        rejectedComments: 0,
+        spamComments: 0,
+        reportedComments: 0,
+      };
+    }
+  }
+
+  async getComments(params?: { page?: number; limit?: number; status?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('page', '/comments', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async moderateComment(id: string, data: { action: string; reason?: string }, auth?: string): Promise<any> {
+    return this.forward('page', `/comments/${id}/moderate`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async batchModerateComments(data: { ids: string[]; action: string }, auth?: string): Promise<any> {
+    return this.forward('page', '/comments/batch-moderate', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async deleteComment(id: string, auth?: string): Promise<any> {
+    return this.forward('page', `/comments/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== SEO Management ====================
+  async getSeoSettings(auth?: string): Promise<any> {
+    try {
+      return await this.forward('page', '/seo/settings', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        defaultMetaTitle: '',
+        defaultMetaDescription: '',
+        defaultOgImage: '',
+        robotsTxt: '',
+        sitemapEnabled: true,
+        autoGenerateMetaTags: true,
+      };
+    }
+  }
+
+  async updateSeoSettings(data: any, auth?: string): Promise<any> {
+    return this.forward('page', '/seo/settings', {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSeoPages(params?: { search?: string; type?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('page', '/seo/pages', { params, headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result);
+    } catch {
+      return { items: [], total: 0 };
+    }
+  }
+
+  async updatePageSeo(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('page', `/seo/pages/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getSeoIssues(auth?: string): Promise<any> {
+    try {
+      return await this.forward('page', '/seo/issues', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return { items: [] };
+    }
+  }
+
+  async getSeoStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('page', '/seo/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        totalPages: 0,
+        pagesWithSeo: 0,
+        pagesWithoutSeo: 0,
+        issuesCount: 0,
+        avgSeoScore: 0,
+      };
+    }
+  }
+
+  async batchOptimizeSeo(auth?: string): Promise<any> {
+    return this.forward('page', '/seo/optimize', {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Security Management (Extended) ====================
+  async getSecuritySettings(auth?: string): Promise<any> {
+    try {
+      return await this.forward('user', '/security/settings', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        mfaRequired: false,
+        sessionTimeout: 30,
+        maxLoginAttempts: 5,
+        ipWhitelist: [],
+        passwordPolicy: {
+          minLength: 8,
+          requireUppercase: true,
+          requireLowercase: true,
+          requireNumbers: true,
+          requireSpecial: false,
+        },
+      };
+    }
+  }
+
+  async updateSecuritySettings(data: any, auth?: string): Promise<any> {
+    return this.forward('user', '/security/settings', {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getBlockedIps(auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('user', '/security/blocked-ips', { headers: auth ? { Authorization: auth } : {} });
+      return this.normalizeListResponse(result);
+    } catch {
+      return { items: [], total: 0 };
+    }
+  }
+
+  async addBlockedIp(data: { ip: string; reason: string; permanent: boolean }, auth?: string): Promise<any> {
+    return this.forward('user', '/security/blocked-ips', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async removeBlockedIp(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/security/blocked-ips/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getActiveSessions(params?: { page?: number; limit?: number; userId?: string; search?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('user', '/security/admin/sessions', {
+        params,
+        headers: auth ? { Authorization: auth } : {},
+      });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  async terminateSession(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/security/admin/sessions/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getPlatformSecurityStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('user', '/security/admin/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        securityScore: 0,
+        loginStats: { successfulLogins24h: 0, failedLogins24h: 0, totalActiveSessions: 0 },
+        mfaStats: { mfaEnabled: 0, mfaDisabled: 0, mfaRate: 0 },
+        blockedIps: 0,
+        recentThreats: [],
+      };
+    }
+  }
+
+  async getPlatformSecurityEvents(params?: { page?: number; limit?: number; userId?: string; type?: string; severity?: string }, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('user', '/security/admin/events', {
+        params,
+        headers: auth ? { Authorization: auth } : {},
+      });
+      return this.normalizeListResponse(result, params);
+    } catch {
+      return { items: [], total: 0, page: 1, limit: 20 };
+    }
+  }
+
+  // ==================== Plan Management ====================
+  async getPlanStats(auth?: string): Promise<any> {
+    try {
+      return await this.forward('user', '/plans/stats', { headers: auth ? { Authorization: auth } : {} });
+    } catch {
+      return {
+        total: 0,
+        active: 0,
+        public: 0,
+        byCode: {},
+      };
+    }
+  }
+
+  async getPlans(includeInactive = false, auth?: string): Promise<any> {
+    try {
+      const result = await this.forward('user', '/plans', {
+        params: { includeInactive: includeInactive ? 'true' : 'false' },
+        headers: auth ? { Authorization: auth } : {},
+      });
+      return this.normalizeListResponse(result);
+    } catch {
+      return { items: [], total: 0 };
+    }
+  }
+
+  async getPlan(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/plans/${id}`, { headers: auth ? { Authorization: auth } : {} });
+  }
+
+  async createPlan(data: any, auth?: string): Promise<any> {
+    return this.forward('user', '/plans', {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updatePlan(id: string, data: any, auth?: string): Promise<any> {
+    return this.forward('user', `/plans/${id}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async deletePlan(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/plans/${id}`, {
+      method: 'DELETE',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async togglePlanActive(id: string, auth?: string): Promise<any> {
+    return this.forward('user', `/plans/${id}/toggle`, {
+      method: 'PATCH',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async duplicatePlan(id: string, data: { code: string; name: string }, auth?: string): Promise<any> {
+    return this.forward('user', `/plans/${id}/duplicate`, {
+      method: 'POST',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updatePlanSortOrder(orders: { id: string; sortOrder: number }[], auth?: string): Promise<any> {
+    return this.forward('user', '/plans/sort-order', {
+      method: 'PUT',
+      data: orders,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async refreshPlanCache(auth?: string): Promise<any> {
+    return this.forward('user', '/plans/refresh-cache', {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  // ==================== Quota Management ====================
+  async getQuotaStats(auth?: string): Promise<any> {
+    return this.forward('user', '/quota/stats', {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getQuotas(params?: { page?: number; limit?: number; search?: string; plan?: string }, auth?: string): Promise<any> {
+    return this.forward('user', '/quota/teams', {
+      params,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async getTeamQuota(teamId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/quota/teams/${teamId}`, {
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async updateTeamQuotaAdmin(teamId: string, data: any, auth?: string): Promise<any> {
+    return this.forward('user', `/quota/teams/${teamId}`, {
+      method: 'PUT',
+      data,
+      headers: auth ? { Authorization: auth } : {},
+    });
+  }
+
+  async resetTeamQuota(teamId: string, auth?: string): Promise<any> {
+    return this.forward('user', `/quota/teams/${teamId}/reset`, {
+      method: 'POST',
+      headers: auth ? { Authorization: auth } : {},
+    });
   }
 }

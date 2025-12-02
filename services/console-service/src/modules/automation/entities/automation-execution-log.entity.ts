@@ -25,6 +25,9 @@ export class AutomationExecutionLog {
   @Column()
   status: WorkflowStatus;
 
+  @Column({ nullable: true })
+  triggerEvent?: string;
+
   @CreateDateColumn()
   startedAt: Date;
 

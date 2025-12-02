@@ -21,13 +21,24 @@ import {
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 
+import { ConfigService } from '@nestjs/config';
+
 import { OpenApiService } from './openapi.service';
 import { OpenApiGuard } from './openapi.guard';
 
 @ApiTags('Open API')
 @Controller('open')
 export class OpenApiController {
-  constructor(private readonly openApiService: OpenApiService) {}
+  private readonly brandName: string;
+  private readonly brandDomain: string;
+
+  constructor(
+    private readonly openApiService: OpenApiService,
+    private readonly configService: ConfigService,
+  ) {
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+  }
 
   // ==================== 文档和配置 ====================
 
@@ -44,7 +55,7 @@ export class OpenApiController {
 <!DOCTYPE html>
 <html>
 <head>
-  <title>lnk.day API Documentation</title>
+  <title>${this.brandName} API Documentation</title>
   <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
 </head>
 <body>
@@ -293,7 +304,7 @@ print(analytics.total_clicks)
       },
       curl: {
         createLink: `
-curl -X POST https://api.lnk.day/api/v1/links \\
+curl -X POST https://api.${this.brandDomain}/api/v1/links \\
   -H "Authorization: Bearer your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -303,7 +314,7 @@ curl -X POST https://api.lnk.day/api/v1/links \\
   }'
 `,
         getAnalytics: `
-curl -X GET "https://api.lnk.day/api/v1/links/link_id/analytics?startDate=2024-01-01&endDate=2024-01-31" \\
+curl -X GET "https://api.${this.brandDomain}/api/v1/links/link_id/analytics?startDate=2024-01-01&endDate=2024-01-31" \\
   -H "Authorization: Bearer your_api_key"
 `,
       },

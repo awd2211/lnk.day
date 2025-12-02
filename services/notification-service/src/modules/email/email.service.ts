@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
+import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bull';
 
 export interface EmailJob {
@@ -11,10 +12,15 @@ export interface EmailJob {
 
 @Injectable()
 export class EmailService {
+  private readonly brandName: string;
+
   constructor(
     @InjectQueue('email')
     private readonly emailQueue: Queue,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+  }
 
   async sendEmail(email: EmailJob): Promise<void> {
     await this.emailQueue.add('send', email, {
@@ -29,7 +35,7 @@ export class EmailService {
   async sendWelcomeEmail(to: string, name: string): Promise<void> {
     await this.sendEmail({
       to,
-      subject: '欢迎加入 lnk.day',
+      subject: `欢迎加入 ${this.brandName}`,
       template: 'welcome',
       data: { name },
     });
@@ -38,7 +44,7 @@ export class EmailService {
   async sendPasswordResetEmail(to: string, resetToken: string): Promise<void> {
     await this.sendEmail({
       to,
-      subject: '重置密码 - lnk.day',
+      subject: `重置密码 - ${this.brandName}`,
       template: 'password-reset',
       data: { resetToken },
     });
@@ -68,7 +74,7 @@ export class EmailService {
   ): Promise<void> {
     await this.sendEmail({
       to,
-      subject: 'lnk.day 周报 - 您的链接表现如何？',
+      subject: `${this.brandName} 周报 - 您的链接表现如何？`,
       template: 'weekly-report',
       data: reportData,
     });
@@ -77,7 +83,7 @@ export class EmailService {
   async sendSecurityAlertEmail(to: string, alertType: string, details: string): Promise<void> {
     await this.sendEmail({
       to,
-      subject: '安全提醒 - lnk.day',
+      subject: `安全提醒 - ${this.brandName}`,
       template: 'security-alert',
       data: { alertType, details },
     });
@@ -86,7 +92,7 @@ export class EmailService {
   async sendTestEmail(to: string): Promise<void> {
     await this.sendEmail({
       to,
-      subject: 'lnk.day 测试邮件',
+      subject: `${this.brandName} 测试邮件`,
       template: 'test',
       data: {
         message: '这是一封测试邮件，用于验证您的邮件配置是否正确。',

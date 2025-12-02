@@ -14,6 +14,9 @@ import {
   AlertTriangle,
   ExternalLink,
   Copy,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -121,9 +124,21 @@ export default function DomainsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   // Fetch stats
   const { data: stats } = useQuery<DomainStats>({
@@ -136,12 +151,14 @@ export default function DomainsPage() {
 
   // Fetch domains
   const { data, isLoading } = useQuery({
-    queryKey: ['domains', { search, page, status: statusFilter }],
+    queryKey: ['domains', { search, page, status: statusFilter, sortBy, sortOrder }],
     queryFn: async () => {
       const response = await domainsService.getDomains({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit: 20,
+        sortBy,
+        sortOrder,
       });
       // API 返回 { domains: [...], total: n } 或 { items: [...], total: n }
       const data = response.data;
@@ -296,12 +313,52 @@ export default function DomainsPage() {
           <table className="w-full">
             <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">域名</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('domain')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    域名
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">团队</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">SSL</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">链接数</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">创建时间</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('sslStatus')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    SSL
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('linkCount')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    链接数
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('createdAt')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    创建时间
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">操作</th>
               </tr>
             </thead>
@@ -391,6 +448,57 @@ export default function DomainsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {data && data.total > 20 && (
+          <div className="flex items-center justify-between border-t px-6 py-4">
+            <p className="text-sm text-gray-500">
+              共 {data.total?.toLocaleString()} 条记录，第 {page} / {Math.ceil(data.total / 20)} 页
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              {Array.from({ length: Math.min(5, Math.ceil(data.total / 20)) }, (_, i) => {
+                const totalPages = Math.ceil(data.total / 20);
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (page <= 3) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = page - 2 + i;
+                }
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={page === pageNum ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPage(pageNum)}
+                    className="w-8 px-0"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(Math.ceil(data.total / 20), p + 1))}
+                disabled={page === Math.ceil(data.total / 20)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Domain Detail Sheet */}

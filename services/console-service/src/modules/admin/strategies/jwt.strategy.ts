@@ -36,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 尝试查找本地 admin 用户
     try {
       const admin = await this.adminService.findOne(payload.sub);
-      if (admin && admin.active) {
+      if (admin && admin.status === 'active') {
         return admin;
       }
     } catch {

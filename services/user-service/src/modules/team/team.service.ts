@@ -37,10 +37,30 @@ export class TeamService {
     return savedTeam;
   }
 
-  async findAll(): Promise<Team[]> {
-    const teams = await this.teamRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(options?: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{ items: Team[]; total: number; page: number; limit: number; totalPages: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.teamRepository.createQueryBuilder('team');
+
+    // Handle sorting
+    if (options?.sortBy) {
+      const sortColumn = this.getSortColumn(options.sortBy);
+      queryBuilder.orderBy(`team.${sortColumn}`, options.sortOrder || 'DESC');
+    } else {
+      queryBuilder.orderBy('team.createdAt', 'DESC');
+    }
+
+    const [teams, total] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
 
     // 手动加载 owner 信息 (因为 ownerId 是 varchar 而 users.id 是 uuid)
     const ownerIds = [...new Set(teams.map((t) => t.ownerId))];
@@ -51,10 +71,24 @@ export class TeamService {
       owners.filter(Boolean).map((u) => [u!.id, this.sanitizeOwner(u!)]),
     );
 
-    return teams.map((team) => {
+    const items = teams.map((team) => {
       (team as any).owner = ownerMap.get(team.ownerId) || null;
       return team;
     });
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  private getSortColumn(sortBy: string): string {
+    const sortMap: Record<string, string> = {
+      name: 'name',
+      status: 'status',
+      plan: 'plan',
+      memberCount: 'memberCount',
+      linkCount: 'linkCount',
+      createdAt: 'createdAt',
+    };
+    return sortMap[sortBy] || 'createdAt';
   }
 
   async findOne(id: string): Promise<Team> {
@@ -182,6 +216,8 @@ export class TeamService {
     }
 
     member.role = updateMemberDto.role;
+    // 递增权限版本号，使旧 Token 失效
+    member.permissionVersion = (member.permissionVersion || 1) + 1;
     return this.teamMemberRepository.save(member);
   }
 
@@ -295,11 +331,17 @@ export class TeamService {
 
   /**
    * 获取用户的当前团队成员身份（通过 user.teamId）
+   *
+   * 返回信息用于构建 JWT payload：
+   * - teamRole: 团队角色（权限从角色实时计算）
+   * - customRoleId: 自定义角色 ID（如果使用自定义角色）
+   * - permissionVersion: 权限版本号（用于实时失效 Token）
    */
   async getUserTeamMembership(userId: string, teamId?: string): Promise<{
     teamId: string | null;
     teamRole: TeamMemberRole | null;
-    permissions: string[];
+    customRoleId?: string;
+    permissionVersion: number;
   } | null> {
     // 如果没有指定 teamId，尝试从用户获取
     if (!teamId) {
@@ -320,22 +362,11 @@ export class TeamService {
       return null;
     }
 
-    // 获取权限
-    let permissions: string[] = [];
-
-    if (member.customRole) {
-      // 使用自定义角色的权限
-      permissions = member.customRole.permissions || [];
-    } else {
-      // 使用预设角色权限
-      const { PRESET_ROLE_PERMISSIONS } = await import('./entities/custom-role.entity');
-      permissions = PRESET_ROLE_PERMISSIONS[member.role] || [];
-    }
-
     return {
       teamId,
       teamRole: member.role,
-      permissions,
+      customRoleId: member.customRoleId,
+      permissionVersion: member.permissionVersion || 1,
     };
   }
 }

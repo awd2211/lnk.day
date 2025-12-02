@@ -37,9 +37,10 @@ async function bootstrap() {
   );
 
   // Swagger
+  const brandName = process.env.BRAND_NAME || 'lnk.day';
   const config = new DocumentBuilder()
-    .setTitle('lnk.day API')
-    .setDescription('lnk.day Enterprise Link Management API')
+    .setTitle(`${brandName} API`)
+    .setDescription(`${brandName} Enterprise Link Management API`)
     .setVersion('1.0')
     .addBearerAuth()
     .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')

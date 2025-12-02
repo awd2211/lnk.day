@@ -8,6 +8,7 @@ import {
   Header,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 
 import { SeoService, SeoInput, PageSeoData } from './seo.service';
@@ -17,11 +18,17 @@ import { PageService } from '../page/page.service';
 @ApiTags('seo')
 @Controller('seo')
 export class SeoController {
+  private readonly baseUrl: string;
+
   constructor(
     private readonly seoService: SeoService,
     private readonly bioLinkService: BioLinkService,
     private readonly pageService: PageService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+    this.baseUrl = this.configService.get('BASE_URL', `https://${brandDomain}`);
+  }
 
   @Post('generate')
   @ApiOperation({ summary: '生成SEO数据' })
@@ -42,7 +49,7 @@ export class SeoController {
   @ApiOperation({ summary: '获取站点地图' })
   @Header('Content-Type', 'application/xml')
   async getSitemap(@Res() res: Response) {
-    const baseUrl = process.env.BASE_URL || 'https://lnk.day';
+    const baseUrl = this.baseUrl;
 
     // Get all published pages
     const { items: pages } = await this.pageService.findAll(undefined, { status: 'published' });
@@ -82,7 +89,7 @@ export class SeoController {
   @ApiOperation({ summary: '获取robots.txt' })
   @Header('Content-Type', 'text/plain')
   async getRobotsTxt(@Res() res: Response) {
-    const baseUrl = process.env.BASE_URL || 'https://lnk.day';
+    const baseUrl = this.baseUrl;
     const robotsTxt = this.seoService.generateRobotsTxt({
       allowAll: true,
       sitemapUrl: `${baseUrl}/seo/sitemap.xml`,
@@ -101,17 +108,23 @@ export class SeoController {
 @ApiTags('seo-preview')
 @Controller()
 export class SeoPreviewController {
+  private readonly baseUrl: string;
+
   constructor(
     private readonly seoService: SeoService,
     private readonly bioLinkService: BioLinkService,
     private readonly pageService: PageService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+    this.baseUrl = this.configService.get('BASE_URL', `https://${brandDomain}`);
+  }
 
   @Get('u/:username/seo')
   @ApiOperation({ summary: '获取Bio Link的SEO数据' })
   async getBioLinkSeo(@Query('username') username: string): Promise<PageSeoData> {
     const bioLink = await this.bioLinkService.findByUsername(username);
-    const baseUrl = process.env.BASE_URL || 'https://lnk.day';
+    const baseUrl = this.baseUrl;
 
     const input: SeoInput = {
       title: bioLink.seo?.title || `${bioLink.profile.name} | Links`,
@@ -132,7 +145,7 @@ export class SeoPreviewController {
   @ApiOperation({ summary: '获取页面的SEO数据' })
   async getPageSeo(@Query('slug') slug: string): Promise<PageSeoData> {
     const page = await this.pageService.findBySlug(slug);
-    const baseUrl = process.env.BASE_URL || 'https://lnk.day';
+    const baseUrl = this.baseUrl;
 
     const input: SeoInput = {
       title: page.seo?.title || page.name,

@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Gauge,
   Search,
-  Plus,
   MoreHorizontal,
   Pencil,
   RefreshCw,
@@ -12,10 +11,6 @@ import {
   MousePointerClick,
   QrCode,
   Key,
-  Users,
-  Globe,
-  FileImage,
-  Smartphone,
   AlertTriangle,
   CheckCircle,
   Clock,
@@ -23,8 +18,10 @@ import {
   Loader2,
   Filter,
   Download,
-  History,
   Settings,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -86,23 +83,41 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 
+interface UsageItem {
+  used: number;
+  limit: number;
+  percentage: number;
+}
+
 interface TeamQuota {
   id: string;
   teamId: string;
-  teamName: string;
+  teamName?: string;
   plan: string;
-  quotas: {
-    links: { used: number; limit: number };
-    clicks: { used: number; limit: number };
-    qrCodes: { used: number; limit: number };
-    apiCalls: { used: number; limit: number };
-    teamMembers: { used: number; limit: number };
-    customDomains: { used: number; limit: number };
-    bioLinks: { used: number; limit: number };
-    deepLinks: { used: number; limit: number };
+  linksUsed: number;
+  clicksUsed: number;
+  qrCodesUsed: number;
+  apiRequestsUsed: number;
+  billingCycleStart: string;
+  billingCycleEnd: string;
+  customLimits: any;
+  limits: {
+    maxLinks: number;
+    maxClicks: number;
+    maxQrCodes: number;
+    maxTeamMembers: number;
+    maxCustomDomains: number;
+    maxCampaigns: number;
+    maxApiRequests: number;
+    retentionDays: number;
+    features: Record<string, boolean>;
   };
-  lastResetAt: string;
-  nextResetAt: string;
+  usage: {
+    links: UsageItem;
+    clicks: UsageItem;
+    qrCodes: UsageItem;
+    apiRequests: UsageItem;
+  };
 }
 
 interface PlanTemplate {
@@ -115,11 +130,7 @@ const QUOTA_TYPES = [
   { key: 'links', label: '链接数量', icon: Link2 },
   { key: 'clicks', label: '月点击量', icon: MousePointerClick },
   { key: 'qrCodes', label: 'QR 码', icon: QrCode },
-  { key: 'apiCalls', label: 'API 调用', icon: Key },
-  { key: 'teamMembers', label: '团队成员', icon: Users },
-  { key: 'customDomains', label: '自定义域名', icon: Globe },
-  { key: 'bioLinks', label: 'Bio 链接', icon: FileImage },
-  { key: 'deepLinks', label: '深度链接', icon: Smartphone },
+  { key: 'apiRequests', label: 'API 调用', icon: Key },
 ];
 
 export default function QuotasPage() {
@@ -127,21 +138,39 @@ export default function QuotasPage() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<TeamQuota | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const limit = 15;
 
   // Form state for editing
   const [quotaForm, setQuotaForm] = useState<Record<string, number>>({});
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
+
   // Fetch team quotas
   const { data: quotasData, isLoading } = useQuery({
-    queryKey: ['admin-quotas', searchQuery, filterPlan],
+    queryKey: ['admin-quotas', searchQuery, filterPlan, page, sortBy, sortOrder],
     queryFn: async () => {
-      const response = await api.get('/system/quotas', {
+      const response = await api.get('/proxy/quotas', {
         params: {
           search: searchQuery || undefined,
           plan: filterPlan !== 'all' ? filterPlan : undefined,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
         },
       });
       return response.data;
@@ -152,7 +181,7 @@ export default function QuotasPage() {
   const { data: plansData } = useQuery({
     queryKey: ['plan-templates'],
     queryFn: async () => {
-      const response = await api.get('/system/plans');
+      const response = await api.get('/proxy/plans');
       return response.data;
     },
   });
@@ -161,25 +190,34 @@ export default function QuotasPage() {
   const { data: statsData } = useQuery({
     queryKey: ['quota-stats'],
     queryFn: async () => {
-      const response = await api.get('/system/quotas/stats');
+      const response = await api.get('/proxy/quotas/stats');
       return response.data;
     },
   });
 
-  const quotas: TeamQuota[] = quotasData?.data || [];
+  const quotas: TeamQuota[] = quotasData?.data || quotasData?.items || [];
+  const total = quotasData?.total || 0;
+  const totalPages = Math.ceil(total / limit);
   const plans: PlanTemplate[] = plansData?.data || [];
-  const stats = statsData || {
-    totalTeams: 1234,
-    nearLimit: 45,
-    overLimit: 12,
-    totalLinks: 456000,
-    totalClicks: 12500000,
+  const stats = {
+    totalTeams: statsData?.totalTeams || 0,
+    nearLimit: statsData?.warnings?.nearingLimit || 0,
+    overLimit: statsData?.warnings?.exceededLimit || 0,
+    totalLinks: statsData?.usage?.totalLinks || 0,
+    totalClicks: statsData?.usage?.totalClicks || 0,
   };
 
   // Update quota mutation
   const updateQuotaMutation = useMutation({
-    mutationFn: async ({ teamId, quotas }: { teamId: string; quotas: Record<string, number> }) => {
-      const response = await api.put(`/system/quotas/${teamId}`, { quotas });
+    mutationFn: async ({ teamId, customLimits }: { teamId: string; customLimits: Record<string, number> }) => {
+      // Map frontend keys to backend limit keys
+      const mappedLimits = {
+        maxLinks: customLimits.links,
+        maxClicks: customLimits.clicks,
+        maxQrCodes: customLimits.qrCodes,
+        maxApiRequests: customLimits.apiRequests,
+      };
+      const response = await api.put(`/proxy/quotas/${teamId}`, { customLimits: mappedLimits });
       return response.data;
     },
     onSuccess: () => {
@@ -196,7 +234,7 @@ export default function QuotasPage() {
   // Reset quota mutation
   const resetQuotaMutation = useMutation({
     mutationFn: async (teamId: string) => {
-      const response = await api.post(`/system/quotas/${teamId}/reset`);
+      const response = await api.post(`/proxy/quotas/${teamId}/reset`);
       return response.data;
     },
     onSuccess: () => {
@@ -211,14 +249,10 @@ export default function QuotasPage() {
   const handleEditQuota = (team: TeamQuota) => {
     setSelectedTeam(team);
     setQuotaForm({
-      links: team.quotas.links.limit,
-      clicks: team.quotas.clicks.limit,
-      qrCodes: team.quotas.qrCodes.limit,
-      apiCalls: team.quotas.apiCalls.limit,
-      teamMembers: team.quotas.teamMembers.limit,
-      customDomains: team.quotas.customDomains.limit,
-      bioLinks: team.quotas.bioLinks.limit,
-      deepLinks: team.quotas.deepLinks.limit,
+      links: team.usage?.links?.limit || team.limits?.maxLinks || 0,
+      clicks: team.usage?.clicks?.limit || team.limits?.maxClicks || 0,
+      qrCodes: team.usage?.qrCodes?.limit || team.limits?.maxQrCodes || 0,
+      apiRequests: team.usage?.apiRequests?.limit || team.limits?.maxApiRequests || 0,
     });
     setEditDialogOpen(true);
   };
@@ -230,7 +264,7 @@ export default function QuotasPage() {
 
   const handleSaveQuota = () => {
     if (selectedTeam) {
-      updateQuotaMutation.mutate({ teamId: selectedTeam.teamId, quotas: quotaForm });
+      updateQuotaMutation.mutate({ teamId: selectedTeam.teamId, customLimits: quotaForm });
     }
   };
 
@@ -250,11 +284,13 @@ export default function QuotasPage() {
     return num.toString();
   };
 
-  const getHighestUsage = (quotas: TeamQuota['quotas']) => {
+  const getHighestUsage = (usage: TeamQuota['usage']) => {
+    if (!usage) return 0;
     let highest = 0;
-    Object.values(quotas).forEach((q) => {
-      const percentage = getUsagePercentage(q.used, q.limit);
-      if (percentage > highest) highest = percentage;
+    Object.values(usage).forEach((q) => {
+      if (q && typeof q.percentage === 'number') {
+        if (q.percentage > highest) highest = q.percentage;
+      }
     });
     return highest;
   };
@@ -388,20 +424,72 @@ export default function QuotasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>团队</TableHead>
-                  <TableHead>套餐</TableHead>
-                  <TableHead>链接使用</TableHead>
-                  <TableHead>点击使用</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('teamName')}
+                    >
+                      团队
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('plan')}
+                    >
+                      套餐
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('linksUsed')}
+                    >
+                      链接使用
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('clicksUsed')}
+                    >
+                      点击使用
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead>最高使用率</TableHead>
-                  <TableHead>下次重置</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('billingCycleEnd')}
+                    >
+                      下次重置
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {quotas.map((team) => {
-                  const linksPercent = getUsagePercentage(team.quotas.links.used, team.quotas.links.limit);
-                  const clicksPercent = getUsagePercentage(team.quotas.clicks.used, team.quotas.clicks.limit);
-                  const highestUsage = getHighestUsage(team.quotas);
+                  const linksUsage = team.usage?.links || { used: 0, limit: 0, percentage: 0 };
+                  const clicksUsage = team.usage?.clicks || { used: 0, limit: 0, percentage: 0 };
+                  const linksPercent = linksUsage.percentage || 0;
+                  const clicksPercent = clicksUsage.percentage || 0;
+                  const highestUsage = getHighestUsage(team.usage);
 
                   return (
                     <TableRow key={team.id}>
@@ -411,7 +499,7 @@ export default function QuotasPage() {
                             <Building2 className="h-4 w-4 text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium">{team.teamName}</p>
+                            <p className="font-medium">{team.teamName || team.teamId.slice(0, 8)}</p>
                             <p className="text-xs text-muted-foreground">{team.teamId}</p>
                           </div>
                         </div>
@@ -423,10 +511,10 @@ export default function QuotasPage() {
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-sm">
                             <span className={getUsageColor(linksPercent)}>
-                              {formatNumber(team.quotas.links.used)}
+                              {formatNumber(linksUsage.used)}
                             </span>
                             <span className="text-muted-foreground">
-                              / {formatNumber(team.quotas.links.limit)}
+                              / {formatNumber(linksUsage.limit)}
                             </span>
                           </div>
                           <Progress
@@ -439,10 +527,10 @@ export default function QuotasPage() {
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-sm">
                             <span className={getUsageColor(clicksPercent)}>
-                              {formatNumber(team.quotas.clicks.used)}
+                              {formatNumber(clicksUsage.used)}
                             </span>
                             <span className="text-muted-foreground">
-                              / {formatNumber(team.quotas.clicks.limit)}
+                              / {formatNumber(clicksUsage.limit)}
                             </span>
                           </div>
                           <Progress
@@ -464,7 +552,7 @@ export default function QuotasPage() {
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          {new Date(team.nextResetAt).toLocaleDateString()}
+                          {new Date(team.billingCycleEnd).toLocaleDateString()}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -496,6 +584,60 @@ export default function QuotasPage() {
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-muted-foreground">
+                共 {total} 条记录，第 {page} / {totalPages} 页
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  上一页
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (page <= 3) {
+                      pageNum = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = page - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  下一页
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -560,7 +702,7 @@ export default function QuotasPage() {
                   {selectedTeam.plan}
                 </Badge>
                 <div className="text-sm text-muted-foreground">
-                  下次重置: {new Date(selectedTeam.nextResetAt).toLocaleDateString()}
+                  下次重置: {new Date(selectedTeam.billingCycleEnd).toLocaleDateString()}
                 </div>
               </div>
 
@@ -568,8 +710,9 @@ export default function QuotasPage() {
 
               <div className="space-y-4">
                 {QUOTA_TYPES.map(({ key, label, icon: Icon }) => {
-                  const quota = selectedTeam.quotas[key as keyof typeof selectedTeam.quotas];
-                  const percentage = getUsagePercentage(quota.used, quota.limit);
+                  const usage = selectedTeam.usage?.[key as keyof typeof selectedTeam.usage];
+                  const quota = usage || { used: 0, limit: 0, percentage: 0 };
+                  const percentage = quota.percentage || 0;
                   return (
                     <div key={key} className="space-y-2">
                       <div className="flex items-center justify-between">

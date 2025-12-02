@@ -1,12 +1,20 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
+import Mailgun from 'mailgun.js';
+import FormData from 'form-data';
+import * as nodemailer from 'nodemailer';
 import { NotificationTemplate } from './entities/notification-template.entity';
-import { NotificationChannel } from './entities/notification-channel.entity';
+import { NotificationChannel, ChannelType } from './entities/notification-channel.entity';
 import { NotificationLog, NotificationStatus } from './entities/notification-log.entity';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
+  private readonly logger = new Logger(NotificationsService.name);
+  private readonly brandName: string;
+  private readonly brandDomain: string;
+
   constructor(
     @InjectRepository(NotificationTemplate)
     private readonly templateRepo: Repository<NotificationTemplate>,
@@ -14,7 +22,11 @@ export class NotificationsService implements OnModuleInit {
     private readonly channelRepo: Repository<NotificationChannel>,
     @InjectRepository(NotificationLog)
     private readonly logRepo: Repository<NotificationLog>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+  }
 
   async onModuleInit() {
     await this.seedDefaultTemplates();
@@ -80,6 +92,17 @@ export class NotificationsService implements OnModuleInit {
     return channel;
   }
 
+  async createChannel(data: { name: string; type: string; config: any }): Promise<NotificationChannel> {
+    const channel = this.channelRepo.create({
+      name: data.name,
+      type: data.type as ChannelType,
+      config: data.config,
+      enabled: false,
+      isDefault: false,
+    });
+    return this.channelRepo.save(channel);
+  }
+
   async updateChannel(id: string, data: Partial<NotificationChannel>): Promise<NotificationChannel> {
     const channel = await this.getChannel(id);
     Object.assign(channel, data);
@@ -92,17 +115,215 @@ export class NotificationsService implements OnModuleInit {
     return this.channelRepo.save(channel);
   }
 
-  async testChannel(id: string): Promise<{ success: boolean; message: string }> {
+  async testChannel(id: string, recipient?: string): Promise<{ success: boolean; message: string }> {
     const channel = await this.getChannel(id);
     channel.lastTestedAt = new Date();
-    // Simulate test
-    const success = Math.random() > 0.2;
-    channel.lastTestStatus = success ? 'success' : 'failed';
-    await this.channelRepo.save(channel);
-    return {
-      success,
-      message: success ? 'Test notification sent successfully' : 'Failed to send test notification',
-    };
+
+    // 创建日志记录
+    const log = this.logRepo.create({
+      type: channel.type,
+      recipient: recipient || 'unknown',
+      subject: channel.type === ChannelType.EMAIL ? `${this.brandName} 测试邮件` : '测试通知',
+      status: NotificationStatus.PENDING,
+      metadata: {
+        channelId: channel.id,
+        channelName: channel.name,
+        isTest: true,
+      },
+    });
+    await this.logRepo.save(log);
+
+    try {
+      if (channel.type === ChannelType.EMAIL) {
+        if (!recipient) {
+          log.status = NotificationStatus.FAILED;
+          log.errorMessage = '请提供测试收件人邮箱地址';
+          await this.logRepo.save(log);
+          throw new BadRequestException('请提供测试收件人邮箱地址');
+        }
+        await this.sendTestEmail(channel, recipient);
+
+        // 更新日志为成功
+        log.status = NotificationStatus.SENT;
+        log.deliveredAt = new Date();
+        await this.logRepo.save(log);
+
+        channel.lastTestStatus = 'success';
+        await this.channelRepo.save(channel);
+        return {
+          success: true,
+          message: `测试邮件已发送至 ${recipient}`,
+        };
+      } else if (channel.type === ChannelType.SMS) {
+        // SMS 测试 - 需要实现真实发送
+        log.status = NotificationStatus.FAILED;
+        log.errorMessage = 'SMS 发送功能尚未实现';
+        await this.logRepo.save(log);
+
+        channel.lastTestStatus = 'failed';
+        await this.channelRepo.save(channel);
+        return {
+          success: false,
+          message: 'SMS 发送功能尚未实现',
+        };
+      } else if (channel.type === ChannelType.SLACK) {
+        // Slack 测试 - 需要实现真实发送
+        log.status = NotificationStatus.FAILED;
+        log.errorMessage = 'Slack 发送功能尚未实现';
+        await this.logRepo.save(log);
+
+        channel.lastTestStatus = 'failed';
+        await this.channelRepo.save(channel);
+        return {
+          success: false,
+          message: 'Slack 发送功能尚未实现',
+        };
+      } else if (channel.type === ChannelType.WEBHOOK) {
+        // Webhook 测试 - 需要实现真实发送
+        log.status = NotificationStatus.FAILED;
+        log.errorMessage = 'Webhook 发送功能尚未实现';
+        await this.logRepo.save(log);
+
+        channel.lastTestStatus = 'failed';
+        await this.channelRepo.save(channel);
+        return {
+          success: false,
+          message: 'Webhook 发送功能尚未实现',
+        };
+      } else {
+        log.status = NotificationStatus.FAILED;
+        log.errorMessage = '未知的渠道类型';
+        await this.logRepo.save(log);
+
+        channel.lastTestStatus = 'failed';
+        await this.channelRepo.save(channel);
+        return {
+          success: false,
+          message: '未知的渠道类型',
+        };
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      // 更新日志为失败
+      log.status = NotificationStatus.FAILED;
+      log.errorMessage = err.message;
+      await this.logRepo.save(log);
+
+      channel.lastTestStatus = 'failed';
+      await this.channelRepo.save(channel);
+      this.logger.error(`Channel test failed: ${err.message}`, err.stack);
+      return {
+        success: false,
+        message: `测试失败: ${err.message}`,
+      };
+    }
+  }
+
+  private async sendTestEmail(channel: NotificationChannel, recipient: string): Promise<void> {
+    const config = channel.config;
+    const provider = config.provider || 'smtp';
+    const fromName = config.fromName || this.brandName;
+    const fromEmail = config.fromEmail || `noreply@${this.brandDomain}`;
+    const subject = `${this.brandName} 测试邮件`;
+    const html = this.getTestEmailTemplate();
+
+    if (provider === 'mailgun') {
+      await this.sendViaMailgun(config, fromName, fromEmail, recipient, subject, html);
+    } else {
+      await this.sendViaSmtp(config, fromName, fromEmail, recipient, subject, html);
+    }
+  }
+
+  private async sendViaMailgun(
+    config: Record<string, any>,
+    fromName: string,
+    fromEmail: string,
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<void> {
+    const mailgunConfig = config.mailgun;
+    if (!mailgunConfig?.apiKey || !mailgunConfig?.domain) {
+      throw new Error('Mailgun 配置不完整，请检查 API Key 和 Domain');
+    }
+
+    const mg = new Mailgun(FormData);
+    const client = mg.client({
+      username: 'api',
+      key: mailgunConfig.apiKey,
+      url: mailgunConfig.region === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net',
+    });
+
+    await client.messages.create(mailgunConfig.domain, {
+      from: `${fromName} <${fromEmail}>`,
+      to: [to],
+      subject,
+      html,
+    });
+  }
+
+  private async sendViaSmtp(
+    config: Record<string, any>,
+    fromName: string,
+    fromEmail: string,
+    to: string,
+    subject: string,
+    html: string,
+  ): Promise<void> {
+    const smtpConfig = config.smtp;
+    if (!smtpConfig?.host) {
+      throw new Error('SMTP 配置不完整，请检查主机地址');
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpConfig.host,
+      port: smtpConfig.port || 587,
+      secure: smtpConfig.secure || false,
+      auth: {
+        user: smtpConfig.user,
+        pass: smtpConfig.pass,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `${fromName} <${fromEmail}>`,
+      to,
+      subject,
+      html,
+    });
+  }
+
+  private getTestEmailTemplate(): string {
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    const brand = this.brandName;
+    return `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #2563eb; margin: 0; font-size: 28px;">${brand}</h1>
+          <p style="color: #6b7280; margin: 8px 0 0 0;">企业级链接管理平台</p>
+        </div>
+        <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #bae6fd; border-radius: 12px; padding: 24px;">
+          <div style="display: flex; align-items: center; margin-bottom: 16px;">
+            <span style="font-size: 32px; margin-right: 12px;">✅</span>
+            <h2 style="color: #1e40af; margin: 0; font-size: 20px;">邮件配置测试成功</h2>
+          </div>
+          <p style="color: #374151; margin: 0 0 16px 0; line-height: 1.6;">
+            恭喜！如果您收到了这封邮件，说明您的邮件通知渠道配置已经正确设置。
+          </p>
+          <div style="background: white; border-radius: 8px; padding: 16px;">
+            <p style="color: #6b7280; margin: 0; font-size: 13px;">
+              <strong>发送时间：</strong>${timestamp}
+            </p>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            © ${new Date().getFullYear()} ${brand} - 此邮件由系统自动发送
+          </p>
+        </div>
+      </div>
+    `;
   }
 
   // =================== Logs ===================
@@ -605,7 +826,7 @@ export class NotificationsService implements OnModuleInit {
           provider: 'aliyun',
           accessKeyId: '',
           accessKeySecret: '',
-          signName: 'lnk.day',
+          signName: this.brandName,
         },
         enabled: false,
         isDefault: false,

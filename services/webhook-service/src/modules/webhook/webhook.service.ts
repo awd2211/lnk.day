@@ -500,7 +500,7 @@ export class WebhookService {
 
     const totalDeliveries = totalSuccesses + totalFailures;
     const successRate = totalDeliveries > 0 ? (totalSuccesses / totalDeliveries) * 100 : 0;
-    const failedWebhooks = webhooks.filter((w) => w.failureCount > 0 && w.lastFailedAt).length;
+    const failedWebhooks = webhooks.filter((w) => w.failureCount > 0).length;
 
     return {
       totalWebhooks,

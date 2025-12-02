@@ -1,31 +1,23 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import DOMPurify from 'dompurify';
 import {
   Save,
   RefreshCw,
   Loader2,
   Shield,
-  Mail,
   Globe,
   Zap,
   Bell,
   Database,
-  Send,
   RotateCcw,
   CheckCircle,
   AlertTriangle,
   Trash2,
   HardDrive,
   Server,
-  Download,
   Upload,
   Archive,
   Clock,
-  FileText,
-  Eye,
-  Code,
-  RotateCw,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -33,8 +25,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -68,23 +58,7 @@ interface SystemConfig {
     enablePublicAPI: boolean;
     apiKeyExpiry: number;
   };
-  email: {
-    provider: 'smtp' | 'mailgun';
-    fromName: string;
-    fromEmail: string;
-    smtp: {
-      host: string;
-      port: number;
-      user: string;
-      pass: string;
-      secure: boolean;
-    };
-    mailgun: {
-      apiKey: string;
-      domain: string;
-      region: 'us' | 'eu';
-    };
-  };
+  // 邮件设置已移至"通知管理 → 渠道配置"
   security: {
     passwordMinLength: number;
     sessionTimeout: number;
@@ -94,13 +68,35 @@ interface SystemConfig {
     requireEmailVerification: boolean;
   };
   features: {
+    // 用户与团队
     enableRegistration: boolean;
+    enableTeams: boolean;
+    // 链接功能
     enableBioLinks: boolean;
     enableQRCodes: boolean;
-    enableCampaigns: boolean;
-    enableTeams: boolean;
     enableDeepLinks: boolean;
     enableRedirectRules: boolean;
+    enableFolders: boolean;
+    enableTags: boolean;
+    // 营销功能
+    enableCampaigns: boolean;
+    enableAbTests: boolean;
+    enableGoals: boolean;
+    enableUtmTemplates: boolean;
+    // 高级功能
+    enablePages: boolean;
+    enableWebhooks: boolean;
+    enableIntegrations: boolean;
+    enableAutomation: boolean;
+    // 监控与安全
+    enableRealtime: boolean;
+    enableAlerts: boolean;
+    enableSso: boolean;
+    enableSecurityScan: boolean;
+    enableContentModeration: boolean;
+    // 内容管理
+    enableComments: boolean;
+    enableSeoManager: boolean;
   };
 }
 
@@ -119,23 +115,7 @@ const defaultConfig: SystemConfig = {
     enablePublicAPI: true,
     apiKeyExpiry: 365,
   },
-  email: {
-    provider: 'smtp',
-    fromName: SHORT_LINK_DOMAIN,
-    fromEmail: `noreply@${SHORT_LINK_DOMAIN}`,
-    smtp: {
-      host: '',
-      port: 587,
-      user: '',
-      pass: '',
-      secure: true,
-    },
-    mailgun: {
-      apiKey: '',
-      domain: '',
-      region: 'us',
-    },
-  },
+  // 邮件设置已移至"通知管理 → 渠道配置"
   security: {
     passwordMinLength: 8,
     sessionTimeout: 24,
@@ -145,92 +125,57 @@ const defaultConfig: SystemConfig = {
     requireEmailVerification: true,
   },
   features: {
+    // 用户与团队
     enableRegistration: true,
+    enableTeams: true,
+    // 链接功能
     enableBioLinks: true,
     enableQRCodes: true,
-    enableCampaigns: true,
-    enableTeams: true,
     enableDeepLinks: true,
     enableRedirectRules: true,
+    enableFolders: true,
+    enableTags: true,
+    // 营销功能
+    enableCampaigns: true,
+    enableAbTests: true,
+    enableGoals: true,
+    enableUtmTemplates: true,
+    // 高级功能
+    enablePages: true,
+    enableWebhooks: true,
+    enableIntegrations: true,
+    enableAutomation: true,
+    // 监控与安全
+    enableRealtime: true,
+    enableAlerts: true,
+    enableSso: false,
+    enableSecurityScan: true,
+    enableContentModeration: true,
+    // 内容管理
+    enableComments: true,
+    enableSeoManager: true,
   },
 };
 
-// Email template info
-const EMAIL_TEMPLATE_INFO: Record<string, { name: string; description: string; variables: string[] }> = {
-  welcome: {
-    name: '欢迎邮件',
-    description: '新用户注册后发送',
-    variables: ['name'],
-  },
-  'password-reset': {
-    name: '密码重置',
-    description: '用户请求重置密码时发送',
-    variables: ['resetLink'],
-  },
-  'team-invite': {
-    name: '团队邀请',
-    description: '邀请用户加入团队时发送',
-    variables: ['inviterName', 'teamName', 'inviteLink'],
-  },
-  'link-milestone': {
-    name: '链接里程碑',
-    description: '链接达到点击里程碑时发送',
-    variables: ['linkTitle', 'clicks'],
-  },
-  'weekly-report': {
-    name: '周报',
-    description: '每周发送的统计报告',
-    variables: ['totalClicks', 'growth'],
-  },
-  'security-alert': {
-    name: '安全提醒',
-    description: '检测到安全事件时发送',
-    variables: ['alertType', 'details'],
-  },
-  test: {
-    name: '测试邮件',
-    description: '用于测试邮件配置',
-    variables: ['message', 'timestamp'],
-  },
-};
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'general' | 'api' | 'email' | 'templates' | 'security' | 'features' | 'maintenance'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'api' | 'security' | 'features' | 'maintenance'>('general');
   const [formData, setFormData] = useState<SystemConfig>(defaultConfig);
   const [hasChanges, setHasChanges] = useState(false);
-  const [testEmailTo, setTestEmailTo] = useState('');
-  const [showTestEmailDialog, setShowTestEmailDialog] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
-  // Email templates state
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [templateSubject, setTemplateSubject] = useState('');
-  const [templateHtml, setTemplateHtml] = useState('');
-  const [showPreview, setShowPreview] = useState(false);
-  const [templateHasChanges, setTemplateHasChanges] = useState(false);
 
-  // Fetch config
+  // Fetch config (不再获取邮件设置，已移至通知管理)
   const { data: config, isLoading } = useQuery({
     queryKey: ['system', 'config'],
     queryFn: async () => {
       try {
-        const [configRes, emailRes] = await Promise.all([
-          systemService.getConfig(),
-          systemService.getEmailSettings(),
-        ]);
+        const configRes = await systemService.getConfig();
         const configData = configRes.data as Partial<SystemConfig>;
-        const emailData = emailRes.data;
         return {
           ...defaultConfig,
           ...configData,
-          email: emailData ? {
-            provider: emailData.provider || 'smtp',
-            fromName: emailData.fromName || SHORT_LINK_DOMAIN,
-            fromEmail: emailData.fromEmail || `noreply@${SHORT_LINK_DOMAIN}`,
-            smtp: emailData.smtp || defaultConfig.email.smtp,
-            mailgun: emailData.mailgun || defaultConfig.email.mailgun,
-          } : defaultConfig.email,
         } as SystemConfig;
       } catch {
         return defaultConfig;
@@ -291,7 +236,6 @@ export default function SettingsPage() {
       setFormData({
         general: { ...defaultConfig.general, ...config.general },
         api: { ...defaultConfig.api, ...config.api },
-        email: { ...defaultConfig.email, ...config.email },
         security: { ...defaultConfig.security, ...config.security },
         features: { ...defaultConfig.features, ...config.features },
       });
@@ -301,11 +245,7 @@ export default function SettingsPage() {
   // Save config mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // Save general config and email settings separately
-      await Promise.all([
-        systemService.updateConfig(formData),
-        systemService.updateEmailSettings(formData.email),
-      ]);
+      await systemService.updateConfig(formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system', 'config'] });
@@ -320,15 +260,6 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['system', 'config'] });
       setFormData(defaultConfig);
       setShowResetDialog(false);
-    },
-  });
-
-  // Test email mutation
-  const testEmailMutation = useMutation({
-    mutationFn: () => systemService.testEmail({ to: testEmailTo }),
-    onSuccess: () => {
-      setShowTestEmailDialog(false);
-      setTestEmailTo('');
     },
   });
 
@@ -371,52 +302,7 @@ export default function SettingsPage() {
     },
   });
 
-  // Email templates query
-  const { data: emailTemplates, isLoading: templatesLoading } = useQuery({
-    queryKey: ['system', 'email-templates'],
-    queryFn: async () => {
-      try {
-        const res = await systemService.getEmailTemplates();
-        return res.data as Record<string, { subject: string; html: string }>;
-      } catch {
-        return {};
-      }
-    },
-    enabled: activeTab === 'templates',
-  });
-
-  // Save template mutation
-  const saveTemplateMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedTemplate) throw new Error('No template selected');
-      return systemService.updateEmailTemplate(selectedTemplate, {
-        subject: templateSubject,
-        html: templateHtml,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['system', 'email-templates'] });
-      setTemplateHasChanges(false);
-    },
-  });
-
-  // Reset template mutation
-  const resetTemplateMutation = useMutation({
-    mutationFn: (id: string) => systemService.resetEmailTemplate(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['system', 'email-templates'] });
-      setTemplateHasChanges(false);
-    },
-  });
-
-  // Load template when selected
-  useEffect(() => {
-    if (selectedTemplate && emailTemplates?.[selectedTemplate]) {
-      setTemplateSubject(emailTemplates[selectedTemplate].subject);
-      setTemplateHtml(emailTemplates[selectedTemplate].html);
-      setTemplateHasChanges(false);
-    }
-  }, [selectedTemplate, emailTemplates]);
+  // 邮件模板已移至"通知管理 → 通知模板"
 
   const updateFormData = (section: keyof SystemConfig, key: string, value: any) => {
     setFormData((prev) => ({
@@ -429,8 +315,8 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'general', label: '常规设置', icon: Globe },
     { id: 'api', label: 'API 设置', icon: Zap },
-    { id: 'email', label: '邮件设置', icon: Mail },
-    { id: 'templates', label: '邮件模板', icon: FileText },
+    // 邮件设置已移至"通知管理 → 渠道配置"
+    // 邮件模板已移至"通知管理 → 通知模板"
     { id: 'security', label: '安全设置', icon: Shield },
     { id: 'features', label: '功能开关', icon: Bell },
     { id: 'maintenance', label: '系统维护', icon: Server },
@@ -593,179 +479,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Email Settings */}
-      {activeTab === 'email' && (
-        <div className="rounded-lg bg-white p-6 shadow">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="text-lg font-semibold">邮件设置</h3>
-            <Button variant="outline" size="sm" onClick={() => setShowTestEmailDialog(true)}>
-              <Send className="mr-2 h-4 w-4" />
-              发送测试邮件
-            </Button>
-          </div>
-          <div className="max-w-xl space-y-6">
-            {/* Provider Selection */}
-            <div className="grid gap-2">
-              <Label>邮件服务提供商</Label>
-              <Select
-                value={formData.email.provider}
-                onValueChange={(value: 'smtp' | 'mailgun') => updateFormData('email', 'provider', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="smtp">SMTP</SelectItem>
-                  <SelectItem value="mailgun">Mailgun</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Common Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="fromName">发件人名称</Label>
-                <Input
-                  id="fromName"
-                  value={formData.email.fromName}
-                  onChange={(e) => updateFormData('email', 'fromName', e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="fromEmail">发件人邮箱</Label>
-                <Input
-                  id="fromEmail"
-                  type="email"
-                  value={formData.email.fromEmail}
-                  onChange={(e) => updateFormData('email', 'fromEmail', e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* SMTP Settings */}
-            {formData.email.provider === 'smtp' && (
-              <div className="space-y-4 rounded-lg border p-4">
-                <h4 className="font-medium">SMTP 配置</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="smtpHost">SMTP 服务器</Label>
-                    <Input
-                      id="smtpHost"
-                      value={formData.email.smtp?.host || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        email: { ...prev.email, smtp: { ...prev.email.smtp, host: e.target.value } }
-                      }))}
-                      placeholder="smtp.example.com"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="smtpPort">SMTP 端口</Label>
-                    <Input
-                      id="smtpPort"
-                      type="number"
-                      value={formData.email.smtp?.port || 587}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        email: { ...prev.email, smtp: { ...prev.email.smtp, port: parseInt(e.target.value) || 587 } }
-                      }))}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="smtpUser">SMTP 用户名</Label>
-                  <Input
-                    id="smtpUser"
-                    value={formData.email.smtp?.user || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, smtp: { ...prev.email.smtp, user: e.target.value } }
-                    }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="smtpPass">SMTP 密码</Label>
-                  <Input
-                    id="smtpPass"
-                    type="password"
-                    value={formData.email.smtp?.pass || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, smtp: { ...prev.email.smtp, pass: e.target.value } }
-                    }))}
-                    placeholder="••••••••"
-                  />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
-                  <div>
-                    <Label>使用 TLS/SSL</Label>
-                    <p className="text-xs text-gray-500">加密邮件传输</p>
-                  </div>
-                  <Switch
-                    checked={formData.email.smtp?.secure ?? true}
-                    onCheckedChange={(checked) => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, smtp: { ...prev.email.smtp, secure: checked } }
-                    }))}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Mailgun Settings */}
-            {formData.email.provider === 'mailgun' && (
-              <div className="space-y-4 rounded-lg border p-4">
-                <h4 className="font-medium">Mailgun 配置</h4>
-                <div className="grid gap-2">
-                  <Label htmlFor="mailgunApiKey">API Key</Label>
-                  <Input
-                    id="mailgunApiKey"
-                    type="password"
-                    value={formData.email.mailgun?.apiKey || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, apiKey: e.target.value } }
-                    }))}
-                    placeholder="key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  />
-                  <p className="text-xs text-gray-500">在 Mailgun 控制台的 API Security 中获取</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="mailgunDomain">发送域名</Label>
-                  <Input
-                    id="mailgunDomain"
-                    value={formData.email.mailgun?.domain || ''}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, domain: e.target.value } }
-                    }))}
-                    placeholder="mg.yourdomain.com"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>服务区域</Label>
-                  <Select
-                    value={formData.email.mailgun?.region || 'us'}
-                    onValueChange={(value: 'us' | 'eu') => setFormData(prev => ({
-                      ...prev,
-                      email: { ...prev.email, mailgun: { ...prev.email.mailgun, region: value } }
-                    }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="us">美国 (api.mailgun.net)</SelectItem>
-                      <SelectItem value="eu">欧洲 (api.eu.mailgun.net)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Security Settings */}
       {activeTab === 'security' && (
         <div className="rounded-lg bg-white p-6 shadow">
@@ -835,199 +548,148 @@ export default function SettingsPage() {
 
       {/* Feature Toggles */}
       {activeTab === 'features' && (
-        <div className="rounded-lg bg-white p-6 shadow">
-          <h3 className="mb-6 text-lg font-semibold">功能开关</h3>
-          <div className="max-w-xl space-y-4">
-            {[
-              { key: 'enableRegistration', label: '开放注册', desc: '允许新用户注册账户' },
-              { key: 'enableBioLinks', label: 'Bio Links', desc: '允许用户创建 Bio Link 页面' },
-              { key: 'enableQRCodes', label: '二维码功能', desc: '允许用户生成和管理二维码' },
-              { key: 'enableCampaigns', label: '营销活动', desc: '允许用户创建营销活动' },
-              { key: 'enableTeams', label: '团队协作', desc: '允许用户创建和管理团队' },
-              { key: 'enableDeepLinks', label: '深度链接', desc: '允许用户创建移动深度链接' },
-              { key: 'enableRedirectRules', label: '重定向规则', desc: '允许用户配置高级重定向规则' },
-            ].map((feature) => (
-              <div
-                key={feature.key}
-                className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
-              >
-                <div>
-                  <Label>{feature.label}</Label>
-                  <p className="text-xs text-gray-500">{feature.desc}</p>
-                </div>
-                <Switch
-                  checked={(formData.features as any)[feature.key] ?? true}
-                  onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Email Templates */}
-      {activeTab === 'templates' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Template List */}
+        <div className="space-y-6">
+          {/* 用户与团队 */}
           <div className="rounded-lg bg-white p-6 shadow">
-            <h3 className="mb-4 text-lg font-semibold">邮件模板</h3>
-            {templatesLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {Object.entries(EMAIL_TEMPLATE_INFO).map(([id, info]) => {
-                  const isSelected = selectedTemplate === id;
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => setSelectedTemplate(id)}
-                      className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                        isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Mail className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-gray-400'}`} />
-                        <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
-                          {info.name}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">{info.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <h3 className="mb-4 text-lg font-semibold">用户与团队</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableRegistration', label: '开放注册', desc: '允许新用户注册账户' },
+                { key: 'enableTeams', label: '团队协作', desc: '允许用户创建和管理团队' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
+                  </div>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Template Editor */}
-          <div className="lg:col-span-2">
-            {selectedTemplate ? (
-              <div className="rounded-lg bg-white p-6 shadow">
-                <div className="mb-4 flex items-center justify-between">
+          {/* 链接功能 */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">链接功能</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableBioLinks', label: 'Bio Links', desc: '允许用户创建 Bio Link 页面' },
+                { key: 'enableQRCodes', label: '二维码功能', desc: '允许用户生成和管理二维码' },
+                { key: 'enableDeepLinks', label: '深度链接', desc: '允许用户创建移动应用深度链接' },
+                { key: 'enableRedirectRules', label: '重定向规则', desc: '允许用户配置高级重定向规则' },
+                { key: 'enableFolders', label: '文件夹管理', desc: '允许用户使用文件夹组织链接' },
+                { key: 'enableTags', label: '标签系统', desc: '允许用户使用标签分类链接' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
                   <div>
-                    <h3 className="text-lg font-semibold">
-                      {EMAIL_TEMPLATE_INFO[selectedTemplate]?.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {EMAIL_TEMPLATE_INFO[selectedTemplate]?.description}
-                    </p>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPreview(!showPreview)}
-                    >
-                      {showPreview ? (
-                        <>
-                          <Code className="mr-2 h-4 w-4" />
-                          编辑
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="mr-2 h-4 w-4" />
-                          预览
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => resetTemplateMutation.mutate(selectedTemplate)}
-                      disabled={resetTemplateMutation.isPending}
-                    >
-                      {resetTemplateMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <RotateCw className="mr-2 h-4 w-4" />
-                      )}
-                      重置
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => saveTemplateMutation.mutate()}
-                      disabled={!templateHasChanges || saveTemplateMutation.isPending}
-                    >
-                      {saveTemplateMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="mr-2 h-4 w-4" />
-                      )}
-                      保存
-                    </Button>
-                  </div>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
                 </div>
+              ))}
+            </div>
+          </div>
 
-                {/* Variables info */}
-                <div className="mb-4 rounded-lg bg-blue-50 p-3">
-                  <p className="text-sm text-blue-700">
-                    <span className="font-medium">可用变量：</span>{' '}
-                    {EMAIL_TEMPLATE_INFO[selectedTemplate]?.variables.map((v) => (
-                      <code key={v} className="mx-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs">
-                        {`{{${v}}}`}
-                      </code>
-                    ))}
-                  </p>
+          {/* 营销功能 */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">营销功能</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableCampaigns', label: '营销活动', desc: '允许用户创建和管理营销活动' },
+                { key: 'enableAbTests', label: 'A/B 测试', desc: '允许用户进行链接 A/B 测试' },
+                { key: 'enableGoals', label: '目标追踪', desc: '允许用户设置和追踪转化目标' },
+                { key: 'enableUtmTemplates', label: 'UTM 模板', desc: '允许用户创建 UTM 参数模板' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
+                  </div>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
                 </div>
+              ))}
+            </div>
+          </div>
 
-                {showPreview ? (
-                  /* Preview Mode */
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-gray-500">邮件主题</Label>
-                      <p className="mt-1 rounded-lg border bg-gray-50 p-3">{templateSubject}</p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-500">邮件内容</Label>
-                      <div
-                        className="mt-1 min-h-[300px] rounded-lg border bg-white p-4"
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(templateHtml) }}
-                      />
-                    </div>
+          {/* 高级功能 */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">高级功能</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enablePages', label: '落地页', desc: '允许用户创建自定义落地页' },
+                { key: 'enableWebhooks', label: 'Webhooks', desc: '允许用户配置 Webhook 回调' },
+                { key: 'enableIntegrations', label: '第三方集成', desc: '允许用户连接第三方服务' },
+                { key: 'enableAutomation', label: '自动化工作流', desc: '允许用户创建自动化规则' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
                   </div>
-                ) : (
-                  /* Edit Mode */
-                  <div className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="templateSubject">邮件主题</Label>
-                      <Input
-                        id="templateSubject"
-                        value={templateSubject}
-                        onChange={(e) => {
-                          setTemplateSubject(e.target.value);
-                          setTemplateHasChanges(true);
-                        }}
-                        placeholder="邮件主题，可使用 {{变量}}"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="templateHtml">邮件内容 (HTML)</Label>
-                      <Textarea
-                        id="templateHtml"
-                        value={templateHtml}
-                        onChange={(e) => {
-                          setTemplateHtml(e.target.value);
-                          setTemplateHasChanges(true);
-                        }}
-                        placeholder="HTML 内容，可使用 {{变量}}"
-                        className="min-h-[300px] font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-lg bg-white p-6 shadow">
-                <div className="text-center text-gray-500">
-                  <FileText className="mx-auto h-12 w-12 text-gray-300" />
-                  <p className="mt-2">选择左侧的模板进行编辑</p>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          </div>
+
+          {/* 监控与安全 */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">监控与安全</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableRealtime', label: '实时监控', desc: '启用实时数据监控面板' },
+                { key: 'enableAlerts', label: '告警系统', desc: '启用告警规则和通知' },
+                { key: 'enableSso', label: 'SSO 单点登录', desc: '启用企业 SSO 集成' },
+                { key: 'enableSecurityScan', label: '安全扫描', desc: '启用链接安全扫描功能' },
+                { key: 'enableContentModeration', label: '内容审核', desc: '启用自动内容审核' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
+                  </div>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 内容管理 */}
+          <div className="rounded-lg bg-white p-6 shadow">
+            <h3 className="mb-4 text-lg font-semibold">内容管理</h3>
+            <div className="space-y-3">
+              {[
+                { key: 'enableComments', label: '评论系统', desc: '启用页面评论功能' },
+                { key: 'enableSeoManager', label: 'SEO 管理', desc: '启用 SEO 优化工具' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <Label>{feature.label}</Label>
+                    <p className="text-xs text-gray-500">{feature.desc}</p>
+                  </div>
+                  <Switch
+                    checked={(formData.features as any)[feature.key] ?? true}
+                    onCheckedChange={(checked) => updateFormData('features', feature.key, checked)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -1243,51 +905,13 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Test Email Dialog */}
-      <Dialog open={showTestEmailDialog} onOpenChange={setShowTestEmailDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>发送测试邮件</DialogTitle>
-            <DialogDescription>输入接收测试邮件的邮箱地址</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="testEmailTo">收件邮箱</Label>
-              <Input
-                id="testEmailTo"
-                type="email"
-                value={testEmailTo}
-                onChange={(e) => setTestEmailTo(e.target.value)}
-                placeholder="test@example.com"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTestEmailDialog(false)}>
-              取消
-            </Button>
-            <Button
-              onClick={() => testEmailMutation.mutate()}
-              disabled={!testEmailTo || testEmailMutation.isPending}
-            >
-              {testEmailMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              发送
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Reset Config Dialog */}
       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>确认重置设置</DialogTitle>
             <DialogDescription>
-              此操作将把所有系统配置恢复为默认值，包括 API 设置、邮件配置、安全设置等。此操作不可撤销。
+              此操作将把所有系统配置恢复为默认值，包括 API 设置、安全设置等。此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

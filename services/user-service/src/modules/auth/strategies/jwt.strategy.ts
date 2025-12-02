@@ -58,11 +58,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.role && ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(payload.role)) {
       return {
         id: payload.sub,
+        sub: payload.sub,
         email: payload.email,
+        name: (payload as any).name,
+        type: payload.type || 'admin',
+        scope: payload.scope || { level: 'platform' },
+        role: payload.role,
         teamRole: payload.role,
-        permissions: [], // Admin 用户不使用常规权限系统
+        permissions: payload.permissions || [],
         isConsoleAdmin: true,
-      };
+      } as any;
     }
 
     // 普通用户需要验证存在于数据库中

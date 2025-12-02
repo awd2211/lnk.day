@@ -1,11 +1,16 @@
 import { Process, Processor, OnQueueActive } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
+import { Repository } from 'typeorm';
 import { Job } from 'bull';
 import * as nodemailer from 'nodemailer';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { EmailJob } from './email.service';
 import { EmailConfigService, EmailProvider } from './email-config.service';
+import { NotificationTemplate, NotificationTemplateType } from '../notifications/entities/notification-template.entity';
+import { NotificationLog, NotificationStatus } from '../notifications/entities/notification-log.entity';
 
 interface MailgunClient {
   messages: {
@@ -20,8 +25,19 @@ export class EmailProcessor {
   private mailgunClient: MailgunClient | null = null;
   private currentProvider: EmailProvider = 'smtp';
   private configVersion = -1;
+  private readonly brandName: string;
+  private readonly brandDomain: string;
 
-  constructor(private readonly emailConfigService: EmailConfigService) {
+  constructor(
+    private readonly emailConfigService: EmailConfigService,
+    @InjectRepository(NotificationTemplate)
+    private readonly templateRepository: Repository<NotificationTemplate>,
+    @InjectRepository(NotificationLog)
+    private readonly logRepository: Repository<NotificationLog>,
+    private readonly configService: ConfigService,
+  ) {
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
     this.initializeProvider();
   }
 
@@ -91,8 +107,19 @@ export class EmailProcessor {
     const { to, subject, template, data } = job.data;
     this.logger.log(`Sending email to ${to}: ${subject}`);
 
+    // 创建发送日志记录
+    const log = this.logRepository.create({
+      type: 'email',
+      recipient: to,
+      subject,
+      templateName: template,
+      status: NotificationStatus.PENDING,
+      metadata: { template, provider: this.currentProvider },
+    });
+    await this.logRepository.save(log);
+
     try {
-      const html = this.renderTemplate(template, data);
+      const html = await this.renderTemplate(template, data);
 
       if (this.currentProvider === 'mailgun' && this.mailgunClient) {
         await this.sendViaMailgun(to, subject, html);
@@ -102,8 +129,19 @@ export class EmailProcessor {
         throw new Error('No email provider configured');
       }
 
+      // 更新日志为已发送
+      log.status = NotificationStatus.SENT;
+      log.deliveredAt = new Date();
+      await this.logRepository.save(log);
+
       this.logger.log(`Email sent successfully to ${to}`);
     } catch (error) {
+      // 更新日志为失败
+      const err = error instanceof Error ? error : new Error(String(error));
+      log.status = NotificationStatus.FAILED;
+      log.errorMessage = err.message;
+      await this.logRepository.save(log);
+
       this.logger.error(`Failed to send email to ${to}`, error);
       throw error;
     }
@@ -134,11 +172,27 @@ export class EmailProcessor {
     });
   }
 
-  private renderTemplate(template: string, data: Record<string, any>): string {
-    const templates: Record<string, (d: Record<string, any>) => string> = {
+  /**
+   * 从数据库或后备模板渲染邮件内容
+   */
+  private async renderTemplate(template: string, data: Record<string, any>): Promise<string> {
+    // 尝试从数据库获取模板
+    const dbTemplate = await this.templateRepository.findOne({
+      where: { code: template, type: NotificationTemplateType.EMAIL, isActive: true },
+    });
+
+    if (dbTemplate) {
+      // 使用数据库模板
+      const content = dbTemplate.htmlContent || dbTemplate.content;
+      return this.interpolateTemplate(content, data);
+    }
+
+    // 后备硬编码模板（逐步迁移到数据库）
+    const brand = this.brandName;
+    const fallbackTemplates: Record<string, (d: Record<string, any>) => string> = {
       welcome: (d) => `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1a1a1a;">欢迎加入 lnk.day, ${d.name}!</h1>
+          <h1 style="color: #1a1a1a;">欢迎加入 ${brand}, ${d.name}!</h1>
           <p style="color: #666;">感谢您注册我们的服务。</p>
         </div>
       `,
@@ -146,7 +200,7 @@ export class EmailProcessor {
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #1a1a1a;">重置密码</h1>
           <p style="color: #666;">点击下面的链接重置您的密码：</p>
-          <a href="https://lnk.day/reset-password?token=${d.resetToken}"
+          <a href="${d.resetLink}"
              style="display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">
             重置密码
           </a>
@@ -155,7 +209,7 @@ export class EmailProcessor {
       'admin-password-reset': (d) => `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #1a1a1a; margin: 0;">lnk.day 管理后台</h1>
+            <h1 style="color: #1a1a1a; margin: 0;">${brand} 管理后台</h1>
           </div>
           <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
             <h2 style="color: #1a1a1a; margin-top: 0;">重置密码</h2>
@@ -171,7 +225,75 @@ export class EmailProcessor {
             <p style="color: #999; font-size: 12px;">如果您没有请求重置密码，请忽略此邮件。</p>
           </div>
           <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
-            © ${new Date().getFullYear()} lnk.day - 企业级链接管理平台
+            © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
+          </p>
+        </div>
+      `,
+      'admin-invite': (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a1a1a; margin: 0;">${brand} 管理后台</h1>
+          </div>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">管理员邀请</h2>
+            <p style="color: #666;">您好，${d.name}，</p>
+            <p style="color: #666;">您已被邀请加入 ${brand} 管理后台，角色为 <strong>${d.roleName}</strong>。</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${d.inviteLink}"
+                 style="display: inline-block; padding: 14px 32px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                接受邀请
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">此链接将在 ${d.expiresIn} 后过期。</p>
+            <p style="color: #999; font-size: 12px;">如果您不认识发件人，请忽略此邮件。</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
+          </p>
+        </div>
+      `,
+      'admin-login-code': (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a1a1a; margin: 0;">${brand} 管理后台</h1>
+          </div>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">登录验证码</h2>
+            <p style="color: #666;">您好，${d.name}，</p>
+            <p style="color: #666;">您的登录验证码是：</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb; background: #eff6ff; padding: 15px 30px; border-radius: 8px;">
+                ${d.code}
+              </span>
+            </div>
+            <p style="color: #666; font-size: 14px;">此验证码将在 ${d.expiresIn} 后过期。</p>
+            <p style="color: #999; font-size: 12px;">如果您没有请求此验证码，请忽略此邮件。</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
+          </p>
+        </div>
+      `,
+      'admin-email-verify': (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a1a1a; margin: 0;">${brand} 管理后台</h1>
+          </div>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">验证您的邮箱</h2>
+            <p style="color: #666;">您好，${d.name}，</p>
+            <p style="color: #666;">请点击下面的按钮验证您的邮箱地址：</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${d.verifyLink}"
+                 style="display: inline-block; padding: 14px 32px; background: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                验证邮箱
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">此链接将在 ${d.expiresIn} 后过期。</p>
+            <p style="color: #999; font-size: 12px;">如果您没有请求此验证，请忽略此邮件。</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
           </p>
         </div>
       `,
@@ -193,7 +315,7 @@ export class EmailProcessor {
       `,
       'weekly-report': (d) => `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1a1a1a;">lnk.day 周报</h1>
+          <h1 style="color: #1a1a1a;">${brand} 周报</h1>
           <p style="color: #666;">本周总点击量：${d.totalClicks}</p>
           <p style="color: #666;">增长率：${d.growth}%</p>
         </div>
@@ -207,7 +329,7 @@ export class EmailProcessor {
       test: (d) => `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #2563eb; margin: 0;">lnk.day</h1>
+            <h1 style="color: #2563eb; margin: 0;">${brand}</h1>
           </div>
           <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px;">
             <h2 style="color: #1a1a1a; margin-top: 0;">✅ 测试邮件</h2>
@@ -220,7 +342,22 @@ export class EmailProcessor {
         </div>
       `,
     };
-    const templateFn = templates[template];
-    return templateFn ? templateFn(data) : '';
+
+    const templateFn = fallbackTemplates[template];
+    if (templateFn) {
+      return templateFn(data);
+    }
+
+    this.logger.warn(`Template "${template}" not found in database or fallback`);
+    return `<p>模板 "${template}" 未找到</p>`;
+  }
+
+  /**
+   * 替换模板中的变量 {{variable}}
+   */
+  private interpolateTemplate(content: string, data: Record<string, any>): string {
+    return content.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return data[key] !== undefined ? String(data[key]) : match;
+    });
   }
 }

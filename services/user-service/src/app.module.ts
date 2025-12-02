@@ -34,6 +34,8 @@ import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 import { UserSagaModule } from './saga/saga.module';
 // import { TenantModule } from './modules/tenant/tenant.module';
 import { SecurityModule } from './modules/security/security.module';
+import { PlanModule } from './modules/plan/plan.module';
+import { ReportTemplateModule } from './modules/report-template/report-template.module';
 
 @Module({
   imports: [
@@ -117,6 +119,8 @@ import { SecurityModule } from './modules/security/security.module';
     UserSagaModule,
     // TenantModule, // Temporarily disabled due to API mismatch
     SecurityModule,
+    PlanModule,
+    ReportTemplateModule,
   ],
   providers: [
     {

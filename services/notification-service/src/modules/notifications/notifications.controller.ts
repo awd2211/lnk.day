@@ -113,6 +113,12 @@ export class NotificationsController {
     return this.service.getChannels();
   }
 
+  @Post('channels')
+  @ApiOperation({ summary: '创建通知渠道' })
+  createChannel(@Body() data: { name: string; type: string; config: any }) {
+    return this.service.createChannel(data);
+  }
+
   @Get('channels/:id')
   @ApiOperation({ summary: '获取渠道详情' })
   getChannel(@Param('id', ParseUUIDPipe) id: string) {
@@ -139,8 +145,11 @@ export class NotificationsController {
 
   @Post('channels/:id/test')
   @ApiOperation({ summary: '测试通知渠道' })
-  testChannel(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.testChannel(id);
+  testChannel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() data?: { recipient?: string },
+  ) {
+    return this.service.testChannel(id, data?.recipient);
   }
 
   // =================== 前端兼容端点 ===================

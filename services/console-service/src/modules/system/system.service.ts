@@ -572,7 +572,7 @@ export class SystemService {
 
   // Backup Operations
   private getBackupDir(): string {
-    const backupDir = this.configService.get('BACKUP_DIR', '/home/eric/lnk.day/backups');
+    const backupDir = this.configService.get('BACKUP_DIR', './backups');
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }

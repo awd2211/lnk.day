@@ -1,13 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { SystemService } from './system.service';
 import { SystemConfigService, EmailSettings } from './config.service';
+import { LogAudit } from '../audit/decorators/audit-log.decorator';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 
 @ApiTags('system')
 @Controller('system')
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
+@UseInterceptors(AuditLogInterceptor)
 export class SystemController {
   constructor(
     private readonly systemService: SystemService,
@@ -40,6 +43,11 @@ export class SystemController {
 
   @Post('services/:name/restart')
   @ApiOperation({ summary: '重启服务' })
+  @LogAudit({
+    action: 'system.service.restart',
+    targetType: 'service',
+    targetIdParam: 'name',
+  })
   restartService(@Param('name') name: string) {
     return this.systemService.restartService(name);
   }
@@ -52,12 +60,22 @@ export class SystemController {
 
   @Put('config')
   @ApiOperation({ summary: '更新系统配置' })
+  @LogAudit({
+    action: 'system.config.update',
+    targetType: 'system',
+    logRequestBody: true,
+    excludeFields: ['password', 'secret', 'apiKey', 'token'],
+  })
   updateConfig(@Body() updates: Record<string, any>) {
     return this.systemService.updateConfig(updates);
   }
 
   @Post('config/reset')
   @ApiOperation({ summary: '重置系统配置为默认值' })
+  @LogAudit({
+    action: 'system.config.reset',
+    targetType: 'system',
+  })
   resetConfig() {
     return this.systemService.resetConfig();
   }
@@ -70,6 +88,11 @@ export class SystemController {
 
   @Post('queues/:queueName/clear')
   @ApiOperation({ summary: '清空队列' })
+  @LogAudit({
+    action: 'system.queue.clear',
+    targetType: 'queue',
+    targetIdParam: 'queueName',
+  })
   clearQueue(@Param('queueName') queueName: string) {
     return this.systemService.clearQueue(queueName);
   }
@@ -91,12 +114,22 @@ export class SystemController {
   @Delete('cache')
   @ApiOperation({ summary: '清除缓存 (DELETE 方式)' })
   @ApiQuery({ name: 'pattern', required: false, description: '匹配模式，不指定则清除全部' })
+  @LogAudit({
+    action: 'system.cache.clear',
+    targetType: 'cache',
+    detailFields: ['pattern'],
+  })
   clearCache(@Query('pattern') pattern?: string) {
     return this.systemService.clearCache(pattern);
   }
 
   @Post('cache/clear')
   @ApiOperation({ summary: '清除缓存 (POST 方式)' })
+  @LogAudit({
+    action: 'system.cache.clear',
+    targetType: 'cache',
+    detailFields: ['pattern'],
+  })
   clearCachePost(@Body() body?: { pattern?: string }) {
     return this.systemService.clearCache(body?.pattern);
   }
@@ -129,12 +162,23 @@ export class SystemController {
 
   @Put('features/:flag')
   @ApiOperation({ summary: '更新功能开关' })
+  @LogAudit({
+    action: 'system.feature.update',
+    targetType: 'feature',
+    targetIdParam: 'flag',
+    detailFields: ['enabled'],
+  })
   updateFeatureFlag(@Param('flag') flag: string, @Body() data: { enabled: boolean }) {
     return this.systemService.updateFeatureFlag(flag, data.enabled);
   }
 
   @Post('maintenance')
   @ApiOperation({ summary: '切换维护模式' })
+  @LogAudit({
+    action: 'system.maintenance.toggle',
+    targetType: 'system',
+    detailFields: ['enabled'],
+  })
   toggleMaintenanceMode(@Body() data: { enabled: boolean }) {
     return this.systemService.toggleMaintenanceMode(data.enabled);
   }
@@ -149,18 +193,34 @@ export class SystemController {
   @Post('backups')
   @ApiOperation({ summary: '创建备份' })
   @ApiBody({ schema: { properties: { type: { type: 'string', enum: ['full', 'incremental'] } } } })
+  @LogAudit({
+    action: 'system.backup.create',
+    targetType: 'backup',
+    detailFields: ['type'],
+    getTarget: (result) => result ? { id: result.id, name: result.name } : null,
+  })
   createBackup(@Body() data?: { type?: 'full' | 'incremental' }) {
     return this.systemService.createBackup(data?.type);
   }
 
   @Post('backups/:id/restore')
   @ApiOperation({ summary: '恢复备份' })
+  @LogAudit({
+    action: 'system.backup.restore',
+    targetType: 'backup',
+    targetIdParam: 'id',
+  })
   restoreBackup(@Param('id') id: string) {
     return this.systemService.restoreBackup(id);
   }
 
   @Delete('backups/:id')
   @ApiOperation({ summary: '删除备份' })
+  @LogAudit({
+    action: 'system.backup.delete',
+    targetType: 'backup',
+    targetIdParam: 'id',
+  })
   deleteBackup(@Param('id') id: string) {
     return this.systemService.deleteBackup(id);
   }
@@ -181,6 +241,12 @@ export class SystemController {
 
   @Put('email-settings')
   @ApiOperation({ summary: '更新邮件配置' })
+  @LogAudit({
+    action: 'system.email.settings.update',
+    targetType: 'email_settings',
+    logRequestBody: true,
+    excludeFields: ['password', 'apiKey', 'secret'],
+  })
   updateEmailSettings(@Body() settings: Partial<EmailSettings>) {
     return this.configService.updateEmailSettings(settings);
   }
@@ -200,6 +266,12 @@ export class SystemController {
 
   @Put('email-templates/:id')
   @ApiOperation({ summary: '更新邮件模板' })
+  @LogAudit({
+    action: 'system.email.template.update',
+    targetType: 'email_template',
+    targetIdParam: 'id',
+    detailFields: ['subject'],
+  })
   updateEmailTemplate(
     @Param('id') id: string,
     @Body() data: { subject: string; html: string },
@@ -209,6 +281,11 @@ export class SystemController {
 
   @Post('email-templates/:id/reset')
   @ApiOperation({ summary: '重置邮件模板为默认值' })
+  @LogAudit({
+    action: 'system.email.template.reset',
+    targetType: 'email_template',
+    targetIdParam: 'id',
+  })
   resetEmailTemplate(@Param('id') id: string) {
     return this.configService.resetEmailTemplate(id);
   }

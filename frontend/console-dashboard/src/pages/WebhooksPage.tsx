@@ -15,6 +15,9 @@ import {
   AlertTriangle,
   Send,
   History,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -112,11 +115,23 @@ export default function WebhooksPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfig | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const queryClient = useQueryClient();
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   // Fetch stats
   const { data: stats } = useQuery<WebhookStats>({
@@ -129,12 +144,14 @@ export default function WebhooksPage() {
 
   // Fetch webhooks
   const { data, isLoading } = useQuery({
-    queryKey: ['webhooks', { search, page, status: statusFilter }],
+    queryKey: ['webhooks', { search, page, status: statusFilter, sortBy, sortOrder }],
     queryFn: async () => {
       const response = await webhooksService.getWebhooks({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         page,
         limit: 20,
+        sortBy,
+        sortOrder,
       });
       return response.data;
     },
@@ -311,12 +328,44 @@ export default function WebhooksPage() {
           <table className="w-full">
             <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">名称</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('name')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    名称
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">URL</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">团队</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">成功率</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">最后触发</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('successRate')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    成功率
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('lastTriggeredAt')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    最后触发
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">操作</th>
               </tr>
             </thead>

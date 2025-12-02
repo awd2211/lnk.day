@@ -31,6 +31,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SecurityModule } from './modules/security/security.module';
 import { RedirectRulesModule } from './modules/redirect-rules/redirect-rules.module';
 import { LinkTemplateModule } from './modules/link-template/link-template.module';
+import { RedirectRuleTemplateModule } from './modules/redirect-rule-template/redirect-rule-template.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { HealthModule } from './modules/health/health.module';
 import { LinkSagaModule } from './saga/saga.module';
@@ -87,6 +88,7 @@ import { TagModule } from './modules/tag/tag.module';
     SecurityModule,
     RedirectRulesModule,
     LinkTemplateModule,
+    RedirectRuleTemplateModule,
     ModerationModule,
     HealthModule,
     LinkSagaModule,

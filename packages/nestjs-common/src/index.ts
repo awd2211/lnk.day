@@ -18,6 +18,9 @@ export * from './auth';
 export * from './permissions';
 export * from './guards';
 
+// 审计
+export * from './audit';
+
 // API
 export * from './swagger';
 export * from './version/version.module';

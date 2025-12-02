@@ -5,9 +5,10 @@ import {
   Put,
   Body,
   Query,
+  Param,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiHeader, ApiParam } from '@nestjs/swagger';
 import { QuotaService } from './quota.service';
 import { PlanType, PlanLimits } from './quota.entity';
 import {
@@ -151,5 +152,68 @@ export class QuotaController {
   @ApiOperation({ summary: '获取所有可用计划' })
   getPlans() {
     return this.quotaService.getPlans();
+  }
+
+  // ==================== Admin Endpoints ====================
+
+  @Get('stats')
+  @AdminOnly()
+  @ApiOperation({ summary: '获取配额统计信息（管理员）' })
+  getQuotaStats() {
+    return this.quotaService.getQuotaStats();
+  }
+
+  @Get('teams')
+  @AdminOnly()
+  @ApiOperation({ summary: '获取所有团队配额列表（管理员）' })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'plan', required: false })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false })
+  getAllTeamQuotas(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('plan') plan?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.quotaService.getAllTeamQuotas({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 20,
+      search,
+      plan: plan as PlanType,
+      sortBy,
+      sortOrder,
+    });
+  }
+
+  @Get('teams/:teamId')
+  @AdminOnly()
+  @ApiOperation({ summary: '获取指定团队配额详情（管理员）' })
+  @ApiParam({ name: 'teamId', description: '团队ID' })
+  getTeamQuotaById(@Param('teamId') teamId: string) {
+    return this.quotaService.getUsage(teamId);
+  }
+
+  @Put('teams/:teamId')
+  @AdminOnly()
+  @ApiOperation({ summary: '更新团队配额（管理员）' })
+  @ApiParam({ name: 'teamId', description: '团队ID' })
+  updateTeamQuotaById(
+    @Param('teamId') teamId: string,
+    @Body() body: { plan?: PlanType; customLimits?: Partial<PlanLimits> },
+  ) {
+    return this.quotaService.updateTeamQuotaById(teamId, body);
+  }
+
+  @Post('teams/:teamId/reset')
+  @AdminOnly()
+  @ApiOperation({ summary: '重置团队月度使用量（管理员）' })
+  @ApiParam({ name: 'teamId', description: '团队ID' })
+  resetTeamQuotaById(@Param('teamId') teamId: string) {
+    return this.quotaService.resetMonthlyUsage(teamId);
   }
 }

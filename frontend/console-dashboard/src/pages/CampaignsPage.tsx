@@ -23,6 +23,9 @@ import {
   History,
   FileText,
   UserCircle,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -167,7 +170,19 @@ export default function CampaignsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [teamFilter, setTeamFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Admin action dialogs
@@ -227,7 +242,7 @@ export default function CampaignsPage() {
 
   // Campaigns list with admin oversight fields
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['campaigns-admin', { page, statusFilter, riskFilter, typeFilter, teamFilter, search }],
+    queryKey: ['campaigns-admin', { page, statusFilter, riskFilter, typeFilter, teamFilter, search, sortBy, sortOrder }],
     queryFn: async () => {
       const res = await campaignsService.getCampaigns({
         page,
@@ -235,6 +250,8 @@ export default function CampaignsPage() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         type: typeFilter !== 'all' ? typeFilter : undefined,
         teamId: teamFilter !== 'all' ? teamFilter : undefined,
+        sortBy,
+        sortOrder,
       });
 
       const rawItems = res.data?.items || res.data || [];
@@ -510,13 +527,45 @@ export default function CampaignsPage() {
                       onCheckedChange={handleSelectAll}
                     />
                   </th>
-                  <th className="p-3 font-medium">活动名称</th>
-                  <th className="p-3 font-medium">状态</th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('name')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      活动名称
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <button
+                      onClick={() => handleSort('status')}
+                      className="flex items-center gap-1 hover:text-gray-700"
+                    >
+                      状态
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
                   <th className="p-3 font-medium">风险</th>
                   <th className="p-3 font-medium">类型</th>
                   <th className="p-3 font-medium">团队/创建者</th>
-                  <th className="p-3 font-medium text-right">链接</th>
-                  <th className="p-3 font-medium text-right">点击</th>
+                  <th className="p-3 font-medium text-right">
+                    <button
+                      onClick={() => handleSort('totalLinks')}
+                      className="flex items-center gap-1 hover:text-gray-700 ml-auto"
+                    >
+                      链接
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium text-right">
+                    <button
+                      onClick={() => handleSort('totalClicks')}
+                      className="flex items-center gap-1 hover:text-gray-700 ml-auto"
+                    >
+                      点击
+                      <ArrowUpDown className="h-4 w-4" />
+                    </button>
+                  </th>
                   <th className="p-3 font-medium">举报</th>
                   <th className="p-3 font-medium text-right">操作</th>
                 </tr>
@@ -675,22 +724,45 @@ export default function CampaignsPage() {
               <p className="text-sm text-muted-foreground">
                 共 {data.total} 条记录，第 {page} / {data.totalPages} 页
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  上一页
+                  <ChevronLeft className="h-4 w-4" />
                 </Button>
+                {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (data.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (page <= 3) {
+                    pageNum = i + 1;
+                  } else if (page >= data.totalPages - 2) {
+                    pageNum = data.totalPages - 4 + i;
+                  } else {
+                    pageNum = page - 2 + i;
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={page === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPage(pageNum)}
+                      className="w-8 px-0"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                   disabled={page === data.totalPages}
                 >
-                  下一页
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>

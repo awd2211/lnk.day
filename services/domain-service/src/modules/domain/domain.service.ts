@@ -25,13 +25,16 @@ const resolveCname = promisify(dns.resolveCname);
 @Injectable()
 export class DomainService {
   private readonly targetCname: string;
+  private readonly brandName: string;
 
   constructor(
     @InjectRepository(CustomDomain)
     private readonly domainRepository: Repository<CustomDomain>,
     private readonly configService: ConfigService,
   ) {
-    this.targetCname = this.configService.get('TARGET_CNAME', 'cname.lnk.day');
+    const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+    this.targetCname = this.configService.get('TARGET_CNAME', `cname.${brandDomain}`);
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
   }
 
   async create(
@@ -169,7 +172,7 @@ export class DomainService {
         type: 'CNAME',
         name: domain.domain,
         value: this.targetCname,
-        description: '指向 lnk.day 的 CNAME 记录',
+        description: `指向 ${this.brandName} 的 CNAME 记录`,
       },
     ];
 

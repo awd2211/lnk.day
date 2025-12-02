@@ -31,6 +31,8 @@ export interface EmailSettings {
 export class EmailConfigService implements OnModuleInit {
   private readonly logger = new Logger(EmailConfigService.name);
   private readonly consoleServiceUrl: string;
+  private readonly brandName: string;
+  private readonly brandDomain: string;
   private settings: EmailSettings;
   private configVersion = 0;
 
@@ -39,12 +41,14 @@ export class EmailConfigService implements OnModuleInit {
     private readonly httpService: HttpService,
   ) {
     this.consoleServiceUrl = this.configService.get('CONSOLE_SERVICE_URL', 'http://localhost:60009');
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
 
     // Initialize with environment defaults
     this.settings = {
       provider: this.configService.get('EMAIL_PROVIDER', 'smtp') as EmailProvider,
-      fromEmail: this.configService.get('EMAIL_FROM', 'noreply@lnk.day'),
-      fromName: this.configService.get('EMAIL_FROM_NAME', 'lnk.day'),
+      fromEmail: this.configService.get('EMAIL_FROM', `noreply@${this.brandDomain}`),
+      fromName: this.configService.get('EMAIL_FROM_NAME', this.brandName),
       smtp: {
         host: this.configService.get('SMTP_HOST', 'localhost'),
         port: parseInt(this.configService.get('SMTP_PORT', '587'), 10),

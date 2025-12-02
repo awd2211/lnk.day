@@ -38,38 +38,84 @@ export class AdminRoleService {
    * 初始化默认角色
    */
   async initializeDefaultRoles(): Promise<void> {
-    const existingRoles = await this.roleRepository.find({ where: { isSystem: true } });
+    const defaultRoles = [
+      {
+        name: 'SUPER_ADMIN',
+        description: '超级管理员，拥有系统所有权限',
+        color: '#EF4444',
+        permissions: DEFAULT_ROLE_PERMISSIONS.SUPER_ADMIN,
+        isSystem: true,
+        priority: 100,
+      },
+      {
+        name: 'SYSTEM_ADMIN',
+        description: '系统管理员，负责技术运维、系统配置、服务管理、备份等',
+        color: '#6366F1',
+        permissions: DEFAULT_ROLE_PERMISSIONS.SYSTEM_ADMIN,
+        isSystem: true,
+        priority: 90,
+      },
+      {
+        name: 'OPERATION_MANAGER',
+        description: '运营主管，运营团队负责人，内容管理、用户管理、数据分析、审核决策',
+        color: '#F59E0B',
+        permissions: DEFAULT_ROLE_PERMISSIONS.OPERATION_MANAGER,
+        isSystem: true,
+        priority: 70,
+      },
+      {
+        name: 'CONTENT_OPERATOR',
+        description: '内容运营，日常内容管理，链接、活动、页面、二维码、评论审核',
+        color: '#10B981',
+        permissions: DEFAULT_ROLE_PERMISSIONS.CONTENT_OPERATOR,
+        isSystem: true,
+        priority: 50,
+      },
+      {
+        name: 'CUSTOMER_SUPPORT',
+        description: '客服专员，用户支持，查看用户/团队，处理用户问题',
+        color: '#3B82F6',
+        permissions: DEFAULT_ROLE_PERMISSIONS.CUSTOMER_SUPPORT,
+        isSystem: true,
+        priority: 40,
+      },
+      {
+        name: 'FINANCE',
+        description: '财务人员，订阅、计费、发票、套餐管理',
+        color: '#EC4899',
+        permissions: DEFAULT_ROLE_PERMISSIONS.FINANCE,
+        isSystem: true,
+        priority: 60,
+      },
+      {
+        name: 'DATA_ANALYST',
+        description: '数据分析师，数据分析、报表导出',
+        color: '#8B5CF6',
+        permissions: DEFAULT_ROLE_PERMISSIONS.DATA_ANALYST,
+        isSystem: true,
+        priority: 30,
+      },
+      {
+        name: 'AUDITOR',
+        description: '审计员，合规审计，审计日志、告警查看',
+        color: '#64748B',
+        permissions: DEFAULT_ROLE_PERMISSIONS.AUDITOR,
+        isSystem: true,
+        priority: 20,
+      },
+    ];
 
-    if (existingRoles.length === 0) {
-      const defaultRoles = [
-        {
-          name: 'SUPER_ADMIN',
-          description: '超级管理员，拥有系统所有权限',
-          color: '#EF4444',
-          permissions: DEFAULT_ROLE_PERMISSIONS.SUPER_ADMIN,
-          isSystem: true,
-          priority: 100,
-        },
-        {
-          name: 'ADMIN',
-          description: '管理员，拥有大部分管理权限',
-          color: '#F59E0B',
-          permissions: DEFAULT_ROLE_PERMISSIONS.ADMIN,
-          isSystem: true,
-          priority: 50,
-        },
-        {
-          name: 'OPERATOR',
-          description: '运营人员，拥有只读权限',
-          color: '#3B82F6',
-          permissions: DEFAULT_ROLE_PERMISSIONS.OPERATOR,
-          isSystem: true,
-          priority: 10,
-        },
-      ];
-
-      for (const role of defaultRoles) {
-        await this.roleRepository.save(this.roleRepository.create(role));
+    for (const roleData of defaultRoles) {
+      const existing = await this.roleRepository.findOne({ where: { name: roleData.name } });
+      if (!existing) {
+        await this.roleRepository.save(this.roleRepository.create(roleData));
+      } else if (existing.isSystem) {
+        // 更新系统角色的权限（保持最新）
+        existing.permissions = roleData.permissions;
+        existing.description = roleData.description;
+        existing.color = roleData.color;
+        existing.priority = roleData.priority;
+        await this.roleRepository.save(existing);
       }
     }
   }

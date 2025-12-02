@@ -48,6 +48,11 @@ import {
   Target,
   GitBranch,
   Activity,
+  MessageSquare,
+  Search,
+  Lock,
+  Crown,
+  UserCog,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -92,6 +97,8 @@ const navigationGroups: NavGroup[] = [
       { name: '二维码', href: '/qr-codes', icon: QrCode },
       { name: '深度链接', href: '/deep-links', icon: Smartphone },
       { name: '落地页', href: '/pages', icon: LayoutIcon },
+      { name: '评论管理', href: '/comments', icon: MessageSquare },
+      { name: 'SEO 管理', href: '/seo-manager', icon: Search },
       { name: '域名管理', href: '/domains', icon: Globe },
       { name: '重定向规则', href: '/redirect-rules', icon: GitBranch },
       { name: '标签管理', href: '/tags', icon: Tag },
@@ -113,6 +120,7 @@ const navigationGroups: NavGroup[] = [
     name: '订阅与计费',
     icon: CreditCard,
     items: [
+      { name: '套餐管理', href: '/plans', icon: Crown },
       { name: '订阅管理', href: '/subscriptions', icon: CreditCard },
       { name: '计费发票', href: '/billing', icon: Receipt },
       { name: '配额管理', href: '/quotas', icon: Database },
@@ -131,6 +139,7 @@ const navigationGroups: NavGroup[] = [
     name: '安全与审计',
     icon: ShieldCheck,
     items: [
+      { name: '安全中心', href: '/security', icon: Lock },
       { name: '内容审核', href: '/moderation', icon: ShieldAlert },
       { name: '审计日志', href: '/audit-logs', icon: FileText },
       { name: '告警管理', href: '/alerts', icon: Bell },
@@ -157,6 +166,7 @@ const navigationGroups: NavGroup[] = [
       { name: '系统监控', href: '/system', icon: Server },
       { name: '性能指标', href: '/metrics', icon: Gauge },
       { name: '自动化规则', href: '/automation', icon: Workflow },
+      { name: '管理员', href: '/admins', icon: UserCog },
       { name: '管理员角色', href: '/admin-roles', icon: ShieldCheck },
       { name: '通知管理', href: '/notifications', icon: Mail },
       { name: '系统设置', href: '/settings', icon: Settings },

@@ -55,27 +55,116 @@ interface PermissionGroup {
   permissions: string[];
 }
 
+// Role display names in Chinese
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  SUPER_ADMIN: '超级管理员',
+  SYSTEM_ADMIN: '系统管理员',
+  OPERATION_MANAGER: '运营主管',
+  CONTENT_OPERATOR: '内容运营',
+  CUSTOMER_SUPPORT: '客服专员',
+  FINANCE: '财务人员',
+  DATA_ANALYST: '数据分析师',
+  AUDITOR: '审计员',
+};
+
+// Get display name for a role
+const getRoleDisplayName = (role: AdminRole): string => {
+  return ROLE_DISPLAY_NAMES[role.name] || role.name;
+};
+
 // Admin permission labels for display
 const PERMISSION_LABELS: Record<string, string> = {
+  // 用户与团队
   'admin:users:view': '查看用户',
   'admin:users:manage': '管理用户',
   'admin:users:delete': '删除用户',
   'admin:teams:view': '查看团队',
   'admin:teams:manage': '管理团队',
   'admin:teams:delete': '删除团队',
+  'admin:tenants:view': '查看租户',
+  'admin:tenants:manage': '管理租户',
+  'admin:tenants:delete': '删除租户',
+  'admin:user-roles:view': '查看用户角色',
+  'admin:user-roles:manage': '管理用户角色',
+
+  // 内容管理
   'admin:links:view': '查看链接',
   'admin:links:manage': '管理链接',
   'admin:links:delete': '删除链接',
-  'admin:qr:view': '查看二维码',
-  'admin:qr:manage': '管理二维码',
-  'admin:pages:view': '查看页面',
-  'admin:pages:manage': '管理页面',
   'admin:campaigns:view': '查看活动',
   'admin:campaigns:manage': '管理活动',
+  'admin:campaigns:delete': '删除活动',
+  'admin:qr:view': '查看二维码',
+  'admin:qr:manage': '管理二维码',
+  'admin:qr:delete': '删除二维码',
+  'admin:deeplinks:view': '查看深度链接',
+  'admin:deeplinks:manage': '管理深度链接',
+  'admin:deeplinks:delete': '删除深度链接',
+  'admin:pages:view': '查看页面',
+  'admin:pages:manage': '管理页面',
+  'admin:pages:delete': '删除页面',
+  'admin:comments:view': '查看评论',
+  'admin:comments:manage': '管理评论',
+  'admin:comments:delete': '删除评论',
+  'admin:seo:view': '查看SEO',
+  'admin:seo:manage': '管理SEO',
   'admin:domains:view': '查看域名',
   'admin:domains:manage': '管理域名',
+  'admin:domains:delete': '删除域名',
+  'admin:redirects:view': '查看重定向',
+  'admin:redirects:manage': '管理重定向',
+  'admin:tags:view': '查看标签',
+  'admin:tags:manage': '管理标签',
+  'admin:folders:view': '查看文件夹',
+  'admin:folders:manage': '管理文件夹',
+
+  // 数据与分析
+  'admin:analytics:view': '查看分析',
+  'admin:analytics:export': '导出分析',
+  'admin:realtime:view': '查看实时数据',
+  'admin:abtests:view': '查看A/B测试',
+  'admin:abtests:manage': '管理A/B测试',
+  'admin:goals:view': '查看目标',
+  'admin:goals:manage': '管理目标',
+
+  // 订阅与计费
+  'admin:plans:view': '查看套餐',
+  'admin:plans:manage': '管理套餐',
+  'admin:subscriptions:view': '查看订阅',
+  'admin:subscriptions:manage': '管理订阅',
   'admin:billing:view': '查看计费',
   'admin:billing:manage': '管理计费',
+  'admin:quotas:view': '查看配额',
+  'admin:quotas:manage': '管理配额',
+
+  // 开发者工具
+  'admin:apikeys:view': '查看API密钥',
+  'admin:apikeys:manage': '管理API密钥',
+  'admin:apikeys:revoke': '撤销API密钥',
+  'admin:webhooks:view': '查看Webhook',
+  'admin:webhooks:manage': '管理Webhook',
+  'admin:integrations:view': '查看集成',
+  'admin:integrations:manage': '管理集成',
+
+  // 安全与审计
+  'admin:security:view': '查看安全',
+  'admin:security:manage': '管理安全',
+  'admin:moderation:view': '查看审核',
+  'admin:moderation:manage': '管理审核',
+  'admin:audit:view': '查看审计',
+  'admin:audit:export': '导出审计',
+  'admin:alerts:view': '查看告警',
+  'admin:alerts:manage': '管理告警',
+  'admin:sso:view': '查看SSO',
+  'admin:sso:manage': '管理SSO',
+  'admin:security-scan:view': '查看安全扫描',
+  'admin:security-scan:manage': '管理安全扫描',
+
+  // 模板预设
+  'admin:templates:view': '查看模板',
+  'admin:templates:manage': '管理模板',
+
+  // 系统管理
   'admin:system:view': '查看系统',
   'admin:system:config': '系统配置',
   'admin:system:logs': '查看日志',
@@ -83,21 +172,15 @@ const PERMISSION_LABELS: Record<string, string> = {
   'admin:system:cache': '管理缓存',
   'admin:system:backup': '备份管理',
   'admin:system:maintenance': '维护模式',
+  'admin:automation:view': '查看自动化',
+  'admin:automation:manage': '管理自动化',
   'admin:admins:view': '查看管理员',
   'admin:admins:manage': '管理管理员',
   'admin:admins:delete': '删除管理员',
   'admin:roles:view': '查看角色',
   'admin:roles:manage': '管理角色',
-  'admin:audit:view': '查看审计',
-  'admin:audit:export': '导出审计',
-  'admin:alerts:view': '查看告警',
-  'admin:alerts:manage': '管理告警',
-  'admin:analytics:view': '查看分析',
-  'admin:analytics:export': '导出分析',
-  'admin:integrations:view': '查看集成',
-  'admin:integrations:manage': '管理集成',
-  'admin:webhooks:view': '查看Webhook',
-  'admin:webhooks:manage': '管理Webhook',
+  'admin:notifications:view': '查看通知',
+  'admin:notifications:manage': '管理通知',
 };
 
 const ROLE_COLORS = [
@@ -303,13 +386,16 @@ export default function AdminRolesPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{role.name}</span>
+                      <span className="font-medium">{getRoleDisplayName(role)}</span>
                       {role.isSystem && (
                         <Badge variant="outline" className="gap-1">
                           <Lock className="h-3 w-3" />
                           系统
                         </Badge>
                       )}
+                      <Badge variant="secondary" className="text-xs font-mono">
+                        {role.name}
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {role.description || `${role.permissions.length} 项权限`}

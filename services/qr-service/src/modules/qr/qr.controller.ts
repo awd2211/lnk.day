@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Res, Get, Query, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody, ApiProperty, ApiBearerAuth } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { IsNotEmpty, IsString, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -183,10 +184,15 @@ import { QrLimitService } from './qr-limit.service';
 @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('qr')
 export class QrController {
+  private readonly brandDomain: string;
+
   constructor(
     private readonly qrService: QrService,
     private readonly qrLimitService: QrLimitService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+  }
 
   @Post('generate')
   @RequirePermissions(Permission.QR_CREATE)
@@ -555,13 +561,13 @@ export class QrController {
       return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     };
 
-    const uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@lnk.day`;
+    const uid = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}@${this.brandDomain}`;
     const now = formatDate(new Date().toISOString());
 
     const lines: string[] = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//lnk.day//QR Service//CN',
+      `PRODID:-//${this.brandDomain}//QR Service//CN`,
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',

@@ -23,6 +23,7 @@ import {
   ApiBearerAuth,
   ApiResponse,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import {
   JwtAuthGuard,
@@ -46,7 +47,15 @@ import {
 @UseGuards(JwtAuthGuard, ScopeGuard, PermissionGuard)
 @Controller('dynamic-qr')
 export class DynamicQrController {
-  constructor(private readonly dynamicQrService: DynamicQrService) {}
+  private readonly defaultBaseUrl: string;
+
+  constructor(
+    private readonly dynamicQrService: DynamicQrService,
+    private readonly configService: ConfigService,
+  ) {
+    const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
+    this.defaultBaseUrl = this.configService.get('BASE_URL', `https://${brandDomain}`);
+  }
 
   @Post()
   @RequirePermissions(Permission.QR_CREATE)
@@ -243,10 +252,10 @@ export class DynamicQrController {
   async generateImage(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,
-    @Query('baseUrl') baseUrl: string = 'https://lnk.day',
     @Res() res: Response,
+    @Query('baseUrl') baseUrl?: string,
   ) {
-    const buffer = await this.dynamicQrService.generateQrImage(id, teamId, baseUrl);
+    const buffer = await this.dynamicQrService.generateQrImage(id, teamId, baseUrl || this.defaultBaseUrl);
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', 'inline; filename=dynamic-qr.png');
     res.setHeader('Cache-Control', 'public, max-age=3600');

@@ -41,6 +41,9 @@ import {
   TrendingUp,
   Eye,
   Building2,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -58,17 +61,30 @@ interface FolderItem {
 
 interface FolderStats {
   totalFolders: number;
-  totalLinksInFolders: number;
-  teamsWithFolders: number;
-  avgLinksPerFolder: number;
+  foldersWithLinks: number;
+  averageLinksPerFolder: number;
+  topFolders: any[];
 }
 
 export default function FoldersPage() {
   const [search, setSearch] = useState('');
   const [teamFilter, setTeamFilter] = useState('all');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedFolder, setSelectedFolder] = useState<FolderItem | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const limit = 15;
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   const { data: stats } = useQuery<FolderStats>({
     queryKey: ['folders', 'stats'],
@@ -81,15 +97,17 @@ export default function FoldersPage() {
   });
 
   const { data: foldersData, isLoading } = useQuery({
-    queryKey: ['folders', page, search, teamFilter],
+    queryKey: ['folders', page, search, teamFilter, sortBy, sortOrder],
     queryFn: () =>
       api
         .get('/proxy/folders', {
           params: {
             page,
-            limit: 15,
+            limit,
             search: search || undefined,
             teamId: teamFilter !== 'all' ? teamFilter : undefined,
+            sortBy,
+            sortOrder,
           },
         })
         .then((r) => r.data),
@@ -100,10 +118,10 @@ export default function FoldersPage() {
     setIsDetailDialogOpen(true);
   };
 
-  const folders = foldersData?.data || [];
+  const folders = foldersData?.items || foldersData?.data || [];
   const total = foldersData?.total || 0;
-  const totalPages = Math.ceil(total / 15);
-  const teams = teamsData?.data || [];
+  const totalPages = Math.ceil(total / limit);
+  const teams = teamsData?.items || teamsData?.data || [];
 
   return (
     <div className="space-y-6">
@@ -120,22 +138,13 @@ export default function FoldersPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">已归档链接</CardTitle>
+            <CardTitle className="text-sm font-medium">有链接的文件夹</CardTitle>
             <Link2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats?.totalLinksInFolders?.toLocaleString() || 0}
+              {stats?.foldersWithLinks?.toLocaleString() || 0}
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">使用文件夹的团队</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.teamsWithFolders || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -145,8 +154,17 @@ export default function FoldersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats?.avgLinksPerFolder?.toFixed(1) || 0}
+              {stats?.averageLinksPerFolder?.toFixed(1) || 0}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">热门文件夹</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.topFolders?.length || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -198,12 +216,52 @@ export default function FoldersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>文件夹名称</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('name')}
+                    >
+                      文件夹名称
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead>所属团队</TableHead>
-                  <TableHead>链接数量</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('linkCount')}
+                    >
+                      链接数量
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead>描述</TableHead>
-                  <TableHead>创建时间</TableHead>
-                  <TableHead>更新时间</TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('createdAt')}
+                    >
+                      创建时间
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3 h-8"
+                      onClick={() => handleSort('updatedAt')}
+                    >
+                      更新时间
+                      <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -269,17 +327,43 @@ export default function FoldersPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-muted-foreground">
-                共 {total} 条记录
+                共 {total} 条记录，第 {page} / {totalPages} 页
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
                   上一页
                 </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (page <= 3) {
+                      pageNum = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = page - 2 + i;
+                    }
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -287,6 +371,7 @@ export default function FoldersPage() {
                   disabled={page === totalPages}
                 >
                   下一页
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>

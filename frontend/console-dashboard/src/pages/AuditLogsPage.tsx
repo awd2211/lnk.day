@@ -15,6 +15,7 @@ import {
   ChevronRight,
   RefreshCw,
   Loader2,
+  ArrowUpDown,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -123,7 +124,19 @@ export default function AuditLogsPage() {
   const [actorTypeFilter, setActorTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('7d');
+  const [sortBy, setSortBy] = useState<string>('timestamp');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   // Calculate date range
   const getDateRange = () => {
@@ -202,7 +215,7 @@ export default function AuditLogsPage() {
 
   // Fetch audit logs
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['audit-logs', { search, page, category: categoryFilter, actorType: actorTypeFilter, status: statusFilter, dateRange }],
+    queryKey: ['audit-logs', { search, page, category: categoryFilter, actorType: actorTypeFilter, status: statusFilter, dateRange, sortBy, sortOrder }],
     queryFn: async () => {
       const { startDate, endDate } = getDateRange();
       const res = await auditService.getLogs({
@@ -213,6 +226,8 @@ export default function AuditLogsPage() {
         status: statusFilter !== 'all' ? statusFilter : undefined,
         startDate,
         endDate,
+        sortBy,
+        sortOrder,
       });
       // Transform backend data to frontend format
       const logs = res.data?.logs || res.data?.items || [];
@@ -408,11 +423,43 @@ export default function AuditLogsPage() {
           <table className="w-full">
             <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">时间</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">操作者</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">操作</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('timestamp')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    时间
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('actorName')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    操作者
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('action')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    操作
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">资源</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-gray-700"
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">详情</th>
               </tr>
             </thead>
@@ -500,7 +547,7 @@ export default function AuditLogsPage() {
             <p className="text-sm text-gray-500">
               共 {data.total?.toLocaleString()} 条记录，第 {page} / {data.totalPages} 页
             </p>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -508,15 +555,36 @@ export default function AuditLogsPage() {
                 onClick={() => setPage(page - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
-                上一页
               </Button>
+              {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (data.totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (page <= 3) {
+                  pageNum = i + 1;
+                } else if (page >= data.totalPages - 2) {
+                  pageNum = data.totalPages - 4 + i;
+                } else {
+                  pageNum = page - 2 + i;
+                }
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={page === pageNum ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPage(pageNum)}
+                    className="w-8 px-0"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
               <Button
                 variant="outline"
                 size="sm"
                 disabled={page >= data.totalPages}
                 onClick={() => setPage(page + 1)}
               >
-                下一页
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

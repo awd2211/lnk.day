@@ -13,6 +13,9 @@ import {
   UserMinus,
   Download,
   MoreVertical,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -93,10 +96,23 @@ export default function TeamsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [planFilter, setPlanFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [managingQuota, setManagingQuota] = useState<Team | null>(null);
   const queryClient = useQueryClient();
+  const limit = 20;
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(column);
+      setSortOrder('DESC');
+    }
+    setPage(1);
+  };
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -114,17 +130,22 @@ export default function TeamsPage() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['teams', { page, statusFilter, planFilter }],
+    queryKey: ['teams', { page, statusFilter, planFilter, sortBy, sortOrder }],
     queryFn: () =>
       proxyService
         .getTeams({
           page,
-          limit: 20,
+          limit,
           status: statusFilter !== 'all' ? statusFilter : undefined,
           plan: planFilter !== 'all' ? planFilter : undefined,
+          sortBy,
+          sortOrder,
         })
         .then((res) => res.data),
   });
+
+  const total = data?.total || 0;
+  const totalPages = Math.ceil(total / limit);
 
   const { data: teamDetail } = useQuery({
     queryKey: ['team', selectedTeam?.id],
@@ -352,13 +373,61 @@ export default function TeamsPage() {
           <table className="w-full">
             <thead className="border-b bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">团队</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('name')}
+                  >
+                    团队
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">所有者</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">状态</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">套餐</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">成员</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">链接</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">创建时间</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('status')}
+                  >
+                    状态
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('plan')}
+                  >
+                    套餐
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('memberCount')}
+                  >
+                    成员
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('linkCount')}
+                  >
+                    链接
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500">
+                  <button
+                    className="flex items-center gap-1 hover:text-gray-700"
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    创建时间
+                    <ArrowUpDown className="h-4 w-4" />
+                  </button>
+                </th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-gray-500">操作</th>
               </tr>
             </thead>
@@ -476,27 +545,54 @@ export default function TeamsPage() {
         </div>
 
         {/* Pagination */}
-        {data && data.total > 20 && (
+        {totalPages > 1 && (
           <div className="flex items-center justify-between border-t px-6 py-4">
             <p className="text-sm text-gray-500">
-              第 {page} 页，共 {Math.ceil(data.total / 20)} 页
+              共 {total} 条记录，第 {page} / {totalPages} 页
             </p>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={page === 1}
                 onClick={() => setPage(page - 1)}
               >
+                <ChevronLeft className="h-4 w-4 mr-1" />
                 上一页
               </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (page <= 3) {
+                    pageNum = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = page - 2 + i;
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={page === pageNum ? 'default' : 'outline'}
+                      size="sm"
+                      className="w-8 h-8 p-0"
+                      onClick={() => setPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={page >= Math.ceil(data.total / 20)}
+                disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
               >
                 下一页
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </div>

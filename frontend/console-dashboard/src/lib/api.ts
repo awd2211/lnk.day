@@ -41,6 +41,9 @@ api.interceptors.response.use(
 export const adminAuthService = {
   login: (email: string, password: string, rememberMe = false, twoFactorCode?: string) =>
     api.post('/admin/login', { email, password, rememberMe, twoFactorCode }),
+  sendLoginCode: (email: string) => api.post('/admin/login/send-code', { email }),
+  loginWithCode: (email: string, code: string, rememberMe = false) =>
+    api.post('/admin/login/code', { email, code, rememberMe }),
   forgotPassword: (email: string) => api.post('/admin/forgot-password', { email }),
   resetPassword: (token: string, password: string) =>
     api.post('/admin/reset-password', { token, password }),
@@ -49,14 +52,33 @@ export const adminAuthService = {
   createAdmin: (data: any) => api.post('/admin', data),
   updateAdmin: (id: string, data: any) => api.put(`/admin/${id}`, data),
   deleteAdmin: (id: string) => api.delete(`/admin/${id}`),
+  resetAdminPassword: (id: string) => api.post(`/admin/${id}/reset-password`),
+  getAdminLoginHistory: (id: string) => api.get(`/admin/${id}/login-history`),
+  toggleAdminStatus: (id: string) => api.patch(`/admin/${id}/toggle-status`),
 };
 
 // Admin Profile Management
 export const profileService = {
   getProfile: () => api.get('/admin/me'),
-  updateProfile: (data: { name?: string; email?: string }) => api.put('/admin/me', data),
+  updateProfile: (data: { name?: string }) => api.put('/admin/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     api.put('/admin/me/password', data),
+
+  // Email Verification (for current email)
+  sendEmailVerification: () => api.post('/admin/me/email/send-verification'),
+  verifyEmail: (token: string) => api.post('/admin/email/verify', { token }),
+
+  // Secure Email Change Flow
+  // Step 1: Request email change (sends code to old email)
+  requestEmailChange: (newEmail: string) => api.post('/admin/me/email/request-change', { newEmail }),
+  // Step 2: Verify old email code
+  verifyOldEmailForChange: (code: string) => api.post('/admin/me/email/verify-old', { code }),
+  // Resend verification code to old email
+  resendEmailChangeCode: () => api.post('/admin/me/email/resend-code'),
+  // Resend new email verification link
+  resendNewEmailVerification: () => api.post('/admin/me/email/resend-new-verification'),
+  // Cancel pending email change
+  cancelPendingEmailChange: () => api.delete('/admin/me/email/pending'),
 
   // Two-Factor Authentication
   setupTwoFactor: () => api.post('/admin/me/2fa/setup'),
@@ -105,7 +127,7 @@ export const systemService = {
 // Proxy to other services
 export const proxyService = {
   // Users
-  getUsers: (params?: { page?: number; limit?: number; search?: string; status?: string; plan?: string }) =>
+  getUsers: (params?: { page?: number; limit?: number; search?: string; status?: string; plan?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/users', { params }),
   getUser: (id: string) => api.get(`/proxy/users/${id}`),
   updateUser: (id: string, data: any) => api.put(`/proxy/users/${id}`, data),
@@ -121,7 +143,7 @@ export const proxyService = {
   resetUserPassword: (id: string) => api.post(`/proxy/users/${id}/reset-password`),
 
   // Teams
-  getTeams: (params?: { page?: number; limit?: number; status?: string; plan?: string }) =>
+  getTeams: (params?: { page?: number; limit?: number; status?: string; plan?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/teams', { params }),
   getTeam: (id: string) => api.get(`/proxy/teams/${id}`),
   updateTeam: (id: string, data: any) => api.put(`/proxy/teams/${id}`, data),
@@ -174,6 +196,8 @@ export const subscriptionsService = {
     plan?: string;
     status?: string;
     search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
   }) => api.get('/proxy/subscriptions', { params }),
   getSubscription: (id: string) => api.get(`/proxy/subscriptions/${id}`),
   changePlan: (id: string, data: { plan: string; billingCycle: 'monthly' | 'yearly' }) =>
@@ -232,6 +256,8 @@ export const auditService = {
     status?: string;
     startDate?: string;
     endDate?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
   }) => api.get('/audit/logs', { params }),
   getLog: (id: string) => api.get(`/audit/logs/${id}`),
   exportLogs: (params?: {
@@ -286,7 +312,7 @@ export const apiKeysService = {
 // Webhooks
 export const webhooksService = {
   getStats: () => api.get('/proxy/webhooks/stats'),
-  getWebhooks: (params?: { page?: number; limit?: number; teamId?: string; status?: string }) =>
+  getWebhooks: (params?: { page?: number; limit?: number; teamId?: string; status?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/webhooks', { params }),
   getWebhook: (id: string) => api.get(`/proxy/webhooks/${id}`),
   updateWebhook: (id: string, data: any) => api.put(`/proxy/webhooks/${id}`, data),
@@ -300,7 +326,7 @@ export const webhooksService = {
 // Domains
 export const domainsService = {
   getStats: () => api.get('/proxy/domains/stats'),
-  getDomains: (params?: { page?: number; limit?: number; status?: string }) =>
+  getDomains: (params?: { page?: number; limit?: number; status?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/domains', { params }),
   getDomain: (id: string) => api.get(`/proxy/domains/${id}`),
   updateDomain: (id: string, data: { status?: string }) => api.patch(`/proxy/domains/${id}`, data),
@@ -323,7 +349,7 @@ export const qrCodesService = {
 // Deep Links
 export const deepLinksService = {
   getStats: () => api.get('/proxy/deeplinks/stats'),
-  getDeepLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string }) =>
+  getDeepLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/deeplinks', { params }),
   getDeepLink: (id: string) => api.get(`/proxy/deeplinks/${id}`),
   deleteDeepLink: (id: string) => api.delete(`/proxy/deeplinks/${id}`),
@@ -335,7 +361,7 @@ export const deepLinksService = {
 // Landing Pages
 export const landingPagesService = {
   getStats: () => api.get('/proxy/pages/stats'),
-  getPages: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }) =>
+  getPages: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/pages', { params }),
   getPage: (id: string) => api.get(`/proxy/pages/${id}`),
   deletePage: (id: string) => api.delete(`/proxy/pages/${id}`),
@@ -421,16 +447,19 @@ export const notificationsService = {
   // Channels
   getChannels: () => api.get('/proxy/notifications/channels'),
   getChannel: (id: string) => api.get(`/proxy/notifications/channels/${id}`),
+  createChannel: (data: { type: string; name: string; config: Record<string, any> }) =>
+    api.post('/proxy/notifications/channels', data),
   updateChannel: (id: string, data: any) => api.put(`/proxy/notifications/channels/${id}`, data),
   toggleChannel: (id: string, enabled: boolean) =>
     api.patch(`/proxy/notifications/channels/${id}`, { enabled }),
-  testChannel: (id: string) => api.post(`/proxy/notifications/channels/${id}/test`),
+  testChannel: (id: string, recipient?: string) =>
+    api.post(`/proxy/notifications/channels/${id}/test`, recipient ? { recipient } : {}),
 };
 
 // Campaigns
 export const campaignsService = {
   getStats: () => api.get('/proxy/campaigns/stats'),
-  getCampaigns: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string }) =>
+  getCampaigns: (params?: { page?: number; limit?: number; status?: string; type?: string; teamId?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/campaigns', { params }),
   getCampaign: (id: string) => api.get(`/proxy/campaigns/${id}`),
   deleteCampaign: (id: string) => api.delete(`/proxy/campaigns/${id}`),
@@ -442,7 +471,7 @@ export const campaignsService = {
 // Links (Admin)
 export const linksService = {
   getStats: () => api.get('/proxy/links/stats'),
-  getLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string; search?: string }) =>
+  getLinks: (params?: { page?: number; limit?: number; status?: string; teamId?: string; search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }) =>
     api.get('/proxy/links', { params }),
   getLink: (id: string) => api.get(`/proxy/links/${id}`),
   deleteLink: (id: string) => api.delete(`/proxy/links/${id}`),

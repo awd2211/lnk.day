@@ -45,6 +45,13 @@ export class TeamMember {
   @JoinColumn({ name: 'customRoleId' })
   customRole?: CustomRole;
 
+  /**
+   * 权限版本号（用于实时失效 Token）
+   * 当成员角色或权限变更时递增，旧 Token 将失效
+   */
+  @Column({ name: 'permission_version', default: 1 })
+  permissionVersion: number;
+
   @CreateDateColumn()
   joinedAt: Date;
 

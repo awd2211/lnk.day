@@ -18,6 +18,8 @@ export interface EmailSettings {
 export class SystemConfigService {
   private readonly logger = new Logger(SystemConfigService.name);
   private readonly notificationServiceUrl: string;
+  private readonly brandName: string;
+  private readonly brandDomain: string;
 
   constructor(
     @InjectRepository(SystemConfig)
@@ -26,6 +28,8 @@ export class SystemConfigService {
     private readonly configService: ConfigService,
   ) {
     this.notificationServiceUrl = this.configService.get('NOTIFICATION_SERVICE_URL', 'http://localhost:60020');
+    this.brandName = this.configService.get('BRAND_NAME', 'lnk.day');
+    this.brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
   }
 
   async getConfig(key: string): Promise<SystemConfig | null> {
@@ -65,8 +69,8 @@ export class SystemConfigService {
       // Return defaults from environment
       return {
         provider: (this.configService.get('EMAIL_PROVIDER', 'smtp') as EmailProvider),
-        fromEmail: this.configService.get('EMAIL_FROM', 'noreply@lnk.day'),
-        fromName: this.configService.get('EMAIL_FROM_NAME', 'lnk.day'),
+        fromEmail: this.configService.get('EMAIL_FROM', `noreply@${this.brandDomain}`),
+        fromName: this.configService.get('EMAIL_FROM_NAME', this.brandName),
         smtp: {
           host: this.configService.get('SMTP_HOST', ''),
           port: parseInt(this.configService.get('SMTP_PORT', '587'), 10),
@@ -101,8 +105,8 @@ export class SystemConfigService {
     // Merge with existing, preserving secrets if not provided
     const merged: EmailSettings = {
       provider: settings.provider ?? currentValue.provider ?? 'smtp',
-      fromEmail: settings.fromEmail ?? currentValue.fromEmail ?? 'noreply@lnk.day',
-      fromName: settings.fromName ?? currentValue.fromName ?? 'lnk.day',
+      fromEmail: settings.fromEmail ?? currentValue.fromEmail ?? `noreply@${this.brandDomain}`,
+      fromName: settings.fromName ?? currentValue.fromName ?? this.brandName,
       smtp: {
         host: settings.smtp?.host ?? currentValue.smtp?.host ?? '',
         port: settings.smtp?.port ?? currentValue.smtp?.port ?? 587,
@@ -204,16 +208,17 @@ export class SystemConfigService {
   }
 
   private getDefaultEmailTemplates(): Record<string, { subject: string; html: string }> {
+    const brand = this.brandName;
     return {
       welcome: {
-        subject: '欢迎加入 lnk.day, {{name}}!',
+        subject: `欢迎加入 ${brand}, {{name}}!`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-  <h1 style="color: #1a1a1a;">欢迎加入 lnk.day, {{name}}!</h1>
+  <h1 style="color: #1a1a1a;">欢迎加入 ${brand}, {{name}}!</h1>
   <p style="color: #666;">感谢您注册我们的服务。</p>
 </div>`,
       },
       'password-reset': {
-        subject: '重置密码 - lnk.day',
+        subject: `重置密码 - ${brand}`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #1a1a1a;">重置密码</h1>
   <p style="color: #666;">点击下面的链接重置您的密码：</p>
@@ -240,25 +245,25 @@ export class SystemConfigService {
 </div>`,
       },
       'weekly-report': {
-        subject: 'lnk.day 周报 - 您的链接表现如何？',
+        subject: `${brand} 周报 - 您的链接表现如何？`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-  <h1 style="color: #1a1a1a;">lnk.day 周报</h1>
+  <h1 style="color: #1a1a1a;">${brand} 周报</h1>
   <p style="color: #666;">本周总点击量：{{totalClicks}}</p>
   <p style="color: #666;">增长率：{{growth}}%</p>
 </div>`,
       },
       'security-alert': {
-        subject: '安全提醒 - lnk.day',
+        subject: `安全提醒 - ${brand}`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
   <h1 style="color: #dc2626;">⚠️ 安全提醒</h1>
   <p style="color: #666;">检测到 {{alertType}}：{{details}}</p>
 </div>`,
       },
       test: {
-        subject: 'lnk.day 测试邮件',
+        subject: `${brand} 测试邮件`,
         html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="text-align: center; margin-bottom: 30px;">
-    <h1 style="color: #2563eb; margin: 0;">lnk.day</h1>
+    <h1 style="color: #2563eb; margin: 0;">${brand}</h1>
   </div>
   <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 20px;">
     <h2 style="color: #1a1a1a; margin-top: 0;">✅ 测试邮件</h2>
@@ -280,8 +285,8 @@ export class SystemConfigService {
       // Return defaults from environment
       return {
         provider: (this.configService.get('EMAIL_PROVIDER', 'smtp') as EmailProvider),
-        fromEmail: this.configService.get('EMAIL_FROM', 'noreply@lnk.day'),
-        fromName: this.configService.get('EMAIL_FROM_NAME', 'lnk.day'),
+        fromEmail: this.configService.get('EMAIL_FROM', `noreply@${this.brandDomain}`),
+        fromName: this.configService.get('EMAIL_FROM_NAME', this.brandName),
         smtp: {
           host: this.configService.get('SMTP_HOST', ''),
           port: parseInt(this.configService.get('SMTP_PORT', '587'), 10),

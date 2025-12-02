@@ -13,6 +13,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AutomationService } from './automation.service';
+import { SchedulerService } from './scheduler.service';
 import { CreateAutomationWorkflowDto } from './dto/create-automation-workflow.dto';
 import { UpdateAutomationWorkflowDto } from './dto/update-automation-workflow.dto';
 import { TriggerType } from './entities/automation-workflow.entity';
@@ -22,7 +23,10 @@ import { TriggerType } from './entities/automation-workflow.entity';
 @UseGuards(AuthGuard('jwt'))
 @ApiBearerAuth()
 export class AutomationController {
-  constructor(private readonly automationService: AutomationService) {}
+  constructor(
+    private readonly automationService: AutomationService,
+    private readonly schedulerService: SchedulerService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: '获取自动化工作流列表' })
@@ -48,6 +52,12 @@ export class AutomationController {
     return this.automationService.getStats();
   }
 
+  @Get('scheduled-jobs')
+  @ApiOperation({ summary: '获取定时任务状态' })
+  async getScheduledJobs() {
+    return this.schedulerService.getScheduledJobsStatus();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '获取单个自动化工作流' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -57,7 +67,12 @@ export class AutomationController {
   @Post()
   @ApiOperation({ summary: '创建自动化工作流' })
   async create(@Body() dto: CreateAutomationWorkflowDto) {
-    return this.automationService.create(dto);
+    const workflow = await this.automationService.create(dto);
+    // 如果是定时任务类型，需要注册到调度器
+    if (dto.trigger?.type === 'schedule' && dto.enabled !== false) {
+      await this.schedulerService.scheduleWorkflow(workflow);
+    }
+    return workflow;
   }
 
   @Put(':id')
@@ -66,12 +81,17 @@ export class AutomationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAutomationWorkflowDto,
   ) {
-    return this.automationService.update(id, dto);
+    const workflow = await this.automationService.update(id, dto);
+    // 重新加载调度器
+    await this.schedulerService.reloadWorkflow(id);
+    return workflow;
   }
 
   @Delete(':id')
   @ApiOperation({ summary: '删除自动化工作流' })
   async remove(@Param('id', ParseUUIDPipe) id: string) {
+    // 先从调度器中移除
+    await this.schedulerService.unscheduleWorkflow(id);
     await this.automationService.remove(id);
     return { success: true };
   }
@@ -79,7 +99,10 @@ export class AutomationController {
   @Post(':id/toggle')
   @ApiOperation({ summary: '切换工作流启用状态' })
   async toggleEnabled(@Param('id', ParseUUIDPipe) id: string) {
-    return this.automationService.toggleEnabled(id);
+    const workflow = await this.automationService.toggleEnabled(id);
+    // 重新加载调度器
+    await this.schedulerService.reloadWorkflow(id);
+    return workflow;
   }
 
   @Post(':id/duplicate')

@@ -47,6 +47,95 @@ export class FolderService {
     });
   }
 
+  // Admin method - get all folders across all teams
+  async findAllAdmin(options?: {
+    page?: number;
+    limit?: number;
+    teamId?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC';
+  }): Promise<{ items: Folder[]; total: number; page: number; limit: number; totalPages: number }> {
+    const page = options?.page || 1;
+    const limit = options?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.folderRepository.createQueryBuilder('folder');
+
+    if (options?.teamId) {
+      queryBuilder.andWhere('folder.teamId = :teamId', { teamId: options.teamId });
+    }
+
+    if (options?.search) {
+      queryBuilder.andWhere('folder.name ILIKE :search', { search: `%${options.search}%` });
+    }
+
+    // Handle sorting
+    if (options?.sortBy) {
+      const sortColumn = this.getSortColumn(options.sortBy);
+      queryBuilder.orderBy(`folder.${sortColumn}`, options.sortOrder || 'DESC');
+    } else {
+      queryBuilder.orderBy('folder.createdAt', 'DESC');
+    }
+
+    const [items, total] = await queryBuilder
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  private getSortColumn(sortBy: string): string {
+    const sortMap: Record<string, string> = {
+      name: 'name',
+      linkCount: 'linkCount',
+      teamId: 'teamId',
+      createdAt: 'createdAt',
+      updatedAt: 'updatedAt',
+      sortOrder: 'sortOrder',
+    };
+    return sortMap[sortBy] || 'createdAt';
+  }
+
+  // Admin method - get folder statistics
+  async getStats(): Promise<{
+    totalFolders: number;
+    foldersWithLinks: number;
+    averageLinksPerFolder: number;
+    topFolders: any[];
+  }> {
+    const totalFolders = await this.folderRepository.count();
+    const foldersWithLinks = await this.folderRepository.count({
+      where: { linkCount: 1 }, // This is approximate, we need > 0
+    });
+
+    // Get folders with linkCount > 0
+    const foldersWithLinksCount = await this.folderRepository
+      .createQueryBuilder('folder')
+      .where('folder.linkCount > 0')
+      .getCount();
+
+    // Calculate average
+    const result = await this.folderRepository
+      .createQueryBuilder('folder')
+      .select('AVG(folder.linkCount)', 'avg')
+      .getRawOne();
+
+    // Get top folders by link count
+    const topFolders = await this.folderRepository.find({
+      order: { linkCount: 'DESC' },
+      take: 10,
+    });
+
+    return {
+      totalFolders,
+      foldersWithLinks: foldersWithLinksCount,
+      averageLinksPerFolder: parseFloat(result?.avg) || 0,
+      topFolders,
+    };
+  }
+
   async findTree(teamId: string): Promise<Folder[]> {
     // Get root folders (no parent)
     const rootFolders = await this.folderRepository.find({
