@@ -327,7 +327,7 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAsRead = (ids: string[]) => {
-    if (ids.length === 1) {
+    if (ids.length === 1 && ids[0]) {
       markAsReadMutation.mutate(ids[0]);
     } else {
       markMultipleAsReadMutation.mutate(ids);
@@ -339,7 +339,7 @@ export default function NotificationsPage() {
   };
 
   const handleDelete = (ids: string[]) => {
-    if (ids.length === 1) {
+    if (ids.length === 1 && ids[0]) {
       deleteMutation.mutate(ids[0]);
     } else {
       deleteMultipleMutation.mutate(ids);
@@ -375,31 +375,33 @@ export default function NotificationsPage() {
   const isAllSelected = filteredNotifications.length > 0 && selectedNotifications.length === filteredNotifications.length;
 
   return (
-    <Layout
-      title="通知中心"
-      description="查看和管理您的所有通知"
-      actions={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleMarkAllAsRead}
-            disabled={markAllAsReadMutation.isPending || unreadCount === 0}
-          >
-            {markAllAsReadMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCheck className="mr-2 h-4 w-4" />
-            )}
-            全部已读
-          </Button>
-          <Button variant="outline" onClick={() => setShowSettings(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            通知设置
-          </Button>
-        </div>
-      }
-    >
+    <Layout>
       <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">通知中心</h1>
+            <p className="text-muted-foreground">查看和管理您的所有通知</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleMarkAllAsRead}
+              disabled={markAllAsReadMutation.isPending || unreadCount === 0}
+            >
+              {markAllAsReadMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCheck className="mr-2 h-4 w-4" />
+              )}
+              全部已读
+            </Button>
+            <Button variant="outline" onClick={() => setShowSettings(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              通知设置
+            </Button>
+          </div>
+        </div>
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
           <div className="rounded-lg border bg-card p-4">

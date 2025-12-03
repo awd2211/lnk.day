@@ -7,6 +7,7 @@ import { OAuthAccount } from './oauth-account.entity';
 import { OAuthService } from './oauth.service';
 import { OAuthController } from './oauth.controller';
 import { UserModule } from '../../user/user.module';
+import { SecurityModule } from '../../security/security.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UserModule } from '../../user/user.module';
       },
     }),
     forwardRef(() => UserModule),
+    SecurityModule,
   ],
   controllers: [OAuthController],
   providers: [OAuthService],

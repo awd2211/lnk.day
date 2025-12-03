@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 
 interface User {
@@ -9,6 +10,7 @@ interface User {
   avatar?: string;
   teamId: string;
   role?: 'owner' | 'admin' | 'member' | 'viewer';
+  emailVerified?: boolean;
   emailVerifiedAt?: string | null;
 }
 
@@ -18,6 +20,8 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  sendLoginCode: (email: string) => Promise<{ message: string; code?: string }>;
+  loginWithCode: (email: string, code: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (data: Partial<User>) => void;
@@ -27,6 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +86,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
+  const sendLoginCode = async (email: string): Promise<{ message: string; code?: string }> => {
+    const { data } = await api.post('/api/v1/auth/send-login-code', { email });
+    return data;
+  };
+
+  const loginWithCode = async (email: string, code: string) => {
+    // 登录前清除旧的缓存数据
+    queryClient.clear();
+
+    const { data } = await api.post('/api/v1/auth/verify-login-code', { email, code });
+    localStorage.setItem('token', data.accessToken);
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken);
+    }
+    if (data.user?.teamId) {
+      localStorage.setItem('teamId', data.user.teamId);
+    }
+    setToken(data.accessToken);
+    setUser(data.user);
+  };
+
   const register = async (name: string, email: string, password: string) => {
     const { data } = await api.post('/api/v1/auth/register', { name, email, password });
     localStorage.setItem('token', data.accessToken);
@@ -94,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('cachedUserId');
@@ -103,7 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     // 清除所有 React Query 缓存，确保切换账户时不会看到旧数据
     queryClient.clear();
-  };
+    // 强制导航到登录页面
+    navigate('/login', { replace: true });
+  }, [queryClient, navigate]);
 
   const updateUser = (data: Partial<User>) => {
     if (user) {
@@ -119,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        sendLoginCode,
+        loginWithCode,
         register,
         logout,
         updateUser,

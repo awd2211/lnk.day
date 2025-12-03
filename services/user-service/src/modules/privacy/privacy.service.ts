@@ -486,26 +486,8 @@ export class PrivacyService implements OnModuleInit, OnModuleDestroy {
 
   private async sendRequestConfirmationEmail(user: User, request: DataRequest): Promise<void> {
     try {
-      let subject = '';
-      let template = '';
-
-      switch (request.type) {
-        case DataRequestType.DELETE:
-          subject = '账户删除请求确认 - lnk.day';
-          template = 'deletion-request';
-          break;
-        case DataRequestType.EXPORT:
-          subject = '数据导出请求已收到 - lnk.day';
-          template = 'export-request';
-          break;
-        default:
-          subject = '数据请求已收到 - lnk.day';
-          template = 'data-request';
-      }
-
       await this.emailService.sendPrivacyRequestEmail(
         user.email,
-        subject,
         request.type,
         request.coolingPeriodEndsAt,
       );

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { securityService } from '@/lib/api';
+import { linkSecurityService } from '@/lib/api';
 
 export type SecurityRiskLevel = 'safe' | 'low' | 'medium' | 'high' | 'critical' | 'unknown';
 
@@ -43,7 +43,7 @@ export function useSecurityAnalysis(url: string | null) {
     queryKey: ['security', 'analyze', url],
     queryFn: async () => {
       if (!url) return null;
-      const { data } = await securityService.analyze(url);
+      const { data } = await linkSecurityService.analyze(url);
       return data as SecurityScanResult;
     },
     enabled: !!url,
@@ -57,7 +57,7 @@ export function useSecurityQuickCheck(url: string | null, options?: { enabled?: 
     queryKey: ['security', 'quick-check', url],
     queryFn: async () => {
       if (!url) return null;
-      const { data } = await securityService.quickCheck(url);
+      const { data } = await linkSecurityService.quickCheck(url);
       return data as { riskLevel: SecurityRiskLevel; score: number };
     },
     enabled: options?.enabled !== false && !!url,
@@ -71,7 +71,7 @@ export function useSecurityHistory(url: string | null, limit?: number) {
     queryKey: ['security', 'history', url, limit],
     queryFn: async () => {
       if (!url) return [];
-      const { data } = await securityService.getScanHistory(url, limit);
+      const { data } = await linkSecurityService.getScanHistory(url, limit);
       return data as SecurityScanResult[];
     },
     enabled: !!url,
@@ -83,7 +83,7 @@ export function useSecurityStats() {
   return useQuery({
     queryKey: ['security', 'stats'],
     queryFn: async () => {
-      const { data } = await securityService.getStats();
+      const { data } = await linkSecurityService.getStats();
       return data as SecurityStats;
     },
   });
@@ -95,7 +95,7 @@ export function useAnalyzeUrl() {
 
   return useMutation({
     mutationFn: async (url: string) => {
-      const { data } = await securityService.analyze(url);
+      const { data } = await linkSecurityService.analyze(url);
       return data as SecurityScanResult;
     },
     onSuccess: (result) => {
@@ -108,7 +108,7 @@ export function useAnalyzeUrl() {
 export function useBatchSecurityScan() {
   return useMutation({
     mutationFn: async (urls: string[]) => {
-      const { data } = await securityService.batchScan(urls);
+      const { data } = await linkSecurityService.batchScan(urls);
       return data as SecurityScanResult[];
     },
   });
@@ -194,7 +194,7 @@ export function useSuspendedLinks(options?: { limit?: number; offset?: number })
   return useQuery({
     queryKey: ['security', 'suspended-links', options],
     queryFn: async () => {
-      const { data } = await securityService.getSuspendedLinks(options);
+      const { data } = await linkSecurityService.getSuspendedLinks(options);
       return data as { links: SuspendedLink[]; total: number };
     },
   });
@@ -208,7 +208,7 @@ export function useReinstateLink() {
 
   return useMutation({
     mutationFn: async ({ linkId, reason }: { linkId: string; reason: string }) => {
-      const { data } = await securityService.reinstateLink(linkId, reason);
+      const { data } = await linkSecurityService.reinstateLink(linkId, reason);
       return data as SuspendedLink;
     },
     onSuccess: () => {
@@ -226,7 +226,7 @@ export function useCheckAndHandleUrl() {
 
   return useMutation({
     mutationFn: async (url: string) => {
-      const { data } = await securityService.checkAndHandle(url);
+      const { data } = await linkSecurityService.checkAndHandle(url);
       return data as {
         analysis: SecurityScanResult;
         actions?: string[];

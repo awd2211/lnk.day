@@ -107,11 +107,13 @@ func (h *RedirectHandler) Redirect(c *fiber.Ctx) error {
 	userAgent := c.Get("User-Agent")
 	referer := c.Get("Referer")
 	linkID := link.ID
+	teamID := link.TeamID
 
 	// Track click asynchronously
 	go func() {
 		event := &model.ClickEvent{
 			LinkID:       linkID,
+			TeamID:       teamID,
 			ShortCode:    code,
 			IP:           ip,
 			UserAgent:    userAgent,

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TemplatesController } from './templates.controller';
+import { PublicTemplatesController } from './public-templates.controller';
 import { TemplatesService } from './templates.service';
 import {
   LinkTemplatePreset,
@@ -30,7 +31,7 @@ import {
       ReportTemplatePreset,
     ]),
   ],
-  controllers: [TemplatesController],
+  controllers: [TemplatesController, PublicTemplatesController],
   providers: [TemplatesService],
   exports: [TemplatesService],
 })

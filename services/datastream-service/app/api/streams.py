@@ -55,6 +55,39 @@ async def list_streams(x_team_id: str = Header(...)):
     return streams
 
 
+# NOTE: /stats must be defined BEFORE /{stream_id} to avoid route collision
+@router.get("/stats")
+async def get_global_stats(x_team_id: str = Header(...)):
+    """
+    获取全局数据流统计
+
+    获取当前团队所有数据流的汇总统计信息。
+    """
+    streams = await stream_service.list_streams(x_team_id)
+
+    total_streams = len(streams)
+    active_streams = len([s for s in streams if s.status == "active"])
+
+    total_events = 0
+    total_bytes = 0
+    total_failures = 0
+
+    for stream in streams:
+        stats = await stream_service.get_stats(stream.id)
+        if stats:
+            total_events += stats.events_delivered
+            total_bytes += stats.bytes_delivered
+            total_failures += stats.failed_deliveries
+
+    return {
+        "totalStreams": total_streams,
+        "activeStreams": active_streams,
+        "eventsToday": total_events,
+        "bytesToday": total_bytes,
+        "failuresLast24h": total_failures,
+    }
+
+
 @router.get("/{stream_id}", response_model=DataStream)
 async def get_stream(stream_id: str, x_team_id: str = Header(...)):
     """
@@ -180,39 +213,7 @@ async def test_connection(stream_id: str, x_team_id: str = Header(...)):
     return result
 
 
-# ========== Statistics ==========
-
-
-@router.get("/stats")
-async def get_global_stats(x_team_id: str = Header(...)):
-    """
-    获取全局数据流统计
-
-    获取当前团队所有数据流的汇总统计信息。
-    """
-    streams = await stream_service.list_streams(x_team_id)
-
-    total_streams = len(streams)
-    active_streams = len([s for s in streams if s.status == "active"])
-
-    total_events = 0
-    total_bytes = 0
-    total_failures = 0
-
-    for stream in streams:
-        stats = await stream_service.get_stats(stream.id)
-        if stats:
-            total_events += stats.events_delivered
-            total_bytes += stats.bytes_delivered
-            total_failures += stats.failed_deliveries
-
-    return {
-        "totalStreams": total_streams,
-        "activeStreams": active_streams,
-        "eventsToday": total_events,
-        "bytesToday": total_bytes,
-        "failuresLast24h": total_failures,
-    }
+# ========== Stream Statistics ==========
 
 
 @router.get("/{stream_id}/stats", response_model=StreamStats)

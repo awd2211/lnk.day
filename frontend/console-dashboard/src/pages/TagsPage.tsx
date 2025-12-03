@@ -28,6 +28,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -95,6 +105,7 @@ export default function TagsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTag, setSelectedTag] = useState<PlatformTag | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PlatformTag | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     color: '#3b82f6',
@@ -156,6 +167,7 @@ export default function TagsPage() {
     onSuccess: () => {
       toast.success('标签删除成功');
       queryClient.invalidateQueries({ queryKey: ['tags'] });
+      setDeleteTarget(null);
     },
     onError: () => toast.error('删除失败'),
   });
@@ -377,11 +389,7 @@ export default function TagsPage() {
                             variant="ghost"
                             size="icon"
                             className="text-destructive"
-                            onClick={() => {
-                              if (confirm('确定删除此标签？')) {
-                                deleteMutation.mutate(tag.id);
-                              }
-                            }}
+                            onClick={() => setDeleteTarget(tag)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -603,6 +611,27 @@ export default function TagsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除标签</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除标签 "{deleteTarget?.name}" 吗？已使用此标签的链接将失去该标签关联。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -11,8 +11,10 @@ import {
 } from './entities/security-event.entity';
 import { BlockedIp } from './entities/blocked-ip.entity';
 import { SecuritySettings } from './entities/security-settings.entity';
+import { UserSecuritySettings } from './entities/user-security-settings.entity';
 import { CreateBlockedIpDto } from './dto/create-blocked-ip.dto';
 import { UpdateSecuritySettingsDto } from './dto/update-security-settings.dto';
+import { UpdateUserSecuritySettingsDto } from './dto/update-user-security-settings.dto';
 
 export interface CreateSessionDto {
   userId: string;
@@ -51,6 +53,8 @@ export class SecurityService {
     private readonly blockedIpRepo: Repository<BlockedIp>,
     @InjectRepository(SecuritySettings)
     private readonly settingsRepo: Repository<SecuritySettings>,
+    @InjectRepository(UserSecuritySettings)
+    private readonly userSettingsRepo: Repository<UserSecuritySettings>,
   ) {}
 
   // ========== Session Management ==========
@@ -591,5 +595,77 @@ export class SecurityService {
     if (settings.auditLogRetentionDays >= 30) score += 5;
 
     return Math.min(100, Math.max(0, score));
+  }
+
+  // ========== User Security Settings ==========
+
+  async getUserSecuritySettings(userId: string): Promise<UserSecuritySettings> {
+    let settings = await this.userSettingsRepo.findOne({ where: { userId } });
+
+    if (!settings) {
+      // Create default settings if not exists
+      settings = this.userSettingsRepo.create({
+        userId,
+        loginNotifications: true,
+        suspiciousActivityAlerts: true,
+        sessionTimeoutDays: 7,
+        ipWhitelistEnabled: false,
+        ipWhitelist: [],
+      });
+      settings = await this.userSettingsRepo.save(settings);
+      this.logger.log(`Created default security settings for user ${userId}`);
+    }
+
+    return settings;
+  }
+
+  async updateUserSecuritySettings(
+    userId: string,
+    dto: UpdateUserSecuritySettingsDto,
+  ): Promise<UserSecuritySettings> {
+    const settings = await this.getUserSecuritySettings(userId);
+
+    // Update fields if provided
+    if (dto.loginNotifications !== undefined) {
+      settings.loginNotifications = dto.loginNotifications;
+    }
+    if (dto.suspiciousActivityAlerts !== undefined) {
+      settings.suspiciousActivityAlerts = dto.suspiciousActivityAlerts;
+    }
+    if (dto.sessionTimeoutDays !== undefined) {
+      settings.sessionTimeoutDays = dto.sessionTimeoutDays;
+    }
+    if (dto.ipWhitelistEnabled !== undefined) {
+      settings.ipWhitelistEnabled = dto.ipWhitelistEnabled;
+    }
+    if (dto.ipWhitelist !== undefined) {
+      settings.ipWhitelist = dto.ipWhitelist;
+    }
+
+    return this.userSettingsRepo.save(settings);
+  }
+
+  async addIpToWhitelist(userId: string, ip: string): Promise<UserSecuritySettings> {
+    const settings = await this.getUserSecuritySettings(userId);
+
+    if (!settings.ipWhitelist) {
+      settings.ipWhitelist = [];
+    }
+
+    if (!settings.ipWhitelist.includes(ip)) {
+      settings.ipWhitelist.push(ip);
+    }
+
+    return this.userSettingsRepo.save(settings);
+  }
+
+  async removeIpFromWhitelist(userId: string, ip: string): Promise<UserSecuritySettings> {
+    const settings = await this.getUserSecuritySettings(userId);
+
+    if (settings.ipWhitelist) {
+      settings.ipWhitelist = settings.ipWhitelist.filter(item => item !== ip);
+    }
+
+    return this.userSettingsRepo.save(settings);
   }
 }

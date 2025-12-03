@@ -283,14 +283,14 @@ export default function AuditLogPage() {
                   </div>
 
                   <Select
-                    value={filters.resourceType || ''}
-                    onValueChange={(value) => handleFilterChange('resourceType', value)}
+                    value={filters.resourceType || 'all'}
+                    onValueChange={(value) => handleFilterChange('resourceType', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="资源类型" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全部</SelectItem>
+                      <SelectItem value="all">全部</SelectItem>
                       {Object.entries(resourceTypeLabels).map(([value, label]) => (
                         <SelectItem key={value} value={value}>{label}</SelectItem>
                       ))}
@@ -298,28 +298,28 @@ export default function AuditLogPage() {
                   </Select>
 
                   <Select
-                    value={filters.status || ''}
-                    onValueChange={(value) => handleFilterChange('status', value)}
+                    value={filters.status || 'all'}
+                    onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="状态" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全部</SelectItem>
+                      <SelectItem value="all">全部</SelectItem>
                       <SelectItem value="success">成功</SelectItem>
                       <SelectItem value="failure">失败</SelectItem>
                     </SelectContent>
                   </Select>
 
                   <Select
-                    value={filters.severity || ''}
-                    onValueChange={(value) => handleFilterChange('severity', value)}
+                    value={filters.severity || 'all'}
+                    onValueChange={(value) => handleFilterChange('severity', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="级别" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全部</SelectItem>
+                      <SelectItem value="all">全部</SelectItem>
                       <SelectItem value="info">信息</SelectItem>
                       <SelectItem value="warning">警告</SelectItem>
                       <SelectItem value="critical">严重</SelectItem>

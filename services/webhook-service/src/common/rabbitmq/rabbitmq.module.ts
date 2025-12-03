@@ -1,13 +1,14 @@
-import { Module, Global, Logger } from '@nestjs/common';
+import { Module, Global, Logger, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as amqplib from 'amqplib';
 import { RABBITMQ_CONNECTION, RABBITMQ_CHANNEL } from './rabbitmq.constants';
 import { WebhookEventConsumer } from './webhook-event.consumer';
 import { EXCHANGES } from '@lnk/shared-types';
+import { WebhookModule } from '../../modules/webhook/webhook.module';
 
 @Global()
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, forwardRef(() => WebhookModule)],
   providers: [
     {
       provide: RABBITMQ_CONNECTION,

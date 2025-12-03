@@ -43,13 +43,36 @@ export class ProxyController {
       const user = (req as any).user;
 
       // Forward relevant headers - use JWT claims, NOT client-supplied headers
+      // Also forward client info headers for session tracking
       const headers: Record<string, string> = {
         'content-type': req.headers['content-type'] || 'application/json',
         'x-user-id': user?.id || '',
         'x-user-email': user?.email || '',
         'x-request-id': req.headers['x-request-id'] as string || crypto.randomUUID(),
-        'x-forwarded-for': req.ip || '',
       };
+
+      // Forward user-agent for device detection
+      if (req.headers['user-agent']) {
+        headers['user-agent'] = req.headers['user-agent'] as string;
+      }
+
+      // Forward IP-related headers for client IP detection
+      // Priority: CF-Connecting-IP (Cloudflare) > X-Real-IP (Nginx) > X-Forwarded-For > req.ip
+      if (req.headers['cf-connecting-ip']) {
+        headers['cf-connecting-ip'] = req.headers['cf-connecting-ip'] as string;
+      }
+      if (req.headers['x-real-ip']) {
+        headers['x-real-ip'] = req.headers['x-real-ip'] as string;
+      }
+      // Build x-forwarded-for chain
+      const existingForwarded = req.headers['x-forwarded-for'];
+      if (existingForwarded) {
+        headers['x-forwarded-for'] = typeof existingForwarded === 'string'
+          ? existingForwarded
+          : existingForwarded[0] || '';
+      } else if (req.ip) {
+        headers['x-forwarded-for'] = req.ip;
+      }
 
       // Forward authorization header for downstream services
       if (req.headers.authorization) {

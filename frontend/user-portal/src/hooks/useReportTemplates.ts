@@ -1,69 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { reportTemplateService } from '@/lib/api';
+import type { ReportTemplate, CreateReportTemplateDto } from '@lnk/shared-types';
 
-export interface ReportTemplate {
-  id: string;
-  teamId: string;
-  createdBy: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category: 'traffic' | 'conversion' | 'engagement' | 'comparison' | 'custom';
-  metrics: string[];
-  dimensions?: string[];
-  filters?: Record<string, any>;
-  dateRange: {
-    type: 'last_7_days' | 'last_30_days' | 'last_90_days' | 'last_12_months' | 'custom';
-    startDate?: string;
-    endDate?: string;
-    compareWithPrevious?: boolean;
-  };
-  groupBy?: string;
-  sortBy?: string;
-  sortOrder: 'asc' | 'desc';
-  limitResults?: number;
-  format: 'pdf' | 'csv' | 'excel' | 'json';
-  includeCharts: boolean;
-  includeSummary: boolean;
-  customBranding?: string;
-  schedule?: {
-    enabled: boolean;
-    frequency: 'daily' | 'weekly' | 'monthly';
-    dayOfWeek?: number;
-    dayOfMonth?: number;
-    time?: string;
-    timezone?: string;
-    recipients: string[];
-  };
-  isFavorite: boolean;
-  usageCount: number;
-  lastUsedAt?: string;
-  lastGeneratedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateReportTemplateDto {
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category?: ReportTemplate['category'];
-  metrics: string[];
-  dimensions?: string[];
-  filters?: Record<string, any>;
-  dateRange: ReportTemplate['dateRange'];
-  groupBy?: string;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-  limitResults?: number;
-  format?: 'pdf' | 'csv' | 'excel' | 'json';
-  includeCharts?: boolean;
-  includeSummary?: boolean;
-  customBranding?: string;
-  schedule?: ReportTemplate['schedule'];
-}
+export type { ReportTemplate, CreateReportTemplateDto };
 
 const QUERY_KEY = ['report-templates'];
 
@@ -71,12 +10,7 @@ export function useReportTemplates(options?: { category?: string; isFavorite?: b
   return useQuery({
     queryKey: [...QUERY_KEY, options],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (options?.category) params.append('category', options.category);
-      if (options?.isFavorite !== undefined) params.append('isFavorite', String(options.isFavorite));
-      if (options?.search) params.append('search', options.search);
-
-      const { data } = await api.get(`/api/v1/report-templates?${params}`);
+      const { data } = await reportTemplateService.getAll(options);
       return data.data as ReportTemplate[];
     },
   });
@@ -87,7 +21,7 @@ export function useCreateReportTemplate() {
 
   return useMutation({
     mutationFn: async (dto: CreateReportTemplateDto) => {
-      const { data } = await api.post('/api/v1/report-templates', dto);
+      const { data } = await reportTemplateService.create(dto);
       return data;
     },
     onSuccess: () => {
@@ -101,7 +35,7 @@ export function useUpdateReportTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateReportTemplateDto> }) => {
-      const response = await api.put(`/api/v1/report-templates/${id}`, data);
+      const response = await reportTemplateService.update(id, data);
       return response.data;
     },
     onSuccess: () => {
@@ -115,7 +49,7 @@ export function useDeleteReportTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/report-templates/${id}`);
+      await reportTemplateService.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -128,7 +62,7 @@ export function useToggleReportTemplateFavorite() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.patch(`/api/v1/report-templates/${id}/favorite`);
+      const { data } = await reportTemplateService.toggleFavorite(id);
       return data;
     },
     onSuccess: () => {
@@ -142,7 +76,7 @@ export function useDuplicateReportTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/report-templates/${id}/duplicate`);
+      const { data } = await reportTemplateService.duplicate(id);
       return data;
     },
     onSuccess: () => {
@@ -156,7 +90,7 @@ export function useGenerateReport() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/report-templates/${id}/generate`);
+      const { data } = await reportTemplateService.generate(id);
       return data;
     },
     onSuccess: () => {

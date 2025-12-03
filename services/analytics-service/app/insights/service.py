@@ -6,7 +6,7 @@ import statistics
 import random
 
 from app.core.config import settings
-from app.db.clickhouse import get_clickhouse_client
+from app.core.clickhouse import get_clickhouse_client
 from .models import (
     InsightType, InsightPriority, InsightCategory, StoryTone,
     DataPoint, Insight, DataStory, StoryRequest,

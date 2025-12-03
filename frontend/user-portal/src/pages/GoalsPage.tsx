@@ -470,14 +470,14 @@ export default function GoalsPage() {
                 <div className="space-y-2">
                   <Label>关联活动（可选）</Label>
                   <Select
-                    value={formData.campaignId}
-                    onValueChange={(value) => setFormData({ ...formData, campaignId: value })}
+                    value={formData.campaignId || 'none'}
+                    onValueChange={(value) => setFormData({ ...formData, campaignId: value === 'none' ? '' : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="选择活动" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">不关联</SelectItem>
+                      <SelectItem value="none">不关联</SelectItem>
                       {campaigns?.items?.map((campaign: Campaign) => (
                         <SelectItem key={campaign.id} value={campaign.id}>
                           {campaign.name}

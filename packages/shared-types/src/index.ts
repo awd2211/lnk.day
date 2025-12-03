@@ -15,3 +15,6 @@ export * from './common';
 
 // Event types
 export * from './events';
+
+// Template types
+export * from './templates';

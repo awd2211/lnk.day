@@ -7,6 +7,7 @@ import { UserSession } from './entities/user-session.entity';
 import { SecurityEvent } from './entities/security-event.entity';
 import { BlockedIp } from './entities/blocked-ip.entity';
 import { SecuritySettings } from './entities/security-settings.entity';
+import { UserSecuritySettings } from './entities/user-security-settings.entity';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { SecuritySettings } from './entities/security-settings.entity';
       SecurityEvent,
       BlockedIp,
       SecuritySettings,
+      UserSecuritySettings,
     ]),
   ],
   controllers: [SecurityController],

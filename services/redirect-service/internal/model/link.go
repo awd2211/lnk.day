@@ -47,6 +47,7 @@ type TimeTarget struct {
 type ClickEvent struct {
 	ID           string    `json:"id"`
 	LinkID       string    `json:"linkId"`
+	TeamID       string    `json:"teamId"`
 	ShortCode    string    `json:"shortCode"`
 	Timestamp    time.Time `json:"timestamp"`
 	IP           string    `json:"ip"`

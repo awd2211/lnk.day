@@ -66,13 +66,12 @@ export default function BillingPage() {
     { id: 'payment' as Tab, label: '支付方式', icon: CreditCard },
   ];
 
-  const handleSelectPlan = async (priceId: string) => {
-    setSelectedPriceId(priceId);
+  const handleSelectPlan = async (planCode: string) => {
+    setSelectedPriceId(planCode);
     try {
       await createCheckout.mutateAsync({
-        priceId,
-        successUrl: `${window.location.origin}/billing?success=true`,
-        cancelUrl: `${window.location.origin}/billing?canceled=true`,
+        plan: planCode,
+        billingCycle: billingInterval === 'month' ? 'monthly' : 'yearly',
       });
     } catch (error: any) {
       toast({
@@ -341,13 +340,7 @@ export default function BillingPage() {
                       plan={plan}
                       interval={billingInterval}
                       currentPlanId={subscription?.planId}
-                      isLoading={
-                        createCheckout.isPending &&
-                        selectedPriceId ===
-                          (billingInterval === 'month'
-                            ? plan.priceIdMonthly
-                            : plan.priceIdYearly)
-                      }
+                      isLoading={createCheckout.isPending && selectedPriceId === (plan.code || plan.id)}
                       onSelect={handleSelectPlan}
                     />
                   ))}

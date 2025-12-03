@@ -23,6 +23,7 @@ import {
   UpdateBioLinkItemDto,
   BioLinkAnalyticsDto,
 } from './dto/bio-link.dto';
+import { PageEventService } from '../../common/rabbitmq/page-event.service';
 
 @Injectable()
 export class BioLinkService {
@@ -39,6 +40,7 @@ export class BioLinkService {
     private readonly subscriberRepository: Repository<BioLinkSubscriber>,
     @InjectRepository(BioLinkContact)
     private readonly contactRepository: Repository<BioLinkContact>,
+    private readonly pageEventService: PageEventService,
   ) {}
 
   // ==================== Bio Link CRUD ====================
@@ -66,7 +68,17 @@ export class BioLinkService {
       theme: dto.theme as any,
     });
 
-    return this.bioLinkRepository.save(bioLink) as Promise<BioLink>;
+    const savedBioLink = await this.bioLinkRepository.save(bioLink);
+
+    // Publish bio link created event
+    await this.pageEventService.publishBioLinkCreated({
+      bioLinkId: savedBioLink.id,
+      username: savedBioLink.username,
+      userId: savedBioLink.userId,
+      teamId: savedBioLink.teamId,
+    });
+
+    return savedBioLink as BioLink;
   }
 
   async findAll(
@@ -468,6 +480,20 @@ export class BioLinkService {
 
     // Update counters
     await this.bioLinkRepository.increment({ id: bioLinkId }, 'totalViews', 1);
+
+    // Publish bio link viewed event
+    const bioLink = await this.bioLinkRepository.findOne({ where: { id: bioLinkId } });
+    if (bioLink) {
+      await this.pageEventService.publishBioLinkViewed({
+        bioLinkId,
+        username: bioLink.username,
+        ip: data.ip,
+        userAgent: data.userAgent,
+        country: data.country,
+        city: data.city,
+        referer: data.referer,
+      });
+    }
   }
 
   async trackClick(

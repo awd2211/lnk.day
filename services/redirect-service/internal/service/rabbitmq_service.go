@@ -33,6 +33,7 @@ type ClickEventMessage struct {
 
 type ClickEventData struct {
 	LinkID      string `json:"linkId"`
+	TeamID      string `json:"teamId"`
 	ShortCode   string `json:"shortCode"`
 	Timestamp   string `json:"timestamp"`
 	IP          string `json:"ip,omitempty"`
@@ -152,6 +153,7 @@ func (s *RabbitMQService) PublishClickEvent(event *model.ClickEvent) error {
 		Source:    "redirect-service",
 		Data: ClickEventData{
 			LinkID:    event.LinkID,
+			TeamID:    event.TeamID,
 			ShortCode: event.ShortCode,
 			Timestamp: event.Timestamp.Format(time.RFC3339),
 			IP:        event.IP,
@@ -203,6 +205,7 @@ func (s *RabbitMQService) PublishClickBatch(events []*model.ClickEvent) error {
 		isBot := event.Device == "bot"
 		clickData[i] = ClickEventData{
 			LinkID:    event.LinkID,
+			TeamID:    event.TeamID,
 			ShortCode: event.ShortCode,
 			Timestamp: event.Timestamp.Format(time.RFC3339),
 			IP:        event.IP,

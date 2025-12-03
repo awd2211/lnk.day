@@ -31,6 +31,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -101,6 +111,10 @@ export default function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [managingQuota, setManagingQuota] = useState<Team | null>(null);
+  // 确认对话框状态
+  const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
+  const [toggleStatusTarget, setToggleStatusTarget] = useState<Team | null>(null);
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<TeamMember | null>(null);
   const queryClient = useQueryClient();
   const limit = 20;
 
@@ -180,6 +194,7 @@ export default function TeamsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
       setSelectedTeam(null);
+      setDeleteTarget(null);
     },
   });
 
@@ -189,6 +204,7 @@ export default function TeamsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
       queryClient.invalidateQueries({ queryKey: ['team'] });
+      setToggleStatusTarget(null);
     },
   });
 
@@ -222,6 +238,7 @@ export default function TeamsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teamMembers'] });
       queryClient.invalidateQueries({ queryKey: ['team'] });
+      setRemoveMemberTarget(null);
     },
   });
 
@@ -241,17 +258,11 @@ export default function TeamsPage() {
   };
 
   const handleDelete = (team: Team) => {
-    if (confirm(`确定要删除团队"${team.name}"吗？此操作将删除该团队的所有数据！`)) {
-      deleteTeam.mutate(team.id);
-    }
+    setDeleteTarget(team);
   };
 
   const handleToggleStatus = (team: Team) => {
-    const newStatus = team.status === 'active' ? 'suspended' : 'active';
-    const action = newStatus === 'suspended' ? '暂停' : '恢复';
-    if (confirm(`确定要${action}团队"${team.name}"吗？`)) {
-      toggleStatus.mutate({ id: team.id, status: newStatus });
-    }
+    setToggleStatusTarget(team);
   };
 
   const handleManageQuota = (team: Team) => {
@@ -273,9 +284,7 @@ export default function TeamsPage() {
   };
 
   const handleRemoveMember = (member: TeamMember) => {
-    if (selectedTeam && confirm(`确定要移除成员"${member.user.name}"吗？`)) {
-      removeMember.mutate({ teamId: selectedTeam.id, memberId: member.id });
-    }
+    setRemoveMemberTarget(member);
   };
 
   const formatDate = (date: string) => {
@@ -910,6 +919,80 @@ export default function TeamsPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* 删除团队确认对话框 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除团队</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除团队"{deleteTarget?.name}"吗？此操作将删除该团队的所有数据，包括链接、二维码、活动等，且无法恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteTarget && deleteTeam.mutate(deleteTarget.id)}
+            >
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 暂停/恢复团队确认对话框 */}
+      <AlertDialog open={!!toggleStatusTarget} onOpenChange={(open) => !open && setToggleStatusTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleStatusTarget?.status === 'active' ? '确认暂停团队' : '确认恢复团队'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleStatusTarget?.status === 'active'
+                ? `暂停团队"${toggleStatusTarget?.name}"后，该团队的所有成员将无法访问相关资源。`
+                : `恢复团队"${toggleStatusTarget?.name}"后，该团队将恢复正常使用。`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className={toggleStatusTarget?.status === 'active' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+              onClick={() => toggleStatusTarget && toggleStatus.mutate({
+                id: toggleStatusTarget.id,
+                status: toggleStatusTarget.status === 'active' ? 'suspended' : 'active',
+              })}
+            >
+              {toggleStatusTarget?.status === 'active' ? '确认暂停' : '确认恢复'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 移除成员确认对话框 */}
+      <AlertDialog open={!!removeMemberTarget} onOpenChange={(open) => !open && setRemoveMemberTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认移除成员</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要将成员"{removeMemberTarget?.user.name}"从团队中移除吗？
+              移除后该成员将无法访问团队资源。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => selectedTeam && removeMemberTarget && removeMember.mutate({
+                teamId: selectedTeam.id,
+                memberId: removeMemberTarget.id,
+              })}
+            >
+              确认移除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

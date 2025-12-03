@@ -148,8 +148,6 @@ class AnalyticsService:
 
     def get_team_summary(self, team_id: str, start_date: datetime, end_date: datetime) -> Dict:
         """Get summary statistics for a team"""
-        # Note: This requires joining with link data or having team_id in clicks table
-        # For now, we'll return aggregated data
         result = self.client.execute(
             """
             SELECT
@@ -157,10 +155,11 @@ class AnalyticsService:
                 uniq(visitor_ip) as unique_visitors,
                 uniq(link_id) as active_links
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             """,
-            {"start_date": start_date, "end_date": end_date}
+            {"team_id": team_id, "start_date": start_date, "end_date": end_date}
         )
 
         if result:
@@ -180,10 +179,11 @@ class AnalyticsService:
             "period": {"start": start_date, "end": end_date}
         }
 
-    def get_team_analytics(self, start_date: datetime, end_date: datetime) -> Dict:
+    def get_team_analytics(self, team_id: str, start_date: datetime, end_date: datetime) -> Dict:
         """Get comprehensive team analytics data for dashboard"""
         # Get a single client for all queries in this method
         client = get_clickhouse_client()
+        params = {"team_id": team_id, "start_date": start_date, "end_date": end_date}
 
         # Total and unique clicks
         totals = client.execute(
@@ -192,10 +192,11 @@ class AnalyticsService:
                 count() as total_clicks,
                 uniq(visitor_ip) as unique_visitors
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Today's clicks
@@ -204,9 +205,10 @@ class AnalyticsService:
             """
             SELECT count() as clicks
             FROM link_events
-            WHERE timestamp >= %(today)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(today)s
             """,
-            {"today": today}
+            {"team_id": team_id, "today": today}
         )
 
         # Time series (clicks by day)
@@ -214,12 +216,13 @@ class AnalyticsService:
             """
             SELECT toDate(timestamp) as date, count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY date
             ORDER BY date
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Device distribution
@@ -227,12 +230,13 @@ class AnalyticsService:
             """
             SELECT device_type, count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY device_type
             ORDER BY clicks DESC
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Browser distribution
@@ -240,13 +244,14 @@ class AnalyticsService:
             """
             SELECT browser, count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY browser
             ORDER BY clicks DESC
             LIMIT 10
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Country distribution
@@ -254,13 +259,14 @@ class AnalyticsService:
             """
             SELECT country, count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY country
             ORDER BY clicks DESC
             LIMIT 10
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Referrer distribution
@@ -268,14 +274,15 @@ class AnalyticsService:
             """
             SELECT referrer, count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
               AND referrer != ''
             GROUP BY referrer
             ORDER BY clicks DESC
             LIMIT 10
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Hourly activity heatmap
@@ -286,12 +293,13 @@ class AnalyticsService:
                 toHour(timestamp) as hour,
                 count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY day_of_week, hour
             ORDER BY day_of_week, hour
             """,
-            {"start_date": start_date, "end_date": end_date}
+            params
         )
 
         # Calculate percentages
@@ -384,12 +392,13 @@ class AnalyticsService:
                 toHour(timestamp) as hour,
                 count() as clicks
             FROM link_events
-            WHERE timestamp >= %(start_date)s
+            WHERE team_id = %(team_id)s
+              AND timestamp >= %(start_date)s
               AND timestamp <= %(end_date)s
             GROUP BY day_of_week, hour
             ORDER BY day_of_week, hour
             """,
-            {"start_date": start_date, "end_date": end_date}
+            {"team_id": team_id, "start_date": start_date, "end_date": end_date}
         )
         return [
             {

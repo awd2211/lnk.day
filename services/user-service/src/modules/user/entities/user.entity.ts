@@ -76,6 +76,15 @@ export class User {
   @Exclude()
   emailVerificationTokenExpiresAt?: Date;
 
+  // 邮箱验证码登录
+  @Column({ nullable: true })
+  @Exclude()
+  loginCode?: string;
+
+  @Column({ nullable: true })
+  @Exclude()
+  loginCodeExpiresAt?: Date;
+
   @Column({ nullable: true })
   lastLoginAt?: Date;
 

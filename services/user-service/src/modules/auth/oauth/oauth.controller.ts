@@ -5,11 +5,12 @@ import {
   Delete,
   Param,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 
 import { OAuthService } from './oauth.service';
@@ -85,6 +86,7 @@ export class OAuthController {
     @Param('provider') provider: OAuthProvider,
     @Query('code') code: string,
     @Query('state') state: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     try {
@@ -92,7 +94,7 @@ export class OAuthController {
       const oauthUser = await this.oauthService.exchangeCodeForTokens(provider, code);
 
       // Handle OAuth login/registration
-      const result = await this.oauthService.handleOAuthCallback(oauthUser);
+      const result = await this.oauthService.handleOAuthCallback(oauthUser, req);
 
       // Redirect to frontend with tokens
       const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
@@ -115,9 +117,10 @@ export class OAuthController {
   async exchangeToken(
     @Param('provider') provider: OAuthProvider,
     @Query('code') code: string,
+    @Req() req: Request,
   ) {
     const oauthUser = await this.oauthService.exchangeCodeForTokens(provider, code);
-    return this.oauthService.handleOAuthCallback(oauthUser);
+    return this.oauthService.handleOAuthCallback(oauthUser, req);
   }
 
   // Account linking endpoints

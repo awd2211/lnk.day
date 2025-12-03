@@ -5,6 +5,7 @@ import { useSidebar, SidebarProvider } from '@/contexts/SidebarContext';
 import { Sidebar, MobileSidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { CommandPalette } from '@/components/CommandPalette';
+import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -37,6 +38,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
           onSearchOpen={() => setCommandOpen(true)}
           onCreateLink={handleCreateLink}
         />
+
+        {/* 邮箱验证提示横幅 */}
+        <EmailVerificationBanner />
 
         {/* 页面内容 */}
         <main className="flex-1 p-4 lg:p-6">{children}</main>

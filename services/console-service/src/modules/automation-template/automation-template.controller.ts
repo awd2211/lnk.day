@@ -9,6 +9,7 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -19,6 +20,8 @@ import {
   AuthenticatedUser,
 } from '@lnk/nestjs-common';
 import { AutomationTemplateService } from './automation-template.service';
+import { LogAudit } from '../audit/decorators/audit-log.decorator';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 import { CreateAutomationTemplateDto } from './dto/create-automation-template.dto';
 import { UpdateAutomationTemplateDto } from './dto/update-automation-template.dto';
 import { TemplateCategory } from './entities/automation-template.entity';
@@ -27,11 +30,18 @@ import { TemplateCategory } from './entities/automation-template.entity';
 @ApiBearerAuth()
 @Controller('automation-templates')
 @UseGuards(AuthGuard('jwt'))
+@UseInterceptors(AuditLogInterceptor)
 export class AutomationTemplateController {
   constructor(private readonly automationTemplateService: AutomationTemplateService) {}
 
   @Post()
   @ApiOperation({ summary: '创建自动化模板' })
+  @LogAudit({
+    action: 'automation.template.create',
+    targetType: 'automation_template',
+    getTarget: (result) => result ? { id: result.id, name: result.name } : null,
+    detailFields: ['name', 'category', 'trigger'],
+  })
   async create(
     @ScopedTeamId() teamId: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -88,6 +98,12 @@ export class AutomationTemplateController {
 
   @Put(':id')
   @ApiOperation({ summary: '更新自动化模板' })
+  @LogAudit({
+    action: 'automation.template.update',
+    targetType: 'automation_template',
+    targetIdParam: 'id',
+    detailFields: ['name', 'category', 'trigger'],
+  })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,
@@ -98,6 +114,11 @@ export class AutomationTemplateController {
 
   @Delete(':id')
   @ApiOperation({ summary: '删除自动化模板' })
+  @LogAudit({
+    action: 'automation.template.delete',
+    targetType: 'automation_template',
+    targetIdParam: 'id',
+  })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,
@@ -108,6 +129,11 @@ export class AutomationTemplateController {
 
   @Patch(':id/favorite')
   @ApiOperation({ summary: '切换收藏状态' })
+  @LogAudit({
+    action: 'automation.template.favorite.toggle',
+    targetType: 'automation_template',
+    targetIdParam: 'id',
+  })
   async toggleFavorite(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,
@@ -117,6 +143,11 @@ export class AutomationTemplateController {
 
   @Post(':id/use')
   @ApiOperation({ summary: '增加使用次数' })
+  @LogAudit({
+    action: 'automation.template.use',
+    targetType: 'automation_template',
+    targetIdParam: 'id',
+  })
   async incrementUsage(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,
@@ -126,6 +157,12 @@ export class AutomationTemplateController {
 
   @Post(':id/duplicate')
   @ApiOperation({ summary: '复制模板' })
+  @LogAudit({
+    action: 'automation.template.duplicate',
+    targetType: 'automation_template',
+    targetIdParam: 'id',
+    getTarget: (result) => result ? { id: result.id, name: result.name } : null,
+  })
   async duplicate(
     @Param('id', ParseUUIDPipe) id: string,
     @ScopedTeamId() teamId: string,

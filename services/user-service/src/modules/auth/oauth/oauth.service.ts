@@ -3,10 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
 import * as crypto from 'crypto';
 
 import { OAuthAccount, OAuthProvider } from './oauth-account.entity';
 import { UserService } from '../../user/user.service';
+import { SecurityService } from '../../security/security.service';
+import { SecurityEventType } from '../../security/entities/security-event.entity';
 
 export interface OAuthUserInfo {
   provider: OAuthProvider;
@@ -28,9 +31,10 @@ export class OAuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly securityService: SecurityService,
   ) {}
 
-  async handleOAuthCallback(oauthUser: OAuthUserInfo): Promise<{
+  async handleOAuthCallback(oauthUser: OAuthUserInfo, req?: Request): Promise<{
     user: any;
     accessToken: string;
     refreshToken: string;
@@ -95,6 +99,15 @@ export class OAuthService {
 
     // Generate JWT tokens
     const tokens = this.generateTokens(user.id, user.email);
+
+    // 创建 session 记录
+    await this.createSessionFromRequest(user.id, tokens.accessToken, req);
+
+    // 记录安全事件
+    const eventMessage = isNewUser
+      ? `通过 ${oauthUser.provider} OAuth 注册并登录`
+      : `通过 ${oauthUser.provider} OAuth 登录`;
+    await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_SUCCESS, eventMessage, req);
 
     return {
       user: {
@@ -367,5 +380,171 @@ export class OAuthService {
       accessToken: this.jwtService.sign(payload, { expiresIn: accessExpiresIn }),
       refreshToken: this.jwtService.sign(payload, { expiresIn: refreshExpiresIn }),
     };
+  }
+
+  /**
+   * 从请求创建 session 记录
+   */
+  private async createSessionFromRequest(userId: string, token: string, req?: Request): Promise<void> {
+    try {
+      const userAgent = req?.headers['user-agent'] || '';
+      const ipAddress = this.getClientIp(req);
+
+      // 解析 User-Agent
+      const { browser, os, deviceType, deviceName } = this.parseUserAgent(userAgent);
+
+      // 计算 token 过期时间
+      const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
+      const expiresAt = new Date(Date.now() + this.parseExpiresIn(accessExpiresIn) * 1000);
+
+      await this.securityService.createSession({
+        userId,
+        token,
+        deviceName,
+        deviceType,
+        browser,
+        os,
+        ipAddress,
+        expiresAt,
+      });
+    } catch (error) {
+      // Session 创建失败不应该影响登录
+      console.error('Failed to create session:', error);
+    }
+  }
+
+  /**
+   * 记录安全事件
+   */
+  private async logSecurityEvent(
+    userId: string,
+    type: SecurityEventType,
+    description: string,
+    req?: Request,
+  ): Promise<void> {
+    try {
+      const userAgent = req?.headers['user-agent'] || '';
+      const ipAddress = this.getClientIp(req);
+      const { deviceName } = this.parseUserAgent(userAgent);
+
+      await this.securityService.logEvent({
+        userId,
+        type,
+        description,
+        ipAddress,
+        userAgent,
+        deviceName,
+      });
+    } catch (error) {
+      // 事件记录失败不应该影响正常流程
+      console.error('Failed to log security event:', error);
+    }
+  }
+
+  /**
+   * 获取客户端 IP 地址
+   * 优先级: CF-Connecting-IP (Cloudflare) > X-Real-IP (Nginx) > X-Forwarded-For > req.ip
+   */
+  private getClientIp(req?: Request): string {
+    if (!req) return '';
+
+    // 1. Cloudflare 的真实客户端 IP
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (cfIp) {
+      const ip = typeof cfIp === 'string' ? cfIp : cfIp[0];
+      if (ip) return ip.trim();
+    }
+
+    // 2. Nginx 的 X-Real-IP
+    const realIp = req.headers['x-real-ip'];
+    if (realIp) {
+      const ip = typeof realIp === 'string' ? realIp : realIp[0];
+      if (ip) return ip.trim();
+    }
+
+    // 3. X-Forwarded-For 链中的第一个 IP
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const ips = typeof forwarded === 'string' ? forwarded : forwarded[0];
+      if (ips) {
+        const firstIp = ips.split(',')[0];
+        if (firstIp) return firstIp.trim();
+      }
+    }
+
+    // 4. 直接连接的 IP
+    return req.ip || req.socket?.remoteAddress || '';
+  }
+
+  /**
+   * 解析 User-Agent 字符串
+   */
+  private parseUserAgent(ua: string): {
+    browser: string;
+    os: string;
+    deviceType: string;
+    deviceName: string;
+  } {
+    let browser = 'Unknown';
+    let os = 'Unknown';
+    let deviceType = 'desktop';
+    let deviceName = 'Unknown Device';
+
+    // 检测浏览器
+    if (ua.includes('Chrome') && !ua.includes('Edg')) {
+      browser = 'Chrome';
+    } else if (ua.includes('Firefox')) {
+      browser = 'Firefox';
+    } else if (ua.includes('Safari') && !ua.includes('Chrome')) {
+      browser = 'Safari';
+    } else if (ua.includes('Edg')) {
+      browser = 'Edge';
+    } else if (ua.includes('Opera') || ua.includes('OPR')) {
+      browser = 'Opera';
+    }
+
+    // 检测操作系统
+    if (ua.includes('Windows')) {
+      os = 'Windows';
+    } else if (ua.includes('Mac OS')) {
+      os = 'macOS';
+    } else if (ua.includes('Linux')) {
+      os = 'Linux';
+    } else if (ua.includes('Android')) {
+      os = 'Android';
+      deviceType = 'mobile';
+    } else if (ua.includes('iPhone') || ua.includes('iPad')) {
+      os = 'iOS';
+      deviceType = ua.includes('iPad') ? 'tablet' : 'mobile';
+    }
+
+    // 生成设备名称
+    deviceName = `${browser} on ${os}`;
+
+    return { browser, os, deviceType, deviceName };
+  }
+
+  /**
+   * 解析过期时间字符串为秒数
+   */
+  private parseExpiresIn(expiresIn: string): number {
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+    if (!match || !match[1] || !match[2]) return 900; // 默认 15 分钟
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    switch (unit) {
+      case 's':
+        return value;
+      case 'm':
+        return value * 60;
+      case 'h':
+        return value * 3600;
+      case 'd':
+        return value * 86400;
+      default:
+        return 900;
+    }
   }
 }

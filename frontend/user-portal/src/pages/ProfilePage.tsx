@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   User,
@@ -92,30 +92,51 @@ function ProfilePage() {
     activityAlerts: true,
   });
 
+  // Profile data type
+  interface ProfileData {
+    name?: string;
+    email?: string;
+    phone?: string;
+    bio?: string;
+    company?: string;
+    location?: string;
+    website?: string;
+    timezone?: string;
+    language?: string;
+    avatar?: string;
+    emailVerified?: boolean;
+    createdAt?: string;
+    preferences?: typeof preferences;
+  }
+
   // Fetch user profile
-  const { data: profileData, isLoading } = useQuery({
+  const { data: profileData, isLoading } = useQuery<ProfileData>({
     queryKey: ['profile'],
     queryFn: async () => {
       const response = await api.get('/api/v1/users/me');
       return response.data;
     },
-    onSuccess: (data) => {
-      setFormData({
-        name: data.name || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        bio: data.bio || '',
-        company: data.company || '',
-        location: data.location || '',
-        website: data.website || '',
-        timezone: data.timezone || 'Asia/Shanghai',
-        language: data.language || 'zh-CN',
-      });
-      if (data.preferences) {
-        setPreferences(data.preferences);
-      }
-    },
   });
+
+  // Sync profile data to form state
+  useEffect(() => {
+    if (profileData) {
+      setFormData({
+        name: profileData.name || '',
+        email: profileData.email || '',
+        phone: profileData.phone || '',
+        bio: profileData.bio || '',
+        company: profileData.company || '',
+        location: profileData.location || '',
+        website: profileData.website || '',
+        timezone: profileData.timezone || 'Asia/Shanghai',
+        language: profileData.language || 'zh-CN',
+      });
+      if (profileData.preferences) {
+        setPreferences(profileData.preferences);
+      }
+    }
+  }, [profileData]);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -264,10 +285,12 @@ function ProfilePage() {
                           已验证
                         </Badge>
                       )}
-                      <Badge variant="outline" className="text-xs">
-                        <Calendar className="mr-1 h-3 w-3" />
-                        加入于 {new Date(profile?.createdAt).toLocaleDateString()}
-                      </Badge>
+                      {profileData?.createdAt && (
+                        <Badge variant="outline" className="text-xs">
+                          <Calendar className="mr-1 h-3 w-3" />
+                          加入于 {new Date(profileData.createdAt).toLocaleDateString()}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>

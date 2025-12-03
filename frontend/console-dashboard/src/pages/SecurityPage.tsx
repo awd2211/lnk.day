@@ -27,6 +27,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -174,6 +184,11 @@ export default function SecurityPage() {
   const [showAddIpDialog, setShowAddIpDialog] = useState(false);
   const [newBlockedIp, setNewBlockedIp] = useState({ ip: '', reason: '', permanent: false });
 
+  // 确认对话框状态
+  const [terminateSessionTarget, setTerminateSessionTarget] = useState<ActiveSession | null>(null);
+  const [unblockIpTarget, setUnblockIpTarget] = useState<BlockedIP | null>(null);
+  const [showSaveSettingsConfirm, setShowSaveSettingsConfirm] = useState(false);
+
   // 获取安全统计（平台级）
   const { data: stats } = useQuery<SecurityStats>({
     queryKey: ['security-stats'],
@@ -220,6 +235,7 @@ export default function SecurityPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['security-settings'] });
       toast({ title: '成功', description: '安全设置已保存' });
+      setShowSaveSettingsConfirm(false);
     },
     onError: () => {
       toast({ title: '错误', description: '保存失败', variant: 'destructive' });
@@ -249,6 +265,7 @@ export default function SecurityPage() {
       queryClient.invalidateQueries({ queryKey: ['security-blocked-ips'] });
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
       toast({ title: '成功', description: 'IP 已解封' });
+      setUnblockIpTarget(null);
     },
     onError: () => {
       toast({ title: '错误', description: '操作失败', variant: 'destructive' });
@@ -261,6 +278,7 @@ export default function SecurityPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['security-sessions'] });
       toast({ title: '成功', description: '会话已终止' });
+      setTerminateSessionTarget(null);
     },
     onError: () => {
       toast({ title: '错误', description: '操作失败', variant: 'destructive' });
@@ -548,7 +566,7 @@ export default function SecurityPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => terminateSessionMutation.mutate(session.id)}
+                            onClick={() => setTerminateSessionTarget(session)}
                           >
                             <XCircle className="h-4 w-4 text-red-500" />
                           </Button>
@@ -621,7 +639,7 @@ export default function SecurityPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => unblockIpMutation.mutate(ip.id)}
+                            onClick={() => setUnblockIpTarget(ip)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -843,7 +861,7 @@ export default function SecurityPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={() => saveSettingsMutation.mutate(settingsForm)}>
+            <Button onClick={() => setShowSaveSettingsConfirm(true)}>
               <ShieldCheck className="mr-2 h-4 w-4" />
               保存安全设置
             </Button>
@@ -894,6 +912,65 @@ export default function SecurityPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 终止会话确认对话框 */}
+      <AlertDialog open={!!terminateSessionTarget} onOpenChange={(open) => !open && setTerminateSessionTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认终止会话</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要终止用户 "{terminateSessionTarget?.userName || terminateSessionTarget?.userEmail}" 的会话吗？
+              该用户将被强制登出，需要重新登录才能继续使用系统。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => terminateSessionTarget && terminateSessionMutation.mutate(terminateSessionTarget.id)}
+            >
+              终止会话
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 解封 IP 确认对话框 */}
+      <AlertDialog open={!!unblockIpTarget} onOpenChange={(open) => !open && setUnblockIpTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认解封 IP</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要解封 IP 地址 "{unblockIpTarget?.ipAddress}" 吗？
+              解封后该 IP 将可以正常访问系统。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => unblockIpTarget && unblockIpMutation.mutate(unblockIpTarget.id)}>
+              确认解封
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 保存安全设置确认对话框 */}
+      <AlertDialog open={showSaveSettingsConfirm} onOpenChange={setShowSaveSettingsConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认保存安全设置</AlertDialogTitle>
+            <AlertDialogDescription>
+              安全策略的更改将立即生效，可能影响用户登录和访问。确定要保存这些更改吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => saveSettingsMutation.mutate(settingsForm)}>
+              确认保存
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

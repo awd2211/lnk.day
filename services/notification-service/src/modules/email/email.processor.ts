@@ -206,6 +206,28 @@ export class EmailProcessor {
           </a>
         </div>
       `,
+      'login_code': (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a1a1a; margin: 0;">${brand}</h1>
+          </div>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">登录验证码</h2>
+            <p style="color: #666;">您好，${d.userName}，</p>
+            <p style="color: #666;">您的登录验证码是：</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #2563eb; background: #eff6ff; padding: 15px 30px; border-radius: 8px; display: inline-block;">
+                ${d.code}
+              </span>
+            </div>
+            <p style="color: #666; font-size: 14px;">此验证码将在 <strong>${d.expiryMinutes} 分钟</strong>后过期。</p>
+            <p style="color: #999; font-size: 12px;">如果您没有请求此验证码，请忽略此邮件。您的账户安全不会受到影响。</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
+          </p>
+        </div>
+      `,
       'admin-password-reset': (d) => `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
@@ -294,6 +316,28 @@ export class EmailProcessor {
           </div>
           <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
             © ${new Date().getFullYear()} ${brand} - 企业级链接管理平台
+          </p>
+        </div>
+      `,
+      'email-verification': (d) => `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2563eb; margin: 0;">${brand}</h1>
+          </div>
+          <div style="background: #f9fafb; border-radius: 8px; padding: 30px;">
+            <h2 style="color: #1a1a1a; margin-top: 0;">验证您的邮箱</h2>
+            <p style="color: #666;">感谢您注册 ${brand}！请点击下面的按钮验证您的邮箱地址：</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${d.verifyLink}"
+                 style="display: inline-block; padding: 14px 32px; background: #10b981; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                验证邮箱
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">此链接将在 ${d.expiresIn} 后过期。</p>
+            <p style="color: #999; font-size: 12px;">如果您没有注册账户，请忽略此邮件。</p>
+          </div>
+          <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+            © ${new Date().getFullYear()} ${brand}
           </p>
         </div>
       `,

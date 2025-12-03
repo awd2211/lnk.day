@@ -16,6 +16,7 @@ import { QrModule } from './modules/qr/qr.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { GS1Module } from './modules/gs1/gs1.module';
 import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { HealthModule } from './modules/health/health.module';
         retryDelay: 3000,
       }),
     }),
+    RabbitMQModule,
     QrModule,
     TrackingModule,
     GS1Module,

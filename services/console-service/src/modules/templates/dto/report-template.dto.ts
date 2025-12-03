@@ -113,7 +113,7 @@ export class CreateReportTemplateDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  sortOrder?: number;
+  displayOrder?: number;
 }
 
 export class UpdateReportTemplateDto extends PartialType(CreateReportTemplateDto) {}

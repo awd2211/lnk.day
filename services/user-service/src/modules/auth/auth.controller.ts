@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -14,37 +15,63 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
+import { UserService } from '../user/user.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SendLoginCodeDto } from './dto/send-login-code.dto';
+import { VerifyLoginCodeDto } from './dto/verify-login-code.dto';
 import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@lnk/nestjs-common';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
 
   @Post('register')
   @ApiOperation({ summary: '用户注册' })
   @ApiResponse({ status: 201, description: '注册成功' })
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 每分钟最多3次注册
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  register(@Body() registerDto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(registerDto, req);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '用户登录' })
+  @ApiOperation({ summary: '用户登录（密码方式）' })
   @ApiResponse({ status: 200, description: '登录成功' })
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 每分钟最多5次登录尝试
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  login(@Body() loginDto: LoginDto, @Req() req: Request) {
+    return this.authService.login(loginDto, req);
+  }
+
+  @Post('send-login-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '发送登录验证码' })
+  @ApiResponse({ status: 200, description: '验证码已发送（如果邮箱存在）' })
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 每分钟最多3次
+  sendLoginCode(@Body() dto: SendLoginCodeDto) {
+    return this.authService.sendLoginCode(dto.email);
+  }
+
+  @Post('verify-login-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '验证码登录' })
+  @ApiResponse({ status: 200, description: '登录成功' })
+  @ApiResponse({ status: 401, description: '验证码错误或已过期' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 每分钟最多5次
+  verifyLoginCode(@Body() dto: VerifyLoginCodeDto, @Req() req: Request) {
+    return this.authService.verifyLoginCode(dto.email, dto.code, req);
   }
 
   @Post('refresh')
@@ -109,5 +136,27 @@ export class AuthController {
       resetPasswordDto.token,
       resetPasswordDto.newPassword,
     );
+  }
+
+  @Get('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '验证邮箱' })
+  @ApiQuery({ name: 'token', description: '邮箱验证 token' })
+  @ApiResponse({ status: 200, description: '邮箱验证成功' })
+  @ApiResponse({ status: 400, description: '验证链接无效或已过期' })
+  verifyEmail(@Query('token') token: string) {
+    return this.userService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '重新发送验证邮件' })
+  @ApiResponse({ status: 200, description: '验证邮件已发送' })
+  @ApiResponse({ status: 400, description: '邮箱已验证' })
+  @Throttle({ default: { limit: 3, ttl: 300000 } }) // 每5分钟最多3次
+  resendVerification(@CurrentUser() user: AuthenticatedUser) {
+    return this.userService.sendEmailVerification(user.id);
   }
 }

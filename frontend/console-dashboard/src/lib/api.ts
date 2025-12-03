@@ -551,4 +551,56 @@ export const templatesService = {
   deleteQrStyle: (id: string) => api.delete(`/templates/qr-styles/${id}`),
   toggleQrStyle: (id: string) => api.patch(`/templates/qr-styles/${id}/toggle`),
   seedQrStyles: () => api.post('/templates/qr-styles/seed'),
+
+  // DeepLink Templates
+  getDeepLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) =>
+    api.get('/templates/deeplinks', { params }),
+  getDeepLinkCategories: () => api.get('/templates/deeplinks/categories'),
+  getDeepLinkTemplate: (id: string) => api.get(`/templates/deeplinks/${id}`),
+  createDeepLinkTemplate: (data: any) => api.post('/templates/deeplinks', data),
+  updateDeepLinkTemplate: (id: string, data: any) => api.put(`/templates/deeplinks/${id}`, data),
+  deleteDeepLinkTemplate: (id: string) => api.delete(`/templates/deeplinks/${id}`),
+  toggleDeepLinkTemplate: (id: string) => api.patch(`/templates/deeplinks/${id}/toggle`),
+
+  // Webhook Templates
+  getWebhookTemplates: (params?: { page?: number; limit?: number; search?: string; platform?: string; status?: string }) =>
+    api.get('/templates/webhooks', { params }),
+  getWebhookTypes: () => api.get('/templates/webhooks/types'),
+  getWebhookTemplate: (id: string) => api.get(`/templates/webhooks/${id}`),
+  createWebhookTemplate: (data: any) => api.post('/templates/webhooks', data),
+  updateWebhookTemplate: (id: string, data: any) => api.put(`/templates/webhooks/${id}`, data),
+  deleteWebhookTemplate: (id: string) => api.delete(`/templates/webhooks/${id}`),
+  toggleWebhookTemplate: (id: string) => api.patch(`/templates/webhooks/${id}/toggle`),
+
+  // Redirect Rule Templates
+  getRedirectRuleTemplates: (params?: { page?: number; limit?: number; search?: string; type?: string; status?: string }) =>
+    api.get('/templates/redirect-rules', { params }),
+  getRedirectRuleTypes: () => api.get('/templates/redirect-rules/types'),
+  getRedirectRuleTemplate: (id: string) => api.get(`/templates/redirect-rules/${id}`),
+  createRedirectRuleTemplate: (data: any) => api.post('/templates/redirect-rules', data),
+  updateRedirectRuleTemplate: (id: string, data: any) => api.put(`/templates/redirect-rules/${id}`, data),
+  deleteRedirectRuleTemplate: (id: string) => api.delete(`/templates/redirect-rules/${id}`),
+  toggleRedirectRuleTemplate: (id: string) => api.patch(`/templates/redirect-rules/${id}/toggle`),
+
+  // SEO Templates
+  getSeoTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) =>
+    api.get('/templates/seo', { params }),
+  getSeoCategories: () => api.get('/templates/seo/categories'),
+  getSeoTemplate: (id: string) => api.get(`/templates/seo/${id}`),
+  createSeoTemplate: (data: any) => api.post('/templates/seo', data),
+  updateSeoTemplate: (id: string, data: any) => api.put(`/templates/seo/${id}`, data),
+  deleteSeoTemplate: (id: string) => api.delete(`/templates/seo/${id}`),
+  toggleSeoTemplate: (id: string) => api.patch(`/templates/seo/${id}/toggle`),
+
+  // Report Templates
+  getReportTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; status?: string }) =>
+    api.get('/templates/reports', { params }),
+  getReportCategories: () => api.get('/templates/reports/categories'),
+  getReportMetrics: () => api.get('/templates/reports/metrics'),
+  getReportDimensions: () => api.get('/templates/reports/dimensions'),
+  getReportTemplate: (id: string) => api.get(`/templates/reports/${id}`),
+  createReportTemplate: (data: any) => api.post('/templates/reports', data),
+  updateReportTemplate: (id: string, data: any) => api.put(`/templates/reports/${id}`, data),
+  deleteReportTemplate: (id: string) => api.delete(`/templates/reports/${id}`),
+  toggleReportTemplate: (id: string) => api.patch(`/templates/reports/${id}/toggle`),
 };

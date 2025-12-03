@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PRESET_ROLE_PERMISSIONS, UnifiedJwtPayload, TeamRole, Scope } from '@lnk/nestjs-common';
@@ -11,6 +12,8 @@ import { UserService } from '../user/user.service';
 import { TeamService } from '../team/team.service';
 import { EmailService } from '../email/email.service';
 import { TokenBlacklistService } from '../redis/token-blacklist.service';
+import { SecurityService } from '../security/security.service';
+import { SecurityEventType } from '../security/entities/security-event.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
@@ -25,28 +28,50 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly tokenBlacklistService: TokenBlacklistService,
+    private readonly securityService: SecurityService,
     @InjectRepository(PasswordResetToken)
     private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
   ) {}
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto, req?: Request) {
     const user = await this.userService.create(registerDto);
     const tokens = await this.generateTokensWithPermissions(user.id, user.email);
 
+    // 创建 session 记录
+    await this.createSessionFromRequest(user.id, tokens.accessToken, req);
+
+    // 记录安全事件
+    await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_SUCCESS, '用户注册并登录', req);
+
     // 发送欢迎邮件
     await this.emailService.sendWelcomeEmail(user.email, user.name);
+
+    // 发送邮箱验证邮件
+    try {
+      await this.userService.sendEmailVerification(user.id);
+    } catch (error) {
+      // 验证邮件发送失败不影响注册成功
+      console.error('Failed to send verification email:', error);
+    }
+
+    // 对于新注册用户，使用 userId 作为个人工作区的 teamId
+    // 这与 JWT scope.teamId 的逻辑保持一致
+    const effectiveTeamId = user.teamId || user.id;
 
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        teamId: effectiveTeamId,
+        emailVerified: false, // 新注册用户邮箱未验证
       },
       ...tokens,
+      requiresEmailVerification: true, // 告诉前端需要邮箱验证
     };
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, req?: Request) {
     const user = await this.userService.findByEmail(loginDto.email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -67,6 +92,10 @@ export class AuthService {
     if (!isPasswordValid) {
       // 记录登录失败
       const result = await this.userService.recordFailedLogin(user.id);
+
+      // 记录安全事件
+      await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_FAILED, '登录失败：密码错误', req);
+
       if (result.locked) {
         throw new UnauthorizedException(
           `密码错误次数过多，账户已锁定 ${result.lockMinutes} 分钟`,
@@ -80,15 +109,30 @@ export class AuthService {
     // 更新最后登录时间 (会自动重置失败计数)
     await this.userService.updateLastLogin(user.id);
 
+    // 对于没有团队的用户，使用 userId 作为个人工作区的 teamId
+    // 这与 JWT scope.teamId 的逻辑保持一致
+    const effectiveTeamId = user.teamId || user.id;
+
     const tokens = await this.generateTokensWithPermissions(user.id, user.email, user.teamId);
+    const emailVerified = !!user.emailVerifiedAt;
+
+    // 创建 session 记录
+    await this.createSessionFromRequest(user.id, tokens.accessToken, req);
+
+    // 记录安全事件
+    await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_SUCCESS, '用户登录成功', req);
+
     return {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        teamId: user.teamId,
+        teamId: effectiveTeamId,
+        emailVerified,
       },
       ...tokens,
+      // 如果邮箱未验证，提示用户需要验证
+      ...(emailVerified ? {} : { requiresEmailVerification: true }),
     };
   }
 
@@ -308,5 +352,267 @@ export class AuthService {
     await this.passwordResetTokenRepository.remove(resetToken);
 
     return { message: '密码重置成功' };
+  }
+
+  /**
+   * 发送登录验证码
+   * 生成6位数字验证码，5分钟有效
+   */
+  async sendLoginCode(email: string): Promise<{ message: string }> {
+    const user = await this.userService.findByEmail(email);
+
+    // 即使用户不存在也返回成功消息，防止用户枚举攻击
+    if (!user) {
+      return { message: '如果该邮箱已注册，您将收到登录验证码' };
+    }
+
+    // 检查账户是否被锁定
+    if (this.userService.isAccountLocked(user)) {
+      const remainingMinutes = this.userService.getRemainingLockTime(user);
+      throw new UnauthorizedException(
+        `账户已被锁定，请在 ${remainingMinutes} 分钟后重试`,
+      );
+    }
+
+    // 生成6位数字验证码
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5分钟后过期
+
+    // 保存验证码到用户记录
+    await this.userService.setLoginCode(user.id, code, expiresAt);
+
+    // 发送登录验证码邮件
+    await this.emailService.sendLoginCodeEmail(user.email, code);
+
+    // 开发环境下返回验证码 (便于测试)
+    if (this.configService.get('NODE_ENV') === 'development') {
+      return {
+        message: '登录验证码已发送',
+        // @ts-ignore - 仅开发环境返回验证码
+        loginCode: code,
+      };
+    }
+
+    return { message: '如果该邮箱已注册，您将收到登录验证码' };
+  }
+
+  /**
+   * 验证码登录
+   * 验证邮箱和验证码，成功后返回登录凭证
+   */
+  async verifyLoginCode(email: string, code: string, req?: Request) {
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('邮箱或验证码错误');
+    }
+
+    // 检查账户是否被锁定
+    if (this.userService.isAccountLocked(user)) {
+      const remainingMinutes = this.userService.getRemainingLockTime(user);
+      throw new UnauthorizedException(
+        `账户已被锁定，请在 ${remainingMinutes} 分钟后重试`,
+      );
+    }
+
+    // 验证验证码
+    if (!user.loginCode || !user.loginCodeExpiresAt) {
+      throw new UnauthorizedException('请先获取登录验证码');
+    }
+
+    if (new Date() > user.loginCodeExpiresAt) {
+      // 清除过期的验证码
+      await this.userService.clearLoginCode(user.id);
+      throw new UnauthorizedException('验证码已过期，请重新获取');
+    }
+
+    if (user.loginCode !== code) {
+      // 记录登录失败
+      const result = await this.userService.recordFailedLogin(user.id);
+
+      // 记录安全事件
+      await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_FAILED, '验证码登录失败：验证码错误', req);
+
+      if (result.locked) {
+        throw new UnauthorizedException(
+          `验证码错误次数过多，账户已锁定 ${result.lockMinutes} 分钟`,
+        );
+      }
+      throw new UnauthorizedException(
+        `验证码错误，还剩 ${result.remainingAttempts} 次尝试机会`,
+      );
+    }
+
+    // 验证成功，清除验证码
+    await this.userService.clearLoginCode(user.id);
+
+    // 更新最后登录时间 (会自动重置失败计数)
+    await this.userService.updateLastLogin(user.id);
+
+    // 对于没有团队的用户，使用 userId 作为个人工作区的 teamId
+    const effectiveTeamId = user.teamId || user.id;
+
+    const tokens = await this.generateTokensWithPermissions(user.id, user.email, user.teamId);
+    const emailVerified = !!user.emailVerifiedAt;
+
+    // 创建 session 记录
+    await this.createSessionFromRequest(user.id, tokens.accessToken, req);
+
+    // 记录安全事件
+    await this.logSecurityEvent(user.id, SecurityEventType.LOGIN_SUCCESS, '验证码登录成功', req);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        teamId: effectiveTeamId,
+        emailVerified,
+      },
+      ...tokens,
+      // 如果邮箱未验证，提示用户需要验证
+      ...(emailVerified ? {} : { requiresEmailVerification: true }),
+    };
+  }
+
+  /**
+   * 从请求创建 session 记录
+   */
+  private async createSessionFromRequest(userId: string, token: string, req?: Request): Promise<void> {
+    try {
+      const userAgent = req?.headers['user-agent'] || '';
+      const ipAddress = this.getClientIp(req);
+
+      // 解析 User-Agent
+      const { browser, os, deviceType, deviceName } = this.parseUserAgent(userAgent);
+
+      // 计算 token 过期时间
+      const accessExpiresIn = this.configService.get('JWT_ACCESS_EXPIRES_IN', '15m');
+      const expiresAt = new Date(Date.now() + this.parseExpiresIn(accessExpiresIn) * 1000);
+
+      await this.securityService.createSession({
+        userId,
+        token,
+        deviceName,
+        deviceType,
+        browser,
+        os,
+        ipAddress,
+        expiresAt,
+      });
+    } catch (error) {
+      // Session 创建失败不应该影响登录
+      console.error('Failed to create session:', error);
+    }
+  }
+
+  /**
+   * 记录安全事件
+   */
+  private async logSecurityEvent(
+    userId: string,
+    type: SecurityEventType,
+    description: string,
+    req?: Request,
+  ): Promise<void> {
+    try {
+      const userAgent = req?.headers['user-agent'] || '';
+      const ipAddress = this.getClientIp(req);
+      const { deviceName } = this.parseUserAgent(userAgent);
+
+      await this.securityService.logEvent({
+        userId,
+        type,
+        description,
+        ipAddress,
+        userAgent,
+        deviceName,
+      });
+    } catch (error) {
+      // 事件记录失败不应该影响正常流程
+      console.error('Failed to log security event:', error);
+    }
+  }
+
+  /**
+   * 获取客户端 IP 地址
+   * 优先级: CF-Connecting-IP (Cloudflare) > X-Real-IP (Nginx) > X-Forwarded-For > req.ip
+   */
+  private getClientIp(req?: Request): string {
+    if (!req) return '';
+
+    // 1. Cloudflare 的真实客户端 IP
+    const cfIp = req.headers['cf-connecting-ip'];
+    if (cfIp) {
+      const ip = typeof cfIp === 'string' ? cfIp : cfIp[0];
+      if (ip) return ip.trim();
+    }
+
+    // 2. Nginx 的 X-Real-IP
+    const realIp = req.headers['x-real-ip'];
+    if (realIp) {
+      const ip = typeof realIp === 'string' ? realIp : realIp[0];
+      if (ip) return ip.trim();
+    }
+
+    // 3. X-Forwarded-For 链中的第一个 IP
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+      const ips = typeof forwarded === 'string' ? forwarded : forwarded[0];
+      if (ips) {
+        const firstIp = ips.split(',')[0];
+        if (firstIp) return firstIp.trim();
+      }
+    }
+
+    // 4. 直接连接的 IP
+    return req.ip || req.socket?.remoteAddress || '';
+  }
+
+  /**
+   * 解析 User-Agent 字符串
+   */
+  private parseUserAgent(ua: string): {
+    browser: string;
+    os: string;
+    deviceType: string;
+    deviceName: string;
+  } {
+    let browser = 'Unknown';
+    let os = 'Unknown';
+    let deviceType = 'desktop';
+    let deviceName = 'Unknown Device';
+
+    // 检测浏览器
+    if (ua.includes('Chrome') && !ua.includes('Edg')) {
+      browser = 'Chrome';
+    } else if (ua.includes('Firefox')) {
+      browser = 'Firefox';
+    } else if (ua.includes('Safari') && !ua.includes('Chrome')) {
+      browser = 'Safari';
+    } else if (ua.includes('Edg')) {
+      browser = 'Edge';
+    } else if (ua.includes('Opera') || ua.includes('OPR')) {
+      browser = 'Opera';
+    }
+
+    // 检测操作系统
+    if (ua.includes('Windows')) {
+      os = 'Windows';
+    } else if (ua.includes('Mac OS')) {
+      os = 'macOS';
+    } else if (ua.includes('Linux')) {
+      os = 'Linux';
+    } else if (ua.includes('Android')) {
+      os = 'Android';
+      deviceType = 'mobile';
+    } else if (ua.includes('iPhone') || ua.includes('iPad')) {
+      os = 'iOS';
+      deviceType = ua.includes('iPad') ? 'tablet' : 'mobile';
+    }
+
+    // 构建设备名称
+    deviceName = `${browser} on ${os}`;
+
+    return { browser, os, deviceType, deviceName };
   }
 }

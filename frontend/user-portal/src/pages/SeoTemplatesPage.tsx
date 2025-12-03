@@ -56,16 +56,23 @@ import {
 } from '@/hooks/useSeoTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PresetTemplatesSection, PresetTemplateCard } from '@/components/shared';
+import {
+  usePresetSeoTemplates,
+  type PresetSeoTemplate,
+} from '@/hooks/usePresetTemplates';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 const CATEGORIES = [
-  { value: 'general', label: '通用' },
-  { value: 'landing_page', label: '落地页' },
-  { value: 'bio_link', label: 'Bio Link' },
-  { value: 'product', label: '产品页' },
-  { value: 'article', label: '文章页' },
-  { value: 'profile', label: '个人主页' },
+  { value: 'ecommerce', label: '电商' },
+  { value: 'saas', label: 'SaaS' },
+  { value: 'content', label: '内容' },
+  { value: 'social', label: '社交' },
+  { value: 'landing', label: '落地页' },
+  { value: 'app', label: '应用' },
+  { value: 'local', label: '本地商业' },
+  { value: 'media', label: '媒体' },
 ];
 
 const OG_TYPES = [
@@ -87,10 +94,21 @@ export default function SeoTemplatesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
 
+  // 预设模板状态
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<string>('');
+
   const { data: templates, isLoading } = useSeoTemplates({
     category: categoryFilter || undefined,
     search: searchQuery || undefined,
   });
+
+  // 预设模板查询
+  const { data: presetTemplatesData, isLoading: presetLoading } = usePresetSeoTemplates({
+    search: presetSearch || undefined,
+    category: presetCategoryFilter || undefined,
+  });
+
   const createTemplate = useCreateSeoTemplate();
   const updateTemplate = useUpdateSeoTemplate();
   const deleteTemplate = useDeleteSeoTemplate();
@@ -104,14 +122,14 @@ export default function SeoTemplatesPage() {
   const [formData, setFormData] = useState<CreateSeoTemplateDto>({
     name: '',
     description: '',
-    category: 'general',
+    category: 'content',
   });
 
   const resetForm = () => {
     setFormData({
       name: '',
       description: '',
-      category: 'general',
+      category: 'content',
     });
   };
 
@@ -212,6 +230,31 @@ export default function SeoTemplatesPage() {
     return count;
   };
 
+  // 使用预设模板
+  const handleUsePresetTemplate = (preset: PresetSeoTemplate) => {
+    setFormData({
+      name: `${preset.name} (副本)`,
+      description: preset.description || '',
+      category: (preset.category as SeoTemplate['category']) || 'content',
+      metaTitleTemplate: preset.config?.metaTitle,
+      metaDescription: preset.config?.metaDescription,
+      metaKeywords: preset.config?.metaKeywords,
+      ogTitleTemplate: preset.config?.ogTitle,
+      ogDescription: preset.config?.ogDescription,
+      ogType: preset.config?.ogType as 'website' | 'article' | 'profile' | 'product' | undefined,
+      ogImage: preset.config?.ogImage,
+      twitterCard: preset.config?.twitterCard,
+      twitterTitleTemplate: preset.config?.twitterTitle,
+      twitterDescription: preset.config?.twitterDescription,
+      twitterImage: preset.config?.twitterImage,
+      favicon: preset.config?.favicon,
+      canonicalUrlPattern: preset.config?.canonicalUrl,
+      metaRobots: preset.config?.robots,
+    });
+    setCreateDialogOpen(true);
+    toast({ title: '已加载预设模板配置，可自行修改后保存' });
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -258,6 +301,34 @@ export default function SeoTemplatesPage() {
           </Dialog>
         </div>
 
+        {/* 预设模板区域 */}
+        <PresetTemplatesSection<PresetSeoTemplate>
+          title="平台预设 SEO 模板"
+          description="使用平台提供的预设 SEO 配置，快速创建您自己的模板"
+          templates={presetTemplatesData?.data}
+          isLoading={presetLoading}
+          categories={CATEGORIES}
+          categoryFilter={presetCategoryFilter}
+          onCategoryChange={setPresetCategoryFilter}
+          searchQuery={presetSearch}
+          onSearchChange={setPresetSearch}
+          emptyMessage="暂无预设 SEO 模板"
+          defaultOpen={!templates || templates.length === 0}
+          renderTemplate={(preset) => (
+            <PresetTemplateCard
+              name={preset.name}
+              description={preset.description}
+              category={CATEGORIES.find((c) => c.value === preset.category)?.label}
+              tags={[
+                ...(preset.config?.ogTitle ? ['OG'] : []),
+                ...(preset.config?.twitterCard ? ['Twitter'] : []),
+              ]}
+              icon={<Globe className="h-5 w-5" />}
+              onUse={() => handleUsePresetTemplate(preset)}
+            />
+          )}
+        />
+
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -269,12 +340,12 @@ export default function SeoTemplatesPage() {
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="所有分类" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有分类</SelectItem>
+              <SelectItem value="all">所有分类</SelectItem>
               {CATEGORIES.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}

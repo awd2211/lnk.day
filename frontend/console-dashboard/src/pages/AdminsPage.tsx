@@ -119,6 +119,7 @@ export default function AdminsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteAdmin, setDeleteAdmin] = useState<Admin | null>(null);
   const [resetPasswordAdmin, setResetPasswordAdmin] = useState<Admin | null>(null);
+  const [toggleStatusAdmin, setToggleStatusAdmin] = useState<Admin | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -248,6 +249,7 @@ export default function AdminsPage() {
       adminAuthService.updateAdmin(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] });
+      setToggleStatusAdmin(null);
     },
   });
 
@@ -619,12 +621,7 @@ export default function AdminsPage() {
                           <DropdownMenuSeparator />
                           {admin.status !== 'pending' && (
                             <DropdownMenuItem
-                              onClick={() =>
-                                toggleStatusMutation.mutate({
-                                  id: admin.id,
-                                  status: admin.status === 'active' ? 'suspended' : 'active',
-                                })
-                              }
+                              onClick={() => setToggleStatusAdmin(admin)}
                             >
                               {admin.status === 'active' ? (
                                 <>
@@ -854,6 +851,50 @@ export default function AdminsPage() {
               onClick={() => resetPasswordAdmin && resetPasswordMutation.mutate(resetPasswordAdmin.id)}
             >
               {resetPasswordMutation.isPending ? '发送中...' : '发送重置邮件'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Toggle Status Confirmation */}
+      <AlertDialog open={!!toggleStatusAdmin} onOpenChange={() => setToggleStatusAdmin(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleStatusAdmin?.status === 'active' ? '停用管理员账号' : '启用管理员账号'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleStatusAdmin?.status === 'active' ? (
+                <>
+                  确定要停用管理员 <strong>{toggleStatusAdmin?.name}</strong> 的账号吗？
+                  停用后该管理员将无法登录系统。
+                </>
+              ) : (
+                <>
+                  确定要启用管理员 <strong>{toggleStatusAdmin?.name}</strong> 的账号吗？
+                  启用后该管理员可以正常登录系统。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className={toggleStatusAdmin?.status === 'active' ? 'bg-orange-600 hover:bg-orange-700' : ''}
+              onClick={() => {
+                if (toggleStatusAdmin) {
+                  toggleStatusMutation.mutate({
+                    id: toggleStatusAdmin.id,
+                    status: toggleStatusAdmin.status === 'active' ? 'suspended' : 'active',
+                  });
+                }
+              }}
+            >
+              {toggleStatusMutation.isPending
+                ? '处理中...'
+                : toggleStatusAdmin?.status === 'active'
+                ? '确认停用'
+                : '确认启用'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

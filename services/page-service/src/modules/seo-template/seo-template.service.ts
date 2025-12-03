@@ -31,12 +31,12 @@ export class SeoTemplateService {
       category?: string;
       isFavorite?: boolean;
       search?: string;
-      page?: number;
-      limit?: number;
+      page?: number | string;
+      limit?: number | string;
     },
   ): Promise<{ data: SeoTemplate[]; total: number; page: number; limit: number }> {
-    const page = options?.page || 1;
-    const limit = options?.limit || 20;
+    const page = Number(options?.page) || 1;
+    const limit = Number(options?.limit) || 20;
     const skip = (page - 1) * limit;
 
     const qb = this.seoTemplateRepo

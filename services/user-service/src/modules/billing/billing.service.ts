@@ -13,21 +13,17 @@ import {
 } from './entities/subscription.entity';
 import { PlanType, PLAN_LIMITS } from '../quota/quota.entity';
 import { QuotaService } from '../quota/quota.service';
+import { PlanService } from '../plan/plan.service';
+import { Plan } from '../plan/plan.entity';
 import {
   CreateSubscriptionDto,
   UpdateSubscriptionDto,
   CancelSubscriptionDto,
   AddPaymentMethodDto,
   PricingDto,
+  PricingPlanDto,
+  PricingResponseDto,
 } from './dto/billing.dto';
-
-// Pricing configuration
-const PRICING: Record<PlanType, { monthly: number; yearly: number }> = {
-  [PlanType.FREE]: { monthly: 0, yearly: 0 },
-  [PlanType.STARTER]: { monthly: 19, yearly: 190 },
-  [PlanType.PRO]: { monthly: 49, yearly: 490 },
-  [PlanType.ENTERPRISE]: { monthly: 199, yearly: 1990 },
-};
 
 @Injectable()
 export class BillingService {
@@ -39,106 +35,167 @@ export class BillingService {
     @InjectRepository(PaymentMethod)
     private readonly paymentMethodRepository: Repository<PaymentMethod>,
     private readonly quotaService: QuotaService,
+    private readonly planService: PlanService,
     private readonly configService: ConfigService,
   ) {}
 
   // ========== Pricing ==========
 
-  getPricing(): PricingDto[] {
-    return [
-      {
-        plan: PlanType.FREE,
-        name: 'Free',
-        description: 'Perfect for individuals getting started',
-        monthlyPrice: PRICING[PlanType.FREE].monthly,
-        yearlyPrice: PRICING[PlanType.FREE].yearly,
-        currency: 'USD',
-        features: ['25 links', '1,000 clicks/month', '5 QR codes', 'Basic analytics'],
-        limits: {
-          maxLinks: PLAN_LIMITS[PlanType.FREE].maxLinks,
-          maxClicks: PLAN_LIMITS[PlanType.FREE].maxClicks,
-          maxQrCodes: PLAN_LIMITS[PlanType.FREE].maxQrCodes,
-          maxTeamMembers: PLAN_LIMITS[PlanType.FREE].maxTeamMembers,
-          maxCustomDomains: PLAN_LIMITS[PlanType.FREE].maxCustomDomains,
-        },
+  /**
+   * 从数据库获取公开的套餐定价信息（新格式，供前端使用）
+   */
+  async getPricing(): Promise<PricingResponseDto> {
+    const plans = await this.planService.findPublic();
+    return {
+      plans: plans.map((plan) => this.convertPlanToPricingPlanDto(plan)),
+    };
+  }
+
+  /**
+   * 将 Plan 实体转换为 PricingPlanDto（匹配前端期望的格式）
+   */
+  private convertPlanToPricingPlanDto(plan: Plan): PricingPlanDto {
+    // 生成功能列表
+    const features: string[] = [];
+
+    // 添加限制相关的功能描述
+    const limits = plan.limits;
+    if (limits.maxLinks === -1) {
+      features.push('无限链接');
+    } else {
+      features.push(`${limits.maxLinks.toLocaleString()} 个链接`);
+    }
+
+    if (limits.maxClicks === -1) {
+      features.push('无限点击');
+    } else {
+      features.push(`${limits.maxClicks.toLocaleString()} 次点击/月`);
+    }
+
+    if (limits.maxQrCodes === -1) {
+      features.push('无限 QR 码');
+    } else {
+      features.push(`${limits.maxQrCodes.toLocaleString()} 个 QR 码`);
+    }
+
+    if (limits.maxTeamMembers === -1) {
+      features.push('无限团队成员');
+    } else if (limits.maxTeamMembers > 1) {
+      features.push(`${limits.maxTeamMembers} 个团队成员`);
+    }
+
+    if (limits.maxCustomDomains === -1) {
+      features.push('无限自定义域名');
+    } else if (limits.maxCustomDomains > 0) {
+      features.push(`${limits.maxCustomDomains} 个自定义域名`);
+    }
+
+    // 添加功能特性
+    const planFeatures = plan.features;
+    if (planFeatures.apiAccess) features.push('API 访问');
+    if (planFeatures.advancedAnalytics) features.push('高级分析');
+    if (planFeatures.abtesting) features.push('A/B 测试');
+    if (planFeatures.geoTargeting) features.push('地理定向');
+    if (planFeatures.deviceTargeting) features.push('设备定向');
+    if (planFeatures.passwordProtection) features.push('密码保护');
+    if (planFeatures.webhooks) features.push('Webhooks');
+    if (planFeatures.sso) features.push('SSO/SAML');
+    if (planFeatures.whiteLabel) features.push('白标');
+    if (planFeatures.dedicatedSupport) features.push('专属支持');
+    if (planFeatures.customIntegrations) features.push('自定义集成');
+    if (planFeatures.auditLogs) features.push('审计日志');
+
+    return {
+      id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      description: plan.description || '',
+      priceMonthly: plan.pricing.monthly,
+      priceYearly: plan.pricing.yearly,
+      priceIdMonthly: plan.stripePriceIdMonthly || undefined,
+      priceIdYearly: plan.stripePriceIdYearly || undefined,
+      features,
+      limits: {
+        links: limits.maxLinks,
+        clicks: limits.maxClicks,
+        customDomains: limits.maxCustomDomains,
+        teamMembers: limits.maxTeamMembers,
+        apiRequests: limits.maxApiRequests,
       },
-      {
-        plan: PlanType.STARTER,
-        name: 'Starter',
-        description: 'Great for small teams and projects',
-        monthlyPrice: PRICING[PlanType.STARTER].monthly,
-        yearlyPrice: PRICING[PlanType.STARTER].yearly,
-        currency: 'USD',
-        features: [
-          '500 links',
-          '50,000 clicks/month',
-          '50 QR codes',
-          '3 team members',
-          '1 custom domain',
-          'API access',
-          'Password protection',
-        ],
-        limits: {
-          maxLinks: PLAN_LIMITS[PlanType.STARTER].maxLinks,
-          maxClicks: PLAN_LIMITS[PlanType.STARTER].maxClicks,
-          maxQrCodes: PLAN_LIMITS[PlanType.STARTER].maxQrCodes,
-          maxTeamMembers: PLAN_LIMITS[PlanType.STARTER].maxTeamMembers,
-          maxCustomDomains: PLAN_LIMITS[PlanType.STARTER].maxCustomDomains,
-        },
+      popular: plan.badgeText === '热门' || plan.badgeText === 'Most Popular',
+    };
+  }
+
+  /**
+   * 将 Plan 实体转换为 PricingDto（旧格式，保留向后兼容）
+   */
+  private convertPlanToPricingDto(plan: Plan): PricingDto {
+    // 生成功能列表
+    const features: string[] = [];
+
+    // 添加限制相关的功能描述
+    const limits = plan.limits;
+    if (limits.maxLinks === -1) {
+      features.push('无限链接');
+    } else {
+      features.push(`${limits.maxLinks.toLocaleString()} 个链接`);
+    }
+
+    if (limits.maxClicks === -1) {
+      features.push('无限点击');
+    } else {
+      features.push(`${limits.maxClicks.toLocaleString()} 次点击/月`);
+    }
+
+    if (limits.maxQrCodes === -1) {
+      features.push('无限 QR 码');
+    } else {
+      features.push(`${limits.maxQrCodes.toLocaleString()} 个 QR 码`);
+    }
+
+    if (limits.maxTeamMembers === -1) {
+      features.push('无限团队成员');
+    } else if (limits.maxTeamMembers > 1) {
+      features.push(`${limits.maxTeamMembers} 个团队成员`);
+    }
+
+    if (limits.maxCustomDomains === -1) {
+      features.push('无限自定义域名');
+    } else if (limits.maxCustomDomains > 0) {
+      features.push(`${limits.maxCustomDomains} 个自定义域名`);
+    }
+
+    // 添加功能特性
+    const planFeatures = plan.features;
+    if (planFeatures.apiAccess) features.push('API 访问');
+    if (planFeatures.advancedAnalytics) features.push('高级分析');
+    if (planFeatures.abtesting) features.push('A/B 测试');
+    if (planFeatures.geoTargeting) features.push('地理定向');
+    if (planFeatures.deviceTargeting) features.push('设备定向');
+    if (planFeatures.passwordProtection) features.push('密码保护');
+    if (planFeatures.webhooks) features.push('Webhooks');
+    if (planFeatures.sso) features.push('SSO/SAML');
+    if (planFeatures.whiteLabel) features.push('白标');
+    if (planFeatures.dedicatedSupport) features.push('专属支持');
+    if (planFeatures.customIntegrations) features.push('自定义集成');
+    if (planFeatures.auditLogs) features.push('审计日志');
+
+    return {
+      plan: plan.code as PlanType,
+      name: plan.name,
+      description: plan.description || '',
+      monthlyPrice: plan.pricing.monthly,
+      yearlyPrice: plan.pricing.yearly,
+      currency: plan.pricing.currency || 'USD',
+      features,
+      limits: {
+        maxLinks: limits.maxLinks,
+        maxClicks: limits.maxClicks,
+        maxQrCodes: limits.maxQrCodes,
+        maxTeamMembers: limits.maxTeamMembers,
+        maxCustomDomains: limits.maxCustomDomains,
       },
-      {
-        plan: PlanType.PRO,
-        name: 'Pro',
-        description: 'For growing businesses',
-        monthlyPrice: PRICING[PlanType.PRO].monthly,
-        yearlyPrice: PRICING[PlanType.PRO].yearly,
-        currency: 'USD',
-        features: [
-          '5,000 links',
-          '500,000 clicks/month',
-          '500 QR codes',
-          '10 team members',
-          '5 custom domains',
-          'Advanced analytics',
-          'A/B testing',
-          'Geo targeting',
-          'Device targeting',
-        ],
-        limits: {
-          maxLinks: PLAN_LIMITS[PlanType.PRO].maxLinks,
-          maxClicks: PLAN_LIMITS[PlanType.PRO].maxClicks,
-          maxQrCodes: PLAN_LIMITS[PlanType.PRO].maxQrCodes,
-          maxTeamMembers: PLAN_LIMITS[PlanType.PRO].maxTeamMembers,
-          maxCustomDomains: PLAN_LIMITS[PlanType.PRO].maxCustomDomains,
-        },
-      },
-      {
-        plan: PlanType.ENTERPRISE,
-        name: 'Enterprise',
-        description: 'For large organizations with custom needs',
-        monthlyPrice: PRICING[PlanType.ENTERPRISE].monthly,
-        yearlyPrice: PRICING[PlanType.ENTERPRISE].yearly,
-        currency: 'USD',
-        features: [
-          'Unlimited links',
-          'Unlimited clicks',
-          'Unlimited QR codes',
-          'Unlimited team members',
-          'Unlimited custom domains',
-          'SSO/SAML',
-          'Dedicated support',
-          'SLA guarantee',
-          'Custom integrations',
-        ],
-        limits: {
-          maxLinks: -1,
-          maxClicks: -1,
-          maxQrCodes: -1,
-          maxTeamMembers: -1,
-          maxCustomDomains: -1,
-        },
-      },
-    ];
+    };
   }
 
   // ========== Subscriptions ==========
@@ -160,8 +217,9 @@ export class BillingService {
       throw new ConflictException('Team already has an active subscription');
     }
 
-    const pricing = PRICING[dto.plan];
-    const amount = dto.billingCycle === BillingCycle.YEARLY ? pricing.yearly : pricing.monthly;
+    // 从数据库获取套餐定价
+    const plan = await this.planService.findByCode(dto.plan);
+    const amount = dto.billingCycle === BillingCycle.YEARLY ? plan.pricing.yearly : plan.pricing.monthly;
 
     const now = new Date();
     const periodEnd = new Date(now);
@@ -171,17 +229,21 @@ export class BillingService {
       periodEnd.setMonth(periodEnd.getMonth() + 1);
     }
 
+    // 使用数据库中配置的试用天数
+    const trialDays = plan.trialDays || 0;
+    const isFreePlan = plan.pricing.monthly === 0;
+
     const subscription = this.subscriptionRepository.create({
       teamId,
       plan: dto.plan,
-      status: dto.plan === PlanType.FREE ? SubscriptionStatus.ACTIVE : SubscriptionStatus.TRIALING,
+      status: isFreePlan ? SubscriptionStatus.ACTIVE : SubscriptionStatus.TRIALING,
       billingCycle: dto.billingCycle,
       paymentProvider: dto.paymentProvider,
       amount,
-      currency: 'USD',
+      currency: plan.pricing.currency || 'USD',
       currentPeriodStart: now,
       currentPeriodEnd: periodEnd,
-      trialEndsAt: dto.plan !== PlanType.FREE ? new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000) : undefined,
+      trialEndsAt: !isFreePlan && trialDays > 0 ? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000) : undefined,
     });
 
     await this.subscriptionRepository.save(subscription);
@@ -202,10 +264,12 @@ export class BillingService {
     }
 
     if (dto.plan) {
-      const pricing = PRICING[dto.plan];
+      // 从数据库获取套餐定价
+      const plan = await this.planService.findByCode(dto.plan);
       const cycle = dto.billingCycle || subscription.billingCycle;
       subscription.plan = dto.plan;
-      subscription.amount = cycle === BillingCycle.YEARLY ? pricing.yearly : pricing.monthly;
+      subscription.amount = cycle === BillingCycle.YEARLY ? plan.pricing.yearly : plan.pricing.monthly;
+      subscription.currency = plan.pricing.currency || 'USD';
 
       // Update quota plan
       await this.quotaService.updatePlan(teamId, dto.plan);
@@ -213,8 +277,9 @@ export class BillingService {
 
     if (dto.billingCycle) {
       subscription.billingCycle = dto.billingCycle;
-      const pricing = PRICING[subscription.plan];
-      subscription.amount = dto.billingCycle === BillingCycle.YEARLY ? pricing.yearly : pricing.monthly;
+      // 从数据库获取当前套餐的定价
+      const plan = await this.planService.findByCode(subscription.plan);
+      subscription.amount = dto.billingCycle === BillingCycle.YEARLY ? plan.pricing.yearly : plan.pricing.monthly;
     }
 
     return this.subscriptionRepository.save(subscription);

@@ -493,14 +493,14 @@ export default function SavedSearchesPage() {
                   <div className="space-y-2">
                     <Label>排序字段</Label>
                     <Select
-                      value={formData.sortBy}
-                      onValueChange={(value) => setFormData({ ...formData, sortBy: value })}
+                      value={formData.sortBy || 'none'}
+                      onValueChange={(value) => setFormData({ ...formData, sortBy: value === 'none' ? '' : value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="选择排序字段" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">不排序</SelectItem>
+                        <SelectItem value="none">不排序</SelectItem>
                         {filterFields.map((field) => (
                           <SelectItem key={field.value} value={field.value}>
                             {field.label}
@@ -618,14 +618,14 @@ export default function SavedSearchesPage() {
               <div className="space-y-2">
                 <Label>排序字段</Label>
                 <Select
-                  value={formData.sortBy}
-                  onValueChange={(value) => setFormData({ ...formData, sortBy: value })}
+                  value={formData.sortBy || 'none'}
+                  onValueChange={(value) => setFormData({ ...formData, sortBy: value === 'none' ? '' : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="选择排序字段" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">不排序</SelectItem>
+                    <SelectItem value="none">不排序</SelectItem>
                     {filterFields.map((field) => (
                       <SelectItem key={field.value} value={field.value}>
                         {field.label}

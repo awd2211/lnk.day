@@ -16,6 +16,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -205,6 +215,7 @@ export default function PlansPage() {
     plan: null,
   });
   const [duplicateForm, setDuplicateForm] = useState({ code: '', name: '' });
+  const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -313,12 +324,17 @@ export default function PlansPage() {
     }
   };
 
-  const handleDelete = async (plan: Plan) => {
-    if (!confirm(`确定要删除套餐 "${plan.name}" 吗？`)) return;
+  const handleDelete = (plan: Plan) => {
+    setDeleteTarget(plan);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
 
     try {
-      await api.delete(`/proxy/plans/${plan.id}`);
+      await api.delete(`/proxy/plans/${deleteTarget.id}`);
       toast({ title: '删除成功', description: '套餐已删除' });
+      setDeleteTarget(null);
       loadPlans();
     } catch (error: any) {
       toast({
@@ -879,6 +895,29 @@ export default function PlansPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 删除套餐确认对话框 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除套餐</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除套餐 "{deleteTarget?.name}" 吗？
+              已订阅此套餐的用户将受到影响。此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDelete}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

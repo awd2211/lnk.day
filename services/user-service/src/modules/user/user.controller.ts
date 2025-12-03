@@ -60,8 +60,14 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '获取当前用户信息' })
-  getMe(@CurrentUser() user: AuthenticatedUser) {
-    return this.userService.findOne(user.id);
+  async getMe(@CurrentUser() user: AuthenticatedUser) {
+    const userData = await this.userService.findOne(user.id);
+    // 对于没有团队的用户，使用 userId 作为个人工作区的 teamId
+    // 这与 JWT scope.teamId 的逻辑保持一致
+    return {
+      ...userData,
+      teamId: userData.teamId || userData.id,
+    };
   }
 
   @Put('me')

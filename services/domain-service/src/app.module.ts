@@ -14,6 +14,7 @@ import {
 } from '@lnk/nestjs-common';
 import { DomainModule } from './modules/domain/domain.module';
 import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { HealthModule } from './modules/health/health.module';
         retryDelay: 3000,
       }),
     }),
+    RabbitMQModule,
     DomainModule,
     HealthModule,
   ],

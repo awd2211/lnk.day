@@ -8,7 +8,7 @@ interface PricingCardProps {
   interval: 'month' | 'year';
   currentPlanId?: string;
   isLoading?: boolean;
-  onSelect: (priceId: string) => void;
+  onSelect: (planCode: string) => void;
 }
 
 export function PricingCard({
@@ -19,8 +19,8 @@ export function PricingCard({
   onSelect,
 }: PricingCardProps) {
   const price = interval === 'month' ? plan.priceMonthly : plan.priceYearly;
-  const priceId = interval === 'month' ? plan.priceIdMonthly : plan.priceIdYearly;
   const isCurrentPlan = currentPlanId === plan.id;
+  const isFreePlan = plan.priceMonthly === 0;
   const yearlyDiscount = Math.round(
     ((plan.priceMonthly * 12 - plan.priceYearly) / (plan.priceMonthly * 12)) * 100
   );
@@ -52,7 +52,7 @@ export function PricingCard({
       <div className="mb-6">
         <div className="flex items-baseline">
           <span className="text-4xl font-bold text-gray-900 dark:text-white">
-            ¥{price.toLocaleString()}
+            ${price.toLocaleString()}
           </span>
           <span className="ml-2 text-gray-500 dark:text-gray-400">
             /{interval === 'month' ? '月' : '年'}
@@ -104,8 +104,8 @@ export function PricingCard({
       <Button
         className="mt-6 w-full"
         variant={plan.popular ? 'default' : 'outline'}
-        disabled={isCurrentPlan || isLoading}
-        onClick={() => onSelect(priceId)}
+        disabled={isCurrentPlan || isLoading || isFreePlan}
+        onClick={() => onSelect(plan.code || plan.id)}
       >
         {isLoading ? (
           <>
@@ -114,6 +114,8 @@ export function PricingCard({
           </>
         ) : isCurrentPlan ? (
           '当前套餐'
+        ) : isFreePlan ? (
+          '免费使用'
         ) : (
           '选择套餐'
         )}

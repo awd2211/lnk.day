@@ -27,6 +27,13 @@ export class ActionExecutorService {
       link: configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
       user: configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
       webhook: configService.get('WEBHOOK_SERVICE_URL', 'http://localhost:60017'),
+      campaign: configService.get('CAMPAIGN_SERVICE_URL', 'http://localhost:60004'),
+      qr: configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
+      page: configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+      deeplink: configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'),
+      domain: configService.get('DOMAIN_SERVICE_URL', 'http://localhost:60014'),
+      integration: configService.get('INTEGRATION_SERVICE_URL', 'http://localhost:60016'),
+      analytics: configService.get('ANALYTICS_SERVICE_URL', 'http://localhost:60050'),
     };
     this.internalApiKey = configService.get('INTERNAL_API_KEY', 'internal-api-key');
   }

@@ -230,7 +230,7 @@ export default function GoalsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ¥{stats?.totalRevenue?.toLocaleString() || 0}
+              ${stats?.totalRevenue?.toLocaleString() || 0}
             </div>
           </CardContent>
         </Card>
@@ -600,7 +600,7 @@ export default function GoalsPage() {
                         </div>
                       </div>
                       {conv.value !== undefined && (
-                        <Badge variant="outline">¥{conv.value.toLocaleString()}</Badge>
+                        <Badge variant="outline">${conv.value.toLocaleString()}</Badge>
                       )}
                     </div>
                   ))

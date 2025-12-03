@@ -20,6 +20,7 @@ import { SecurityService } from './security.service';
 import { SecurityEventType, SecurityEventSeverity } from './entities/security-event.entity';
 import { CreateBlockedIpDto } from './dto/create-blocked-ip.dto';
 import { UpdateSecuritySettingsDto } from './dto/update-security-settings.dto';
+import { UpdateUserSecuritySettingsDto } from './dto/update-user-security-settings.dto';
 import {
   JwtAuthGuard,
   ScopeGuard,
@@ -109,6 +110,41 @@ export class SecurityController {
   @ApiOperation({ summary: '获取安全概览' })
   async getSecurityOverview(@CurrentUser() user: AuthenticatedUser) {
     return this.securityService.getSecurityOverview(user.sub);
+  }
+
+  // ========== User Security Settings ==========
+
+  @Get('user-settings')
+  @ApiOperation({ summary: '获取当前用户的安全设置' })
+  async getUserSecuritySettings(@CurrentUser() user: AuthenticatedUser) {
+    return this.securityService.getUserSecuritySettings(user.sub);
+  }
+
+  @Put('user-settings')
+  @ApiOperation({ summary: '更新当前用户的安全设置' })
+  async updateUserSecuritySettings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateUserSecuritySettingsDto,
+  ) {
+    return this.securityService.updateUserSecuritySettings(user.sub, dto);
+  }
+
+  @Post('user-settings/ip-whitelist')
+  @ApiOperation({ summary: '添加 IP 到白名单' })
+  async addIpToWhitelist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('ip') ip: string,
+  ) {
+    return this.securityService.addIpToWhitelist(user.sub, ip);
+  }
+
+  @Delete('user-settings/ip-whitelist/:ip')
+  @ApiOperation({ summary: '从白名单移除 IP' })
+  async removeIpFromWhitelist(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('ip') ip: string,
+  ) {
+    return this.securityService.removeIpFromWhitelist(user.sub, ip);
   }
 
   // ========== Platform Security Settings (Admin) ==========

@@ -29,13 +29,15 @@ export class DeepLinkTemplateService {
   async findAll(
     teamId: string,
     options?: {
-      page?: number;
-      limit?: number;
+      page?: number | string;
+      limit?: number | string;
       isFavorite?: boolean;
       search?: string;
     },
   ): Promise<{ data: DeepLinkTemplate[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 20, isFavorite, search } = options || {};
+    const { isFavorite, search } = options || {};
+    const page = Number(options?.page) || 1;
+    const limit = Number(options?.limit) || 20;
     const skip = (page - 1) * limit;
 
     const qb = this.templateRepository

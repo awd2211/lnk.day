@@ -1,7 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // All API calls go through api-gateway
-const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:60000';
+// 默认为空字符串，这样请求会发送到当前域名的相对路径
+// 开发时可以设置 VITE_API_GATEWAY_URL=http://localhost:60000
+const API_GATEWAY_URL = import.meta.env.VITE_API_GATEWAY_URL || '';
 
 // Page service URL for bio link preview
 export const PAGE_SERVICE_URL = import.meta.env.VITE_PAGE_SERVICE_URL || 'http://localhost:60007';
@@ -184,8 +186,12 @@ const createApiClient = (baseURL: string) => {
 
 // Single API client for all services via api-gateway
 export const api = createApiClient(API_GATEWAY_URL);
+
+/** @deprecated 使用 api 代替，所有 API 都通过 api-gateway 统一访问 */
 export const linkApi = api;
+/** @deprecated 使用 api 代替，所有 API 都通过 api-gateway 统一访问 */
 export const analyticsApi = api;
+/** @deprecated 使用 api 代替，所有 API 都通过 api-gateway 统一访问 */
 export const qrApi = api;
 
 // Auth API
@@ -199,8 +205,8 @@ export const authService = {
     api.post('/api/v1/users/change-password', data),
 
   // Email verification
-  sendVerificationEmail: () => api.post('/api/v1/users/send-verification-email'),
-  verifyEmail: (token: string) => api.get('/api/v1/users/verify-email', { params: { token } }),
+  resendVerification: () => api.post('/api/v1/auth/resend-verification'),
+  verifyEmail: (token: string) => api.get('/api/v1/auth/verify-email', { params: { token } }),
 
   // 2FA
   get2FAStatus: () => api.get('/api/v1/auth/2fa/status'),
@@ -209,6 +215,16 @@ export const authService = {
   disable2FA: (code: string) => api.delete('/api/v1/auth/2fa/disable', { data: { code } }),
   regenerateBackupCodes: (code: string) =>
     api.post('/api/v1/auth/2fa/regenerate-backup-codes', { code }),
+
+  // Password reset
+  forgotPassword: (email: string) => api.post('/api/v1/auth/forgot-password', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    api.post('/api/v1/auth/reset-password', { token, newPassword }),
+
+  // Login code (验证码登录)
+  sendLoginCode: (email: string) => api.post('/api/v1/auth/send-login-code', { email }),
+  verifyLoginCode: (email: string, code: string) =>
+    api.post('/api/v1/auth/verify-login-code', { email, code }),
 };
 
 // Link API
@@ -432,7 +448,7 @@ export const billingService = {
     api.get(`/api/v1/billing/invoices/${invoiceId}/download`, { responseType: 'blob' }),
 
   // Stripe
-  createCheckoutSession: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
+  createCheckoutSession: (data: { plan: string; billingCycle: 'monthly' | 'yearly' }) =>
     api.post('/api/v1/stripe/checkout', data),
   createPortalSession: (data: { returnUrl: string }) => api.post('/api/v1/stripe/portal', data),
   createSetupIntent: () => api.post('/api/v1/stripe/setup-intent'),
@@ -485,6 +501,18 @@ export const securityService = {
   disable2FA: (code: string) => api.delete('/api/v1/auth/2fa/disable', { data: { code } }),
   regenerateBackupCodes: (code: string) =>
     api.post('/api/v1/auth/2fa/regenerate-backup-codes', { code }),
+  // User Security Settings
+  getUserSettings: () => api.get('/api/v1/security/user-settings'),
+  updateUserSettings: (data: {
+    loginNotifications?: boolean;
+    suspiciousActivityAlerts?: boolean;
+    sessionTimeoutDays?: number;
+    ipWhitelistEnabled?: boolean;
+    ipWhitelist?: string[];
+  }) => api.put('/api/v1/security/user-settings', data),
+  addIpToWhitelist: (ip: string) => api.post('/api/v1/security/user-settings/ip-whitelist', { ip }),
+  removeIpFromWhitelist: (ip: string) =>
+    api.delete(`/api/v1/security/user-settings/ip-whitelist/${encodeURIComponent(ip)}`),
 };
 
 // User/Team API
@@ -974,4 +1002,134 @@ export const openApiService = {
   // API Key validation
   validateApiKey: (apiKey: string) =>
     api.post('/api/v1/open/validate-key', {}, { headers: { 'X-API-Key': apiKey } }),
+};
+
+// Preset Templates API (console-service 提供的平台预设模板，只读)
+export const presetTemplateService = {
+  // Link Templates
+  getLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/links', { params }),
+  getLinkTemplate: (id: string) => api.get(`/api/v1/preset-templates/links/${id}`),
+
+  // UTM Templates
+  getUTMTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; platform?: string }) =>
+    api.get('/api/v1/preset-templates/utm', { params }),
+  getUTMTemplate: (id: string) => api.get(`/api/v1/preset-templates/utm/${id}`),
+  getUTMPlatforms: () => api.get('/api/v1/preset-templates/utm/platforms'),
+
+  // Campaign Templates
+  getCampaignTemplates: (params?: { page?: number; limit?: number; search?: string; scenario?: string }) =>
+    api.get('/api/v1/preset-templates/campaigns', { params }),
+  getCampaignTemplate: (id: string) => api.get(`/api/v1/preset-templates/campaigns/${id}`),
+  getCampaignScenarios: () => api.get('/api/v1/preset-templates/campaigns/scenarios'),
+
+  // Bio Link Templates
+  getBioLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string; industry?: string }) =>
+    api.get('/api/v1/preset-templates/bio-links', { params }),
+  getBioLinkTemplate: (id: string) => api.get(`/api/v1/preset-templates/bio-links/${id}`),
+  getBioLinkIndustries: () => api.get('/api/v1/preset-templates/bio-links/industries'),
+  getBioLinkTemplatePreview: (id: string) => api.get(`/api/v1/preset-templates/bio-links/${id}/preview`),
+
+  // QR Styles
+  getQRStyles: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/qr-styles', { params }),
+  getQRStyle: (id: string) => api.get(`/api/v1/preset-templates/qr-styles/${id}`),
+  getQRStylePreview: (id: string) => api.get(`/api/v1/preset-templates/qr-styles/${id}/preview`),
+
+  // DeepLink Templates
+  getDeepLinkTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/deeplinks', { params }),
+  getDeepLinkTemplate: (id: string) => api.get(`/api/v1/preset-templates/deeplinks/${id}`),
+  getDeepLinkCategories: () => api.get('/api/v1/preset-templates/deeplinks/categories'),
+
+  // Webhook Templates
+  getWebhookTemplates: (params?: { page?: number; limit?: number; search?: string; platform?: string }) =>
+    api.get('/api/v1/preset-templates/webhooks', { params }),
+  getWebhookTemplate: (id: string) => api.get(`/api/v1/preset-templates/webhooks/${id}`),
+  getWebhookPlatforms: () => api.get('/api/v1/preset-templates/webhooks/platforms'),
+
+  // Redirect Rule Templates
+  getRedirectRuleTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/redirect-rules', { params }),
+  getRedirectRuleTemplate: (id: string) => api.get(`/api/v1/preset-templates/redirect-rules/${id}`),
+  getRedirectRuleCategories: () => api.get('/api/v1/preset-templates/redirect-rules/categories'),
+
+  // SEO Templates
+  getSeoTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/seo', { params }),
+  getSeoTemplate: (id: string) => api.get(`/api/v1/preset-templates/seo/${id}`),
+  getSeoCategories: () => api.get('/api/v1/preset-templates/seo/categories'),
+
+  // Report Templates
+  getReportTemplates: (params?: { page?: number; limit?: number; search?: string; category?: string }) =>
+    api.get('/api/v1/preset-templates/reports', { params }),
+  getReportTemplate: (id: string) => api.get(`/api/v1/preset-templates/reports/${id}`),
+  getReportCategories: () => api.get('/api/v1/preset-templates/reports/categories'),
+  getAvailableMetrics: () => api.get('/api/v1/preset-templates/reports/metrics'),
+  getAvailableDimensions: () => api.get('/api/v1/preset-templates/reports/dimensions'),
+};
+
+// =============================================================================
+// 用户模板 CRUD API (区别于 presetTemplateService 的只读预设模板)
+// =============================================================================
+
+// Report Template API (user-service: 60002)
+export const reportTemplateService = {
+  getAll: (params?: { category?: string; isFavorite?: boolean; search?: string }) =>
+    api.get('/api/v1/report-templates', { params }),
+  getOne: (id: string) => api.get(`/api/v1/report-templates/${id}`),
+  create: (data: any) => api.post('/api/v1/report-templates', data),
+  update: (id: string, data: any) => api.put(`/api/v1/report-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/report-templates/${id}`),
+  toggleFavorite: (id: string) => api.patch(`/api/v1/report-templates/${id}/favorite`),
+  duplicate: (id: string) => api.post(`/api/v1/report-templates/${id}/duplicate`),
+  generate: (id: string) => api.post(`/api/v1/report-templates/${id}/generate`),
+};
+
+// DeepLink Template API (deeplink-service: 60008)
+export const deepLinkTemplateService = {
+  getAll: (params?: { category?: string; isFavorite?: boolean; search?: string }) =>
+    api.get('/api/v1/deeplink-templates', { params }),
+  getOne: (id: string) => api.get(`/api/v1/deeplink-templates/${id}`),
+  create: (data: any) => api.post('/api/v1/deeplink-templates', data),
+  update: (id: string, data: any) => api.put(`/api/v1/deeplink-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/deeplink-templates/${id}`),
+  toggleFavorite: (id: string) => api.patch(`/api/v1/deeplink-templates/${id}/favorite`),
+  duplicate: (id: string) => api.post(`/api/v1/deeplink-templates/${id}/duplicate`),
+};
+
+// Webhook Template API (webhook-service: 60017)
+export const webhookTemplateService = {
+  getAll: (params?: { platform?: string; isFavorite?: boolean; search?: string }) =>
+    api.get('/api/v1/webhook-templates', { params }),
+  getOne: (id: string) => api.get(`/api/v1/webhook-templates/${id}`),
+  create: (data: any) => api.post('/api/v1/webhook-templates', data),
+  update: (id: string, data: any) => api.put(`/api/v1/webhook-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/webhook-templates/${id}`),
+  toggleFavorite: (id: string) => api.patch(`/api/v1/webhook-templates/${id}/favorite`),
+  duplicate: (id: string) => api.post(`/api/v1/webhook-templates/${id}/duplicate`),
+};
+
+// Redirect Rule Template API (link-service: 60003)
+export const redirectRuleTemplateService = {
+  getAll: (params?: { category?: string; isFavorite?: boolean; search?: string }) =>
+    api.get('/api/v1/redirect-rule-templates', { params }),
+  getOne: (id: string) => api.get(`/api/v1/redirect-rule-templates/${id}`),
+  create: (data: any) => api.post('/api/v1/redirect-rule-templates', data),
+  update: (id: string, data: any) => api.put(`/api/v1/redirect-rule-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/redirect-rule-templates/${id}`),
+  toggleFavorite: (id: string) => api.patch(`/api/v1/redirect-rule-templates/${id}/favorite`),
+  duplicate: (id: string) => api.post(`/api/v1/redirect-rule-templates/${id}/duplicate`),
+};
+
+// SEO Template API (page-service: 60007)
+export const seoTemplateService = {
+  getAll: (params?: { category?: string; isFavorite?: boolean; search?: string }) =>
+    api.get('/api/v1/seo-templates', { params }),
+  getOne: (id: string) => api.get(`/api/v1/seo-templates/${id}`),
+  create: (data: any) => api.post('/api/v1/seo-templates', data),
+  update: (id: string, data: any) => api.put(`/api/v1/seo-templates/${id}`, data),
+  delete: (id: string) => api.delete(`/api/v1/seo-templates/${id}`),
+  toggleFavorite: (id: string) => api.patch(`/api/v1/seo-templates/${id}/favorite`),
+  duplicate: (id: string) => api.post(`/api/v1/seo-templates/${id}/duplicate`),
 };

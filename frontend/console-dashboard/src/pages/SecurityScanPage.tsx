@@ -44,6 +44,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -161,6 +171,7 @@ export default function SecurityScanPage() {
     value: '',
     reason: '',
   });
+  const [removeBlacklistTarget, setRemoveBlacklistTarget] = useState<BlacklistEntry | null>(null);
 
   const { data: stats } = useQuery<SecurityStats>({
     queryKey: ['security-stats'],
@@ -239,6 +250,7 @@ export default function SecurityScanPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['security-blacklist'] });
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+      setRemoveBlacklistTarget(null);
       toast.success('已从黑名单移除');
     },
     onError: () => {
@@ -511,11 +523,7 @@ export default function SecurityScanPage() {
                           variant="ghost"
                           size="icon"
                           className="text-red-600"
-                          onClick={() => {
-                            if (confirm('确定要从黑名单移除吗？')) {
-                              removeFromBlacklistMutation.mutate(entry.id);
-                            }
-                          }}
+                          onClick={() => setRemoveBlacklistTarget(entry)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -833,6 +841,27 @@ export default function SecurityScanPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Remove from Blacklist Confirmation */}
+      <AlertDialog open={!!removeBlacklistTarget} onOpenChange={(open) => !open && setRemoveBlacklistTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认移除黑名单</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要从黑名单移除 "{removeBlacklistTarget?.value}" 吗？移除后该条目将不再被拦截。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => removeBlacklistTarget && removeFromBlacklistMutation.mutate(removeBlacklistTarget.id)}
+            >
+              确认移除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

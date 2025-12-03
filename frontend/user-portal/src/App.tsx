@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 // Critical pages - load immediately
 import HomePage from '@/pages/HomePage';
 import LoginPage from '@/pages/LoginPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import VerifyEmailPage from '@/pages/VerifyEmailPage';
 
 // Lazy loaded pages - code split for smaller initial bundle
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
@@ -58,6 +60,7 @@ const WebhookTemplatesPage = lazy(() => import('@/pages/WebhookTemplatesPage'));
 const RedirectRuleTemplatesPage = lazy(() => import('@/pages/RedirectRuleTemplatesPage'));
 const SeoTemplatesPage = lazy(() => import('@/pages/SeoTemplatesPage'));
 const ReportTemplatesPage = lazy(() => import('@/pages/ReportTemplatesPage'));
+const QRStyleTemplatesPage = lazy(() => import('@/pages/QRStyleTemplatesPage'));
 
 // Loading fallback component
 function PageLoader() {
@@ -92,6 +95,8 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           {/* Public Bio Link page - no auth required */}
           <Route path="/u/:username" element={<BioLinkPublicPage />} />
           <Route
@@ -504,6 +509,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ReportTemplatesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/templates/qr-styles"
+            element={
+              <ProtectedRoute>
+                <QRStyleTemplatesPage />
               </ProtectedRoute>
             }
           />

@@ -863,7 +863,7 @@ export class TemplatesService {
 
     const [items, total] = await this.reportTemplateRepo.findAndCount({
       where,
-      order: { sortOrder: 'ASC', createdAt: 'DESC' },
+      order: { displayOrder: 'ASC', createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });

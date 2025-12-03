@@ -101,15 +101,23 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-100 text-red-700',
 };
 
+// User Security Settings Interface
+interface UserSecuritySettings {
+  id: string;
+  userId: string;
+  loginNotifications: boolean;
+  suspiciousActivityAlerts: boolean;
+  sessionTimeoutDays: number;
+  ipWhitelistEnabled: boolean;
+  ipWhitelist: string[];
+}
+
 export default function SecuritySettingsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Security settings state
-  const [loginNotifications, setLoginNotifications] = useState(true);
-  const [suspiciousActivityAlerts, setSuspiciousActivityAlerts] = useState(true);
-  const [ipWhitelistEnabled, setIpWhitelistEnabled] = useState(false);
-  const [sessionTimeout, setSessionTimeout] = useState('7');
+  // New IP input state
+  const [newIpAddress, setNewIpAddress] = useState('');
 
   // Password change dialog
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -154,6 +162,50 @@ export default function SecuritySettingsPage() {
       return data;
     },
     enabled: false,
+  });
+
+  // User Security Settings Query
+  const { data: userSettingsData, isLoading: isLoadingUserSettings } = useQuery({
+    queryKey: ['user-security-settings'],
+    queryFn: async () => {
+      const { data } = await securityService.getUserSettings();
+      return data as UserSecuritySettings;
+    },
+  });
+
+  // User Settings Mutations
+  const updateUserSettingsMutation = useMutation({
+    mutationFn: (data: Partial<UserSecuritySettings>) => securityService.updateUserSettings(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-security-settings'] });
+      toast({ title: '设置已保存' });
+    },
+    onError: () => {
+      toast({ title: '保存失败', variant: 'destructive' });
+    },
+  });
+
+  const addIpMutation = useMutation({
+    mutationFn: (ip: string) => securityService.addIpToWhitelist(ip),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-security-settings'] });
+      setNewIpAddress('');
+      toast({ title: 'IP 已添加到白名单' });
+    },
+    onError: () => {
+      toast({ title: '添加失败', variant: 'destructive' });
+    },
+  });
+
+  const removeIpMutation = useMutation({
+    mutationFn: (ip: string) => securityService.removeIpFromWhitelist(ip),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-security-settings'] });
+      toast({ title: 'IP 已从白名单移除' });
+    },
+    onError: () => {
+      toast({ title: '移除失败', variant: 'destructive' });
+    },
   });
 
   // Mutations
@@ -208,6 +260,13 @@ export default function SecuritySettingsPage() {
   const sessions: Session[] = sessionsData?.sessions || [];
   const events: SecurityEvent[] = eventsData?.events || [];
   const twoFactorEnabled = twoFactorStatus?.enabled || false;
+
+  // User settings with defaults
+  const loginNotifications = userSettingsData?.loginNotifications ?? true;
+  const suspiciousActivityAlerts = userSettingsData?.suspiciousActivityAlerts ?? true;
+  const sessionTimeoutDays = userSettingsData?.sessionTimeoutDays ?? 7;
+  const ipWhitelistEnabled = userSettingsData?.ipWhitelistEnabled ?? false;
+  const ipWhitelist = userSettingsData?.ipWhitelist ?? [];
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('zh-CN');
@@ -266,7 +325,7 @@ export default function SecuritySettingsPage() {
     verify2FAMutation.mutate(twoFactorCode);
   };
 
-  const isLoading = isLoadingSessions || isLoadingEvents;
+  const isLoading = isLoadingSessions || isLoadingEvents || isLoadingUserSettings;
 
   if (isLoading) {
     return (
@@ -493,10 +552,10 @@ export default function SecuritySettingsPage() {
                           <DialogDescription>使用验证器应用扫描下方二维码</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
-                          {enable2FAData?.qrCodeDataUrl ? (
+                          {enable2FAData?.qrCodeUrl ? (
                             <div className="flex justify-center">
                               <img
-                                src={enable2FAData.qrCodeDataUrl}
+                                src={enable2FAData.qrCodeUrl}
                                 alt="2FA QR Code"
                                 className="w-48 h-48 border rounded-lg"
                               />
@@ -682,7 +741,13 @@ export default function SecuritySettingsPage() {
                     <p className="font-medium">登录通知</p>
                     <p className="text-sm text-muted-foreground">当有新设备登录时发送邮件通知</p>
                   </div>
-                  <Switch checked={loginNotifications} onCheckedChange={setLoginNotifications} />
+                  <Switch
+                    checked={loginNotifications}
+                    onCheckedChange={(checked) =>
+                      updateUserSettingsMutation.mutate({ loginNotifications: checked })
+                    }
+                    disabled={updateUserSettingsMutation.isPending}
+                  />
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
@@ -690,7 +755,13 @@ export default function SecuritySettingsPage() {
                     <p className="font-medium">可疑活动警报</p>
                     <p className="text-sm text-muted-foreground">检测到异常登录尝试时发送警报</p>
                   </div>
-                  <Switch checked={suspiciousActivityAlerts} onCheckedChange={setSuspiciousActivityAlerts} />
+                  <Switch
+                    checked={suspiciousActivityAlerts}
+                    onCheckedChange={(checked) =>
+                      updateUserSettingsMutation.mutate({ suspiciousActivityAlerts: checked })
+                    }
+                    disabled={updateUserSettingsMutation.isPending}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -706,14 +777,18 @@ export default function SecuritySettingsPage() {
                     <p className="text-sm text-muted-foreground">自动登出的空闲时间</p>
                   </div>
                   <select
-                    value={sessionTimeout}
-                    onChange={(e) => setSessionTimeout(e.target.value)}
+                    value={sessionTimeoutDays === 0 ? '0' : String(sessionTimeoutDays)}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      updateUserSettingsMutation.mutate({ sessionTimeoutDays: value });
+                    }}
                     className="border rounded-md px-3 py-2"
+                    disabled={updateUserSettingsMutation.isPending}
                   >
                     <option value="1">1 天</option>
                     <option value="7">7 天</option>
                     <option value="30">30 天</option>
-                    <option value="never">永不过期</option>
+                    <option value="0">永不过期</option>
                   </select>
                 </div>
               </CardContent>
@@ -730,7 +805,13 @@ export default function SecuritySettingsPage() {
                     <p className="font-medium">启用 IP 白名单</p>
                     <p className="text-sm text-muted-foreground">仅允许白名单中的 IP 地址登录</p>
                   </div>
-                  <Switch checked={ipWhitelistEnabled} onCheckedChange={setIpWhitelistEnabled} />
+                  <Switch
+                    checked={ipWhitelistEnabled}
+                    onCheckedChange={(checked) =>
+                      updateUserSettingsMutation.mutate({ ipWhitelistEnabled: checked })
+                    }
+                    disabled={updateUserSettingsMutation.isPending}
+                  />
                 </div>
                 {ipWhitelistEnabled && (
                   <>
@@ -745,11 +826,50 @@ export default function SecuritySettingsPage() {
                     <div className="space-y-2">
                       <Label>允许的 IP 地址</Label>
                       <div className="flex gap-2">
-                        <Input placeholder="例如: 123.45.67.89" />
-                        <Button>
-                          <Plus className="h-4 w-4" />
+                        <Input
+                          placeholder="例如: 123.45.67.89"
+                          value={newIpAddress}
+                          onChange={(e) => setNewIpAddress(e.target.value)}
+                        />
+                        <Button
+                          onClick={() => {
+                            if (newIpAddress.trim()) {
+                              addIpMutation.mutate(newIpAddress.trim());
+                            }
+                          }}
+                          disabled={addIpMutation.isPending || !newIpAddress.trim()}
+                        >
+                          {addIpMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Plus className="h-4 w-4" />
+                          )}
                         </Button>
                       </div>
+                      {ipWhitelist.length > 0 && (
+                        <div className="mt-4 space-y-2">
+                          {ipWhitelist.map((ip) => (
+                            <div
+                              key={ip}
+                              className="flex items-center justify-between p-2 border rounded-md"
+                            >
+                              <code className="text-sm">{ip}</code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeIpMutation.mutate(ip)}
+                                disabled={removeIpMutation.isPending}
+                              >
+                                {removeIpMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <X className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

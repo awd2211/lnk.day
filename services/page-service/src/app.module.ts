@@ -18,6 +18,7 @@ import { BioLinkModule } from './modules/bio-link/bio-link.module';
 import { SeoModule } from './modules/seo/seo.module';
 import { SeoTemplateModule } from './modules/seo-template/seo-template.module';
 import { HealthModule } from './modules/health/health.module';
+import { RabbitMQModule } from './common/rabbitmq/rabbitmq.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { HealthModule } from './modules/health/health.module';
         synchronize: config.get('NODE_ENV') !== 'production',
       }),
     }),
+    RabbitMQModule,
     PageModule,
     TemplateModule,
     BioLinkModule,

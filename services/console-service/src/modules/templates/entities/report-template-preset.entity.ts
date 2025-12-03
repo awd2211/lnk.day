@@ -87,7 +87,7 @@ export class ReportTemplatePreset {
   isActive: boolean;
 
   @Column({ default: 0 })
-  sortOrder: number;
+  displayOrder: number;
 
   @Column({ default: 0 })
   usageCount: number;

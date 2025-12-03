@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { nanoid } from 'nanoid';
 import { QrRecord, QrScan, QrType, QrContentType } from './qr-record.entity';
+import { QREventService } from '../../common/rabbitmq/qr-event.service';
 
 @Injectable()
 export class TrackingService {
@@ -11,6 +12,7 @@ export class TrackingService {
     private readonly qrRecordRepository: Repository<QrRecord>,
     @InjectRepository(QrScan)
     private readonly qrScanRepository: Repository<QrScan>,
+    private readonly qrEventService: QREventService,
   ) {}
 
   async createQrRecord(data: {
@@ -37,7 +39,19 @@ export class TrackingService {
       tags: data.tags || [],
     });
 
-    return this.qrRecordRepository.save(record);
+    const savedRecord = await this.qrRecordRepository.save(record);
+
+    // Publish QR created event
+    await this.qrEventService.publishQRCreated({
+      qrId: savedRecord.id,
+      linkId: savedRecord.linkId,
+      shortCode: savedRecord.shortCode,
+      format: 'png',
+      userId: savedRecord.userId,
+      teamId: savedRecord.teamId,
+    });
+
+    return savedRecord;
   }
 
   async findByShortCode(shortCode: string): Promise<QrRecord> {
@@ -86,8 +100,16 @@ export class TrackingService {
     return this.qrRecordRepository.save(record);
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, userId?: string): Promise<void> {
     const record = await this.findById(id);
+
+    // Publish QR deleted event before removing
+    await this.qrEventService.publishQRDeleted({
+      qrId: record.id,
+      userId: userId || record.userId,
+      teamId: record.teamId,
+    });
+
     await this.qrRecordRepository.remove(record);
   }
 
@@ -136,6 +158,18 @@ export class TrackingService {
     }
     record.lastScannedAt = new Date();
     await this.qrRecordRepository.save(record);
+
+    // Publish QR scanned event
+    await this.qrEventService.publishQRScanned({
+      qrId: record.id,
+      linkId: record.linkId,
+      shortCode: record.shortCode,
+      ip: scanData.ipAddress,
+      userAgent: scanData.userAgent,
+      country: scanData.country,
+      city: scanData.city,
+      device: scanData.deviceType,
+    });
 
     return scan;
   }

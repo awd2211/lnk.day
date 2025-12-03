@@ -47,6 +47,13 @@ export class ProxyService {
         url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
         requireAuth: true,
       },
+      // Billing pricing (public, must come before auth-required billing routes)
+      {
+        name: 'user-service-billing-pricing',
+        prefix: '/api/billing/pricing',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: false,
+      },
       {
         name: 'user-service-billing',
         prefix: '/api/billing',
@@ -90,6 +97,24 @@ export class ProxyService {
         url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
         requireAuth: true,
       },
+      {
+        name: 'user-service-report-templates',
+        prefix: '/api/report-templates',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
+      {
+        name: 'user-service-plans',
+        prefix: '/api/plans',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
+      {
+        name: 'user-service-tenants',
+        prefix: '/api/tenants',
+        url: this.configService.get('USER_SERVICE_URL', 'http://localhost:60002'),
+        requireAuth: true,
+      },
       // Link Service (60003)
       {
         name: 'link-service-links',
@@ -118,6 +143,12 @@ export class ProxyService {
       {
         name: 'link-service-redirect-rules',
         prefix: '/api/redirect-rules',
+        url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
+        requireAuth: true,
+      },
+      {
+        name: 'link-service-redirect-rule-templates',
+        prefix: '/api/redirect-rule-templates',
         url: this.configService.get('LINK_SERVICE_URL', 'http://localhost:60003'),
         requireAuth: true,
       },
@@ -203,6 +234,12 @@ export class ProxyService {
         url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
         requireAuth: true,
       },
+      {
+        name: 'qr-service-dynamic',
+        prefix: '/api/dynamic-qr',
+        url: this.configService.get('QR_SERVICE_URL', 'http://localhost:60005'),
+        requireAuth: true,
+      },
       // Page Service (60007)
       {
         name: 'page-service-pages',
@@ -242,6 +279,12 @@ export class ProxyService {
         requireAuth: true,
       },
       {
+        name: 'page-service-seo-templates',
+        prefix: '/api/seo-templates',
+        url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
+        requireAuth: true,
+      },
+      {
         name: 'page-service-comments',
         prefix: '/api/comments',
         url: this.configService.get('PAGE_SERVICE_URL', 'http://localhost:60007'),
@@ -254,7 +297,19 @@ export class ProxyService {
         url: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'),
         requireAuth: true,
       },
+      {
+        name: 'deeplink-service-templates',
+        prefix: '/api/deeplink-templates',
+        url: this.configService.get('DEEPLINK_SERVICE_URL', 'http://localhost:60008'),
+        requireAuth: true,
+      },
       // Console Service (60009)
+      {
+        name: 'console-service-preset-templates',
+        prefix: '/api/preset-templates',
+        url: this.configService.get('CONSOLE_SERVICE_URL', 'http://localhost:60009'),
+        requireAuth: true,
+      },
       {
         name: 'console-service-admin',
         prefix: '/api/admin',
@@ -288,6 +343,12 @@ export class ProxyService {
       {
         name: 'console-service-alerts',
         prefix: '/api/alerts',
+        url: this.configService.get('CONSOLE_SERVICE_URL', 'http://localhost:60009'),
+        requireAuth: true,
+      },
+      {
+        name: 'console-service-automation-templates',
+        prefix: '/api/automation-templates',
         url: this.configService.get('CONSOLE_SERVICE_URL', 'http://localhost:60009'),
         requireAuth: true,
       },
@@ -353,6 +414,12 @@ export class ProxyService {
         prefix: '/api/automation',
         url: this.configService.get('WEBHOOK_SERVICE_URL', 'http://localhost:60017'),
         targetPrefix: '/api/v1/webhooks', // 映射到 webhooks controller
+        requireAuth: true,
+      },
+      {
+        name: 'webhook-service-templates',
+        prefix: '/api/webhook-templates',
+        url: this.configService.get('WEBHOOK_SERVICE_URL', 'http://localhost:60017'),
         requireAuth: true,
       },
       // Integration Service (60016) - OAuth endpoints (public, must be before auth-required routes)
@@ -471,7 +538,7 @@ export class ProxyService {
         name: 'datastream-service-streams',
         prefix: '/api/data-streams',
         url: this.configService.get('DATASTREAM_SERVICE_URL', 'http://localhost:60001'),
-        targetPrefix: '/api/v1', // 映射 /api/data-streams -> /api/v1/data-streams
+        targetPrefix: '/api/v1/data-streams', // 映射 /api/data-streams -> /api/v1/data-streams
         requireAuth: true,
       },
     ];

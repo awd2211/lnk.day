@@ -1,77 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { seoTemplateService } from '@/lib/api';
+import type { SeoTemplate, CreateSeoTemplateDto } from '@lnk/shared-types';
 
-export interface SeoTemplate {
-  id: string;
-  teamId: string;
-  createdBy: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category: 'general' | 'landing_page' | 'bio_link' | 'product' | 'article' | 'profile';
-  // Meta
-  metaTitleTemplate?: string;
-  metaDescription?: string;
-  metaKeywords?: string[];
-  metaAuthor?: string;
-  metaRobots?: string;
-  metaLanguage?: string;
-  // Open Graph
-  ogTitleTemplate?: string;
-  ogDescription?: string;
-  ogType?: 'website' | 'article' | 'profile' | 'product';
-  ogImage?: string;
-  ogSiteName?: string;
-  ogLocale?: string;
-  // Twitter
-  twitterCard?: 'summary' | 'summary_large_image' | 'app' | 'player';
-  twitterSite?: string;
-  twitterCreator?: string;
-  twitterTitleTemplate?: string;
-  twitterDescription?: string;
-  twitterImage?: string;
-  // Other
-  favicon?: string;
-  canonicalUrlPattern?: string;
-  customMeta?: Array<{ name: string; content: string }>;
-  schemaConfig?: { type?: string; additionalProperties?: Record<string, any> };
-  isFavorite: boolean;
-  usageCount: number;
-  lastUsedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateSeoTemplateDto {
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category?: SeoTemplate['category'];
-  metaTitleTemplate?: string;
-  metaDescription?: string;
-  metaKeywords?: string[];
-  metaAuthor?: string;
-  metaRobots?: string;
-  metaLanguage?: string;
-  ogTitleTemplate?: string;
-  ogDescription?: string;
-  ogType?: SeoTemplate['ogType'];
-  ogImage?: string;
-  ogSiteName?: string;
-  ogLocale?: string;
-  twitterCard?: SeoTemplate['twitterCard'];
-  twitterSite?: string;
-  twitterCreator?: string;
-  twitterTitleTemplate?: string;
-  twitterDescription?: string;
-  twitterImage?: string;
-  favicon?: string;
-  canonicalUrlPattern?: string;
-  customMeta?: SeoTemplate['customMeta'];
-  schemaConfig?: SeoTemplate['schemaConfig'];
-}
+export type { SeoTemplate, CreateSeoTemplateDto };
 
 const QUERY_KEY = ['seo-templates'];
 
@@ -79,12 +10,7 @@ export function useSeoTemplates(options?: { category?: string; isFavorite?: bool
   return useQuery({
     queryKey: [...QUERY_KEY, options],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (options?.category) params.append('category', options.category);
-      if (options?.isFavorite !== undefined) params.append('isFavorite', String(options.isFavorite));
-      if (options?.search) params.append('search', options.search);
-
-      const { data } = await api.get(`/api/v1/seo-templates?${params}`);
+      const { data } = await seoTemplateService.getAll(options);
       return data.data as SeoTemplate[];
     },
   });
@@ -95,7 +21,7 @@ export function useCreateSeoTemplate() {
 
   return useMutation({
     mutationFn: async (dto: CreateSeoTemplateDto) => {
-      const { data } = await api.post('/api/v1/seo-templates', dto);
+      const { data } = await seoTemplateService.create(dto);
       return data;
     },
     onSuccess: () => {
@@ -109,7 +35,7 @@ export function useUpdateSeoTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateSeoTemplateDto> }) => {
-      const response = await api.put(`/api/v1/seo-templates/${id}`, data);
+      const response = await seoTemplateService.update(id, data);
       return response.data;
     },
     onSuccess: () => {
@@ -123,7 +49,7 @@ export function useDeleteSeoTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/seo-templates/${id}`);
+      await seoTemplateService.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -136,7 +62,7 @@ export function useToggleSeoTemplateFavorite() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.patch(`/api/v1/seo-templates/${id}/favorite`);
+      const { data } = await seoTemplateService.toggleFavorite(id);
       return data;
     },
     onSuccess: () => {
@@ -150,7 +76,7 @@ export function useDuplicateSeoTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/seo-templates/${id}/duplicate`);
+      const { data } = await seoTemplateService.duplicate(id);
       return data;
     },
     onSuccess: () => {

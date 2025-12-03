@@ -18,10 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { billingService } from '@/lib/api';
 
-// 初始化 Stripe - 使用环境变量中的公钥
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ''
-);
+// 懒加载 Stripe - 只在配置了公钥时初始化
+const getStripePromise = () => {
+  const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  if (!key) return null;
+  return loadStripe(key);
+};
 
 interface AddPaymentMethodDialogProps {
   open: boolean;
@@ -197,7 +199,7 @@ export function AddPaymentMethodDialog({
             </AlertDescription>
           </Alert>
         ) : (
-          <Elements stripe={stripePromise}>
+          <Elements stripe={getStripePromise()}>
             <PaymentForm onSuccess={handleSuccess} onCancel={handleCancel} />
           </Elements>
         )}

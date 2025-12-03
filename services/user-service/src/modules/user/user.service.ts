@@ -157,6 +157,28 @@ export class UserService {
     return { locked: false, remainingAttempts: this.MAX_LOGIN_ATTEMPTS - newAttempts };
   }
 
+  // ========== 邮箱验证码登录相关方法 ==========
+
+  /**
+   * 设置登录验证码
+   */
+  async setLoginCode(id: string, code: string, expiresAt: Date): Promise<void> {
+    await this.userRepository.update(id, {
+      loginCode: code,
+      loginCodeExpiresAt: expiresAt,
+    });
+  }
+
+  /**
+   * 清除登录验证码
+   */
+  async clearLoginCode(id: string): Promise<void> {
+    await this.userRepository.update(id, {
+      loginCode: undefined,
+      loginCodeExpiresAt: undefined,
+    });
+  }
+
   /**
    * 解锁账户
    */

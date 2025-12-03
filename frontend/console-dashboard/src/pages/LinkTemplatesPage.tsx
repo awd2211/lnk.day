@@ -85,6 +85,12 @@ const CATEGORY_CONFIG: Record<LinkTemplateCategory, { label: string; color: stri
   general: { label: '通用', color: 'bg-slate-100 text-slate-700' },
 };
 
+const DEFAULT_CATEGORY_CONFIG = { label: '未知', color: 'bg-gray-100 text-gray-700' };
+
+const getCategoryConfig = (category: string) => {
+  return CATEGORY_CONFIG[category as LinkTemplateCategory] || DEFAULT_CATEGORY_CONFIG;
+};
+
 const REDIRECT_TYPES = [
   { value: '301', label: '301 永久重定向' },
   { value: '302', label: '302 临时重定向' },
@@ -357,8 +363,8 @@ export default function LinkTemplatesPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{template.name}</span>
-                        <Badge className={CATEGORY_CONFIG[template.category].color}>
-                          {CATEGORY_CONFIG[template.category].label}
+                        <Badge className={getCategoryConfig(template.category).color}>
+                          {getCategoryConfig(template.category).label}
                         </Badge>
                         {!template.isActive && (
                           <Badge variant="outline" className="text-gray-500">已禁用</Badge>

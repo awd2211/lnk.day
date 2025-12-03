@@ -14,5 +14,11 @@ export default defineConfig({
     port: 60010,
     host: true,
     allowedHosts: ['app.lnk.day', 'localhost'],
+    hmr: {
+      // 当通过代理访问时，使用实际的主机名
+      host: 'app.lnk.day',
+      protocol: 'wss',
+      clientPort: 443,
+    },
   },
 });

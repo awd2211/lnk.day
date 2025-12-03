@@ -16,12 +16,24 @@ const (
 	cacheInvalidationQueue    = "link.cache.invalidation"
 )
 
+// LinkEvent matches the format published by link-service
 type LinkEvent struct {
+	ID        string                 `json:"id"`
 	Type      string                 `json:"type"`
-	LinkID    string                 `json:"linkId"`
-	ShortCode string                 `json:"shortCode"`
 	Timestamp string                 `json:"timestamp"`
-	Data      map[string]interface{} `json:"data,omitempty"`
+	Source    string                 `json:"source"`
+	Data      LinkEventData          `json:"data"`
+}
+
+type LinkEventData struct {
+	LinkID       string                 `json:"linkId"`
+	ShortCode    string                 `json:"shortCode"`
+	OriginalUrl  string                 `json:"originalUrl,omitempty"`
+	UserID       string                 `json:"userId,omitempty"`
+	TeamID       string                 `json:"teamId,omitempty"`
+	CampaignID   string                 `json:"campaignId,omitempty"`
+	Changes      map[string]interface{} `json:"changes,omitempty"`
+	OldShortCode string                 `json:"oldShortCode,omitempty"`
 }
 
 type CacheInvalidationService struct {
@@ -145,28 +157,36 @@ func (s *CacheInvalidationService) handleMessage(msg amqp.Delivery) {
 		return
 	}
 
-	log.Printf("Received event: %s for shortCode: %s", event.Type, event.ShortCode)
+	shortCode := event.Data.ShortCode
+	log.Printf("Received event: %s for shortCode: %s", event.Type, shortCode)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Invalidate cache for the short code
-	if err := s.linkService.InvalidateCache(ctx, event.ShortCode); err != nil {
-		log.Printf("Failed to invalidate cache for %s: %v", event.ShortCode, err)
+	if err := s.linkService.InvalidateCache(ctx, shortCode); err != nil {
+		log.Printf("Failed to invalidate cache for %s: %v", shortCode, err)
 		msg.Nack(false, true) // requeue
 		return
 	}
 
-	// Also invalidate old short code if it changed
-	if event.Data != nil {
-		if oldCode, ok := event.Data["oldShortCode"].(string); ok && oldCode != "" {
+	// Also invalidate old short code if it changed (for update events)
+	if event.Data.OldShortCode != "" && event.Data.OldShortCode != shortCode {
+		if err := s.linkService.InvalidateCache(ctx, event.Data.OldShortCode); err != nil {
+			log.Printf("Failed to invalidate cache for old code %s: %v", event.Data.OldShortCode, err)
+		}
+	}
+
+	// Check changes for short code updates
+	if event.Data.Changes != nil {
+		if oldCode, ok := event.Data.Changes["oldShortCode"].(string); ok && oldCode != "" && oldCode != shortCode {
 			if err := s.linkService.InvalidateCache(ctx, oldCode); err != nil {
-				log.Printf("Failed to invalidate cache for old code %s: %v", oldCode, err)
+				log.Printf("Failed to invalidate cache for changed code %s: %v", oldCode, err)
 			}
 		}
 	}
 
-	log.Printf("Cache invalidated for shortCode: %s", event.ShortCode)
+	log.Printf("Cache invalidated for shortCode: %s", shortCode)
 	msg.Ack(false)
 }
 

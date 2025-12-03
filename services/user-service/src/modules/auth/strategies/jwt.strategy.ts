@@ -2,39 +2,21 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import {
+  UnifiedJwtPayload,
+  AuthenticatedUser,
+  AdminRole,
+} from '@lnk/nestjs-common';
 
 import { UserService } from '../../user/user.service';
 
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  type?: 'user' | 'admin';
-  role?: string;         // 用于 admin 用户
-  teamId?: string;       // 顶层 teamId (兼容旧格式)
-  teamRole?: string;     // OWNER | ADMIN | MEMBER | VIEWER
-  permissions?: string[];
-  scope?: {              // 新的 scope 格式
-    level: 'personal' | 'team' | 'platform';
-    teamId?: string;
-  };
-  iat?: number;
-  exp?: number;
-}
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  name?: string;
-  teamId?: string;
-  teamRole?: string;
-  permissions: string[];
-  isConsoleAdmin?: boolean;
-  scope?: {
-    level: 'personal' | 'team' | 'platform';
-    teamId?: string;
-  };
-}
-
+/**
+ * JWT 验证策略 (user-service)
+ *
+ * 此策略扩展了 @lnk/nestjs-common 的基础策略，增加了：
+ * - 普通用户需验证存在于数据库中
+ * - 管理员用户直接信任 JWT（来自 console-service）
+ */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -52,22 +34,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    // 对于来自 console-service 的 admin 用户 (有 SUPER_ADMIN 或 ADMIN 角色)
-    // 即使用户不在 user-service 数据库中也信任它
-    if (payload.role && ['SUPER_ADMIN', 'ADMIN', 'OPERATOR'].includes(payload.role)) {
+  async validate(payload: UnifiedJwtPayload): Promise<AuthenticatedUser> {
+    // 管理员用户（来自 console-service）直接信任
+    if (this.isAdminUser(payload)) {
       return {
+        ...payload,
         id: payload.sub,
-        sub: payload.sub,
-        email: payload.email,
-        name: (payload as any).name,
-        type: payload.type || 'admin',
-        scope: payload.scope || { level: 'platform' },
-        role: payload.role,
-        teamRole: payload.role,
-        permissions: payload.permissions || [],
-        isConsoleAdmin: true,
-      } as any;
+      };
     }
 
     // 普通用户需要验证存在于数据库中
@@ -76,18 +49,29 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    // 从 scope.teamId 或顶层 teamId 获取 teamId（优先使用 scope）
-    const effectiveTeamId = payload.scope?.teamId || payload.teamId || user.teamId;
-
-    // 返回包含权限信息的用户对象
+    // 返回认证用户对象
     return {
+      ...payload,
       id: user.id,
-      email: user.email,
       name: user.name,
-      teamId: effectiveTeamId,
-      teamRole: payload.teamRole || undefined,
-      permissions: payload.permissions || [],
-      scope: payload.scope || (effectiveTeamId ? { level: 'personal', teamId: effectiveTeamId } : undefined),
     };
+  }
+
+  /**
+   * 检查是否为管理员用户
+   */
+  private isAdminUser(payload: UnifiedJwtPayload): boolean {
+    if (payload.type === 'admin') {
+      return true;
+    }
+    if (
+      payload.role &&
+      [AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.OPERATOR].includes(
+        payload.role as AdminRole,
+      )
+    ) {
+      return true;
+    }
+    return false;
   }
 }

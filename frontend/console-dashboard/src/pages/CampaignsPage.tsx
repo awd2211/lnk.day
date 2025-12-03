@@ -159,7 +159,7 @@ const campaignExportColumns = [
   { key: 'totalLinks', header: '链接数' },
   { key: 'totalClicks', header: '点击数' },
   { key: 'conversions', header: '转化数' },
-  { key: 'budget', header: '预算', formatter: (v?: number) => v ? `¥${v}` : '-' },
+  { key: 'budget', header: '预算', formatter: (v?: number) => v ? `$${v}` : '-' },
   { key: 'createdAt', header: '创建时间', formatter: (v: string) => new Date(v).toLocaleString() },
 ];
 
@@ -337,7 +337,7 @@ export default function CampaignsPage() {
 
   const formatCurrency = (amount?: number) => {
     if (amount === undefined) return '-';
-    return `¥${amount.toLocaleString()}`;
+    return `$${amount.toLocaleString()}`;
   };
 
   const getGoalProgress = (campaign: Campaign) => {

@@ -51,8 +51,13 @@ import {
   type DeepLinkTemplate,
   type CreateDeepLinkTemplateDto,
 } from '@/hooks/useDeepLinkTemplates';
+import {
+  usePresetDeepLinkTemplates,
+  type PresetDeepLinkTemplate,
+} from '@/hooks/usePresetTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PresetTemplatesSection, PresetTemplateCard } from '@/components/shared';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -69,10 +74,21 @@ export default function DeepLinkTemplatesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
 
+  // 预设模板状态
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<string>('');
+
   const { data: templates, isLoading } = useDeepLinkTemplates({
     category: categoryFilter || undefined,
     search: searchQuery || undefined,
   });
+
+  // 预设模板查询
+  const { data: presetTemplatesData, isLoading: presetLoading } = usePresetDeepLinkTemplates({
+    search: presetSearch || undefined,
+    category: presetCategoryFilter || undefined,
+  });
+
   const createTemplate = useCreateDeepLinkTemplate();
   const updateTemplate = useUpdateDeepLinkTemplate();
   const deleteTemplate = useDeleteDeepLinkTemplate();
@@ -173,6 +189,29 @@ export default function DeepLinkTemplatesPage() {
     setEditTemplate(template);
   };
 
+  // 使用预设模板
+  const handleUsePresetTemplate = (preset: PresetDeepLinkTemplate) => {
+    // Convert preset android config - appLinks may be string in preset but needs to be string[] in DTO
+    const androidConfig = preset.android
+      ? {
+          ...preset.android,
+          appLinks: preset.android.appLinks
+            ? [preset.android.appLinks]
+            : undefined,
+        }
+      : {};
+    setFormData({
+      name: `${preset.name} (副本)`,
+      description: preset.description || '',
+      category: preset.category || 'custom',
+      ios: preset.ios || {},
+      android: androidConfig,
+      fallbackUrl: preset.fallbackUrl || '',
+    });
+    setCreateDialogOpen(true);
+    toast({ title: '已加载预设模板配置，可自行修改后保存' });
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -219,6 +258,34 @@ export default function DeepLinkTemplatesPage() {
           </Dialog>
         </div>
 
+        {/* 预设模板区域 */}
+        <PresetTemplatesSection<PresetDeepLinkTemplate>
+          title="平台预设 Deep Link 模板"
+          description="使用平台提供的预设深度链接配置，快速创建您自己的模板"
+          templates={presetTemplatesData?.data}
+          isLoading={presetLoading}
+          categories={CATEGORIES}
+          categoryFilter={presetCategoryFilter}
+          onCategoryChange={setPresetCategoryFilter}
+          searchQuery={presetSearch}
+          onSearchChange={setPresetSearch}
+          emptyMessage="暂无预设 Deep Link 模板"
+          defaultOpen={!templates || templates.length === 0}
+          renderTemplate={(preset) => (
+            <PresetTemplateCard
+              name={preset.name}
+              description={preset.description}
+              category={CATEGORIES.find((c) => c.value === preset.category)?.label}
+              tags={[
+                ...(preset.ios?.bundleId ? ['iOS'] : []),
+                ...(preset.android?.packageName ? ['Android'] : []),
+              ]}
+              icon={<Smartphone className="h-5 w-5" />}
+              onUse={() => handleUsePresetTemplate(preset)}
+            />
+          )}
+        />
+
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -230,12 +297,12 @@ export default function DeepLinkTemplatesPage() {
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="所有分类" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有分类</SelectItem>
+              <SelectItem value="all">所有分类</SelectItem>
               {CATEGORIES.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}

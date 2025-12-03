@@ -53,6 +53,11 @@ import {
 } from '@/hooks/useWebhookTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PresetTemplatesSection, PresetTemplateCard } from '@/components/shared';
+import {
+  usePresetWebhookTemplates,
+  type PresetWebhookTemplate,
+} from '@/hooks/usePresetTemplates';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -74,10 +79,21 @@ export default function WebhookTemplatesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState<string>('');
 
+  // 预设模板状态
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetPlatformFilter, setPresetPlatformFilter] = useState<string>('');
+
   const { data: templates, isLoading } = useWebhookTemplates({
     platform: platformFilter || undefined,
     search: searchQuery || undefined,
   });
+
+  // 预设模板查询
+  const { data: presetTemplatesData, isLoading: presetLoading } = usePresetWebhookTemplates({
+    search: presetSearch || undefined,
+    platform: presetPlatformFilter || undefined,
+  });
+
   const createTemplate = useCreateWebhookTemplate();
   const updateTemplate = useUpdateWebhookTemplate();
   const deleteTemplate = useDeleteWebhookTemplate();
@@ -182,6 +198,30 @@ export default function WebhookTemplatesPage() {
     setEditTemplate(template);
   };
 
+  // 使用预设模板
+  const handleUsePresetTemplate = (preset: PresetWebhookTemplate) => {
+    setFormData({
+      name: `${preset.name} (副本)`,
+      description: preset.description || '',
+      platform: preset.platform || 'custom',
+      url: preset.config?.url || '',
+      method: (preset.config?.method as 'GET' | 'POST' | 'PUT') || 'POST',
+      headers: preset.config?.headers || {},
+      slackConfig: preset.platform === 'slack' ? {
+        channel: preset.config?.channel,
+        username: preset.config?.username,
+        iconEmoji: preset.config?.iconEmoji,
+      } : undefined,
+      discordConfig: preset.platform === 'discord' ? {
+        username: preset.config?.username,
+        avatarUrl: preset.config?.avatarUrl,
+      } : undefined,
+      payloadTemplate: preset.config?.payloadTemplate,
+    });
+    setCreateDialogOpen(true);
+    toast({ title: '已加载预设模板配置，可自行修改后保存' });
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -228,6 +268,34 @@ export default function WebhookTemplatesPage() {
           </Dialog>
         </div>
 
+        {/* 预设模板区域 */}
+        <PresetTemplatesSection<PresetWebhookTemplate>
+          title="平台预设 Webhook 模板"
+          description="使用平台提供的预设 Webhook 配置，快速创建您自己的模板"
+          templates={presetTemplatesData?.data}
+          isLoading={presetLoading}
+          categories={PLATFORMS.map((p) => ({ value: p.value, label: `${p.icon} ${p.label}` }))}
+          categoryFilter={presetPlatformFilter}
+          onCategoryChange={setPresetPlatformFilter}
+          searchQuery={presetSearch}
+          onSearchChange={setPresetSearch}
+          emptyMessage="暂无预设 Webhook 模板"
+          defaultOpen={!templates || templates.length === 0}
+          renderTemplate={(preset) => (
+            <PresetTemplateCard
+              name={preset.name}
+              description={preset.description}
+              category={PLATFORMS.find((p) => p.value === preset.platform)?.label}
+              tags={[
+                preset.config?.method || 'POST',
+                ...(preset.config?.channel ? [`#${preset.config.channel}`] : []),
+              ]}
+              icon={<Webhook className="h-5 w-5" />}
+              onUse={() => handleUsePresetTemplate(preset)}
+            />
+          )}
+        />
+
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -239,12 +307,12 @@ export default function WebhookTemplatesPage() {
               className="pl-9"
             />
           </div>
-          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+          <Select value={platformFilter || 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="所有平台" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有平台</SelectItem>
+              <SelectItem value="all">所有平台</SelectItem>
               {PLATFORMS.map((p) => (
                 <SelectItem key={p.value} value={p.value}>
                   {p.icon} {p.label}

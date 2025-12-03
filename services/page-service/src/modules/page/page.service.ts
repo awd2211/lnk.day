@@ -2,12 +2,14 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Page, PageStatus, PageBlock, ABTestConfig, ABTestVariant } from './entities/page.entity';
+import { PageEventService } from '../../common/rabbitmq/page-event.service';
 
 @Injectable()
 export class PageService {
   constructor(
     @InjectRepository(Page)
     private readonly pageRepository: Repository<Page>,
+    private readonly pageEventService: PageEventService,
   ) {}
 
   async create(data: Partial<Page>): Promise<Page> {
@@ -19,7 +21,18 @@ export class PageService {
     }
 
     const page = this.pageRepository.create(data);
-    return this.pageRepository.save(page);
+    const savedPage = await this.pageRepository.save(page);
+
+    // Publish page created event
+    await this.pageEventService.publishPageCreated({
+      pageId: savedPage.id,
+      slug: savedPage.slug || '',
+      title: savedPage.name || '',
+      userId: savedPage.userId || '',
+      teamId: savedPage.teamId,
+    });
+
+    return savedPage;
   }
 
   async findAll(
@@ -88,8 +101,17 @@ export class PageService {
     return this.pageRepository.save(page);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId?: string): Promise<void> {
     const page = await this.findOne(id);
+
+    // Publish page deleted event before removing
+    await this.pageEventService.publishPageDeleted({
+      pageId: page.id,
+      slug: page.slug || '',
+      userId: userId || page.userId || '',
+      teamId: page.teamId,
+    });
+
     await this.pageRepository.remove(page);
   }
 

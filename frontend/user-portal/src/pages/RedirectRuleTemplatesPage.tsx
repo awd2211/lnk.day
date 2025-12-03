@@ -55,6 +55,11 @@ import {
 } from '@/hooks/useRedirectRuleTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PresetTemplatesSection, PresetTemplateCard } from '@/components/shared';
+import {
+  usePresetRedirectRuleTemplates,
+  type PresetRedirectRuleTemplate,
+} from '@/hooks/usePresetTemplates';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -71,10 +76,21 @@ export default function RedirectRuleTemplatesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
 
+  // 预设模板状态
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<string>('');
+
   const { data: templates, isLoading } = useRedirectRuleTemplates({
     category: categoryFilter || undefined,
     search: searchQuery || undefined,
   });
+
+  // 预设模板查询
+  const { data: presetTemplatesData, isLoading: presetLoading } = usePresetRedirectRuleTemplates({
+    search: presetSearch || undefined,
+    category: presetCategoryFilter || undefined,
+  });
+
   const createTemplate = useCreateRedirectRuleTemplate();
   const updateTemplate = useUpdateRedirectRuleTemplate();
   const deleteTemplate = useDeleteRedirectRuleTemplate();
@@ -188,6 +204,53 @@ export default function RedirectRuleTemplatesPage() {
     return count;
   };
 
+  const getPresetRuleCount = (preset: PresetRedirectRuleTemplate) => {
+    let count = 0;
+    if (preset.config?.variants?.length) count += preset.config.variants.length;
+    if (preset.config?.geoRules?.length) count += preset.config.geoRules.length;
+    if (preset.config?.deviceRules?.length) count += preset.config.deviceRules.length;
+    if (preset.config?.timeRules?.length) count += preset.config.timeRules.length;
+    return count;
+  };
+
+  // 使用预设模板
+  const handleUsePresetTemplate = (preset: PresetRedirectRuleTemplate) => {
+    setFormData({
+      name: `${preset.name} (副本)`,
+      description: preset.description || '',
+      category: preset.category || 'custom',
+      abTestVariants: preset.config?.variants?.map((v) => ({
+        name: v.name,
+        url: v.url,
+        weight: v.weight,
+      })),
+      geoPresets: preset.config?.geoRules?.map((r) => ({
+        name: '',
+        countries: r.countries || [],
+        regions: r.regions,
+        url: r.url,
+      })),
+      devicePresets: preset.config?.deviceRules?.map((r) => ({
+        name: '',
+        devices: r.devices || [],
+        os: r.os,
+        browsers: r.browsers,
+        url: r.url,
+      })),
+      timePresets: preset.config?.timeRules?.map((r) => ({
+        name: '',
+        startTime: r.startTime || '09:00',
+        endTime: r.endTime || '18:00',
+        days: r.days?.map((d) => parseInt(d)) || [1, 2, 3, 4, 5],
+        timezone: r.timezone || 'Asia/Shanghai',
+        url: r.url,
+      })),
+      defaultUrl: preset.config?.defaultUrl || '',
+    });
+    setCreateDialogOpen(true);
+    toast({ title: '已加载预设模板配置，可自行修改后保存' });
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -234,6 +297,31 @@ export default function RedirectRuleTemplatesPage() {
           </Dialog>
         </div>
 
+        {/* 预设模板区域 */}
+        <PresetTemplatesSection<PresetRedirectRuleTemplate>
+          title="平台预设重定向规则模板"
+          description="使用平台提供的预设规则配置，快速创建您自己的模板"
+          templates={presetTemplatesData?.data}
+          isLoading={presetLoading}
+          categories={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+          categoryFilter={presetCategoryFilter}
+          onCategoryChange={setPresetCategoryFilter}
+          searchQuery={presetSearch}
+          onSearchChange={setPresetSearch}
+          emptyMessage="暂无预设重定向规则模板"
+          defaultOpen={!templates || templates.length === 0}
+          renderTemplate={(preset) => (
+            <PresetTemplateCard
+              name={preset.name}
+              description={preset.description}
+              category={CATEGORIES.find((c) => c.value === preset.category)?.label}
+              tags={[`${getPresetRuleCount(preset)} 条规则`]}
+              icon={<Split className="h-5 w-5" />}
+              onUse={() => handleUsePresetTemplate(preset)}
+            />
+          )}
+        />
+
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -245,12 +333,12 @@ export default function RedirectRuleTemplatesPage() {
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="所有类型" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有类型</SelectItem>
+              <SelectItem value="all">所有类型</SelectItem>
               {CATEGORIES.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}

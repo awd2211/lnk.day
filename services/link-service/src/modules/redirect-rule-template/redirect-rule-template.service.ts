@@ -29,14 +29,16 @@ export class RedirectRuleTemplateService {
   async findAll(
     teamId: string,
     options?: {
-      page?: number;
-      limit?: number;
+      page?: number | string;
+      limit?: number | string;
       isFavorite?: boolean;
       category?: string;
       search?: string;
     },
   ): Promise<{ data: RedirectRuleTemplate[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 20, isFavorite, category, search } = options || {};
+    const { isFavorite, category, search } = options || {};
+    const page = Number(options?.page) || 1;
+    const limit = Number(options?.limit) || 20;
     const skip = (page - 1) * limit;
 
     const qb = this.templateRepository

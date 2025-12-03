@@ -12,6 +12,8 @@ import {
   EXCHANGES,
   QUEUES,
 } from '@lnk/shared-types';
+import { WebhookService } from '../../modules/webhook/webhook.service';
+import { WebhookEvent } from '../../modules/webhook/entities/webhook.entity';
 
 const WEBHOOK_QUEUE = 'webhook.all.events';
 
@@ -24,6 +26,17 @@ type WebhookTriggerEvent =
   | UserCreatedEvent
   | ClickRecordedEvent;
 
+// 事件类型映射到 Webhook 事件
+const EVENT_TYPE_MAP: Record<string, WebhookEvent> = {
+  'link.created': 'link.created',
+  'link.updated': 'link.updated',
+  'link.deleted': 'link.deleted',
+  'click.recorded': 'link.clicked',
+  'campaign.created': 'campaign.started',
+  'campaign.goal.reached': 'conversion.tracked',
+  'user.created': 'user.invited',
+};
+
 @Injectable()
 export class WebhookEventConsumer implements OnModuleInit {
   private readonly logger = new Logger(WebhookEventConsumer.name);
@@ -31,6 +44,7 @@ export class WebhookEventConsumer implements OnModuleInit {
   constructor(
     @Inject(RABBITMQ_CHANNEL)
     private readonly channel: amqplib.Channel | null,
+    private readonly webhookService: WebhookService,
   ) {}
 
   async onModuleInit() {
@@ -100,14 +114,130 @@ export class WebhookEventConsumer implements OnModuleInit {
   private async handleEvent(event: WebhookTriggerEvent): Promise<void> {
     this.logger.debug(`Processing webhook trigger: ${event.type} [${event.id}]`);
 
-    // 根据事件类型查找匹配的 webhook 订阅
-    // const subscriptions = await this.webhookService.findSubscriptionsByEventType(event.type);
+    // 映射事件类型到 Webhook 事件
+    const webhookEventType = EVENT_TYPE_MAP[event.type];
+    if (!webhookEventType) {
+      this.logger.debug(`No webhook mapping for event type: ${event.type}`);
+      return;
+    }
 
-    // 触发 webhook 调用
-    // for (const sub of subscriptions) {
-    //   await this.webhookService.trigger(sub, event);
-    // }
+    // 获取 teamId
+    const teamId = this.extractTeamId(event);
+    if (!teamId) {
+      this.logger.warn(`No teamId found in event: ${event.type}`);
+      return;
+    }
 
-    this.logger.debug(`Webhook trigger processed: ${event.type}`);
+    // 构建事件数据
+    const eventData = this.buildEventData(event);
+
+    try {
+      // 触发匹配的 webhooks
+      const triggeredCount = await this.webhookService.fireEvent(
+        webhookEventType,
+        teamId,
+        eventData,
+      );
+
+      this.logger.log(`Fired ${triggeredCount} webhooks for event ${event.type} (team: ${teamId})`);
+    } catch (error: any) {
+      this.logger.error(`Failed to fire webhooks for event ${event.type}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private extractTeamId(event: WebhookTriggerEvent): string | null {
+    // 根据事件类型提取 teamId (事件使用 data 字段)
+    switch (event.type) {
+      case 'link.created':
+      case 'link.updated':
+      case 'link.deleted':
+        return (event as LinkCreatedEvent | LinkUpdatedEvent | LinkDeletedEvent).data.teamId || null;
+      case 'click.recorded':
+        // click 事件没有 teamId，需要通过 linkId 查询
+        return null;
+      case 'campaign.created':
+        return (event as CampaignCreatedEvent).data.teamId || null;
+      case 'campaign.goal.reached':
+        // CampaignGoalReachedEvent 没有 teamId，需要通过 campaignId 查询
+        // 目前跳过此类事件
+        return null;
+      case 'user.created':
+        return (event as UserCreatedEvent).data.teamId || null;
+      default:
+        return null;
+    }
+  }
+
+  private buildEventData(event: WebhookTriggerEvent): Record<string, any> {
+    // 提取通用事件数据
+    const baseData = {
+      eventId: event.id,
+      eventType: event.type,
+      timestamp: event.timestamp,
+    };
+
+    // 根据事件类型添加特定数据 (事件使用 data 字段)
+    switch (event.type) {
+      case 'link.created':
+      case 'link.updated':
+      case 'link.deleted': {
+        const data = (event as LinkCreatedEvent | LinkUpdatedEvent | LinkDeletedEvent).data;
+        return {
+          ...baseData,
+          linkId: data.linkId,
+          shortCode: data.shortCode,
+          originalUrl: (data as any).originalUrl,
+          teamId: data.teamId,
+          userId: data.userId,
+          tags: (data as any).tags,
+        };
+      }
+      case 'click.recorded': {
+        const data = (event as ClickRecordedEvent).data;
+        return {
+          ...baseData,
+          linkId: data.linkId,
+          shortCode: data.shortCode,
+          country: data.country,
+          city: data.city,
+          device: data.device,
+          browser: data.browser,
+          referer: data.referer,
+        };
+      }
+      case 'campaign.created': {
+        const data = (event as CampaignCreatedEvent).data;
+        return {
+          ...baseData,
+          campaignId: data.campaignId,
+          name: data.name,
+          teamId: data.teamId,
+        };
+      }
+      case 'campaign.goal.reached': {
+        const data = (event as CampaignGoalReachedEvent).data;
+        return {
+          ...baseData,
+          campaignId: data.campaignId,
+          goalId: data.goalId,
+          goalName: data.goalName,
+          currentValue: data.currentValue,
+          targetValue: data.targetValue,
+          userId: data.userId,
+        };
+      }
+      case 'user.created': {
+        const data = (event as UserCreatedEvent).data;
+        return {
+          ...baseData,
+          userId: data.userId,
+          email: data.email,
+          teamId: data.teamId,
+        };
+      }
+      default:
+        return baseData;
+    }
   }
 }

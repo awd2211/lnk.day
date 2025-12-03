@@ -86,6 +86,11 @@ async def get_link_analytics(
 @router.get("/team")
 async def get_team_analytics(request: Request):
     """获取团队分析数据（包含所有统计信息）"""
+    # Get team_id from x-team-id header (set by api-gateway from JWT)
+    team_id = request.headers.get("x-team-id")
+    if not team_id:
+        raise HTTPException(status_code=400, detail="Missing team_id. x-team-id header is required.")
+
     start_date, end_date = get_date_params(request)
 
     if not start_date:
@@ -96,7 +101,7 @@ async def get_team_analytics(request: Request):
     end_date = normalize_end_date(end_date)
 
     try:
-        return analytics_service.get_team_analytics(start_date, end_date)
+        return analytics_service.get_team_analytics(team_id, start_date, end_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -104,6 +109,16 @@ async def get_team_analytics(request: Request):
 @router.get("/team/{team_id}/summary")
 async def get_team_summary(team_id: str, request: Request):
     """获取团队统计概览"""
+    # Validate team_id matches the authenticated user's team (prevent IDOR)
+    header_team_id = request.headers.get("x-team-id")
+    if header_team_id and header_team_id != team_id:
+        raise HTTPException(status_code=403, detail="Access denied: team_id mismatch")
+
+    # Use header team_id if path param is empty
+    effective_team_id = team_id or header_team_id
+    if not effective_team_id:
+        raise HTTPException(status_code=400, detail="Missing team_id")
+
     start_date, end_date = get_date_params(request)
 
     if not start_date:
@@ -114,7 +129,7 @@ async def get_team_summary(team_id: str, request: Request):
     end_date = normalize_end_date(end_date)
 
     try:
-        return analytics_service.get_team_summary(team_id, start_date, end_date)
+        return analytics_service.get_team_summary(effective_team_id, start_date, end_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -129,10 +144,19 @@ async def get_realtime_stats(link_id: str):
 
 
 @router.get("/realtime/team/{team_id}")
-async def get_team_realtime_stats(team_id: str):
+async def get_team_realtime_stats(team_id: str, request: Request):
     """获取团队实时统计数据"""
+    # Validate team_id matches the authenticated user's team (prevent IDOR)
+    header_team_id = request.headers.get("x-team-id")
+    if header_team_id and header_team_id != team_id:
+        raise HTTPException(status_code=403, detail="Access denied: team_id mismatch")
+
+    effective_team_id = team_id or header_team_id
+    if not effective_team_id:
+        raise HTTPException(status_code=400, detail="Missing team_id")
+
     try:
-        return await realtime_service.get_team_realtime_stats(team_id)
+        return await realtime_service.get_team_realtime_stats(effective_team_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -274,6 +298,16 @@ async def get_hourly_activity(link_id: str, request: Request):
 @router.get("/team/{team_id}/hourly-activity")
 async def get_team_hourly_activity(team_id: str, request: Request):
     """获取团队按星期和小时的访问热力图数据"""
+    # Validate team_id matches the authenticated user's team (prevent IDOR)
+    header_team_id = request.headers.get("x-team-id")
+    if header_team_id and header_team_id != team_id:
+        raise HTTPException(status_code=403, detail="Access denied: team_id mismatch")
+
+    # Use header team_id if path param is empty
+    effective_team_id = team_id or header_team_id
+    if not effective_team_id:
+        raise HTTPException(status_code=400, detail="Missing team_id")
+
     start_date, end_date = get_date_params(request)
 
     if not start_date:
@@ -284,6 +318,6 @@ async def get_team_hourly_activity(team_id: str, request: Request):
     end_date = normalize_end_date(end_date)
 
     try:
-        return analytics_service.get_team_hourly_activity(team_id, start_date, end_date)
+        return analytics_service.get_team_hourly_activity(effective_team_id, start_date, end_date)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

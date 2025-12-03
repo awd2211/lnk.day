@@ -198,6 +198,7 @@ class RabbitMQConsumer:
                     "event_id": event.get("id", str(uuid.uuid4())),
                     "event_type": "click",  # Enum value
                     "link_id": event.get("linkId", ""),
+                    "team_id": event.get("teamId", ""),  # Team isolation
                     "user_id": "",  # Not available from redirect-service
                     "timestamp": timestamp,
                     "visitor_ip": event.get("ip", ""),
@@ -214,7 +215,7 @@ class RabbitMQConsumer:
 
             self.clickhouse.execute(
                 """
-                INSERT INTO link_events (event_id, event_type, link_id, user_id, timestamp,
+                INSERT INTO link_events (event_id, event_type, link_id, team_id, user_id, timestamp,
                                          visitor_ip, country, city, device_type, os, browser,
                                          referrer, utm_source, utm_medium, utm_campaign)
                 VALUES

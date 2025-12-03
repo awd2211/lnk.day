@@ -21,6 +21,10 @@ import {
   FileSearch,
   BarChart3,
   ArrowRight,
+  Tag,
+  Megaphone,
+  QrCode,
+  Palette,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -392,6 +396,9 @@ export default function TemplatesPage() {
   // Template type navigation
   const templateTypes = [
     { title: '链接模板', description: '链接配置预设', href: '/templates', icon: Link2, active: true },
+    { title: 'UTM 模板', description: 'UTM 参数追踪配置', href: '/utm-templates', icon: Tag },
+    { title: '活动模板', description: '营销活动配置', href: '/campaign-templates', icon: Megaphone },
+    { title: 'QR 样式', description: 'QR 码颜色、样式配置', href: '/templates/qr-styles', icon: QrCode },
     { title: 'DeepLink 模板', description: 'iOS/Android 深度链接配置', href: '/templates/deeplinks', icon: Smartphone },
     { title: 'Webhook 模板', description: 'Slack/Discord/Teams 通知', href: '/templates/webhooks', icon: Webhook },
     { title: '重定向规则', description: 'A/B 测试、地理位置规则', href: '/templates/redirect-rules', icon: GitBranch },
@@ -415,7 +422,7 @@ export default function TemplatesPage() {
         </div>
 
         {/* Template type navigation */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {templateTypes.map((type) => (
             <Link
               key={type.href}

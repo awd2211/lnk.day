@@ -1,54 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { webhookTemplateService } from '@/lib/api';
+import type { WebhookTemplate, CreateWebhookTemplateDto } from '@lnk/shared-types';
 
-export interface WebhookTemplate {
-  id: string;
-  teamId: string;
-  createdBy: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  platform: 'slack' | 'discord' | 'teams' | 'custom';
-  url?: string;
-  method: 'GET' | 'POST' | 'PUT';
-  headers?: Record<string, string>;
-  slackConfig?: {
-    channel?: string;
-    username?: string;
-    iconEmoji?: string;
-    iconUrl?: string;
-  };
-  discordConfig?: {
-    username?: string;
-    avatarUrl?: string;
-  };
-  teamsConfig?: {
-    themeColor?: string;
-    sections?: any[];
-  };
-  payloadTemplate?: Record<string, any>;
-  isFavorite: boolean;
-  usageCount: number;
-  lastUsedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateWebhookTemplateDto {
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  platform: WebhookTemplate['platform'];
-  url?: string;
-  method?: WebhookTemplate['method'];
-  headers?: Record<string, string>;
-  slackConfig?: WebhookTemplate['slackConfig'];
-  discordConfig?: WebhookTemplate['discordConfig'];
-  teamsConfig?: WebhookTemplate['teamsConfig'];
-  payloadTemplate?: Record<string, any>;
-}
+export type { WebhookTemplate, CreateWebhookTemplateDto };
 
 const QUERY_KEY = ['webhook-templates'];
 
@@ -56,12 +10,7 @@ export function useWebhookTemplates(options?: { platform?: string; isFavorite?: 
   return useQuery({
     queryKey: [...QUERY_KEY, options],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (options?.platform) params.append('platform', options.platform);
-      if (options?.isFavorite !== undefined) params.append('isFavorite', String(options.isFavorite));
-      if (options?.search) params.append('search', options.search);
-
-      const { data } = await api.get(`/api/v1/webhook-templates?${params}`);
+      const { data } = await webhookTemplateService.getAll(options);
       return data.data as WebhookTemplate[];
     },
   });
@@ -72,7 +21,7 @@ export function useCreateWebhookTemplate() {
 
   return useMutation({
     mutationFn: async (dto: CreateWebhookTemplateDto) => {
-      const { data } = await api.post('/api/v1/webhook-templates', dto);
+      const { data } = await webhookTemplateService.create(dto);
       return data;
     },
     onSuccess: () => {
@@ -86,7 +35,7 @@ export function useUpdateWebhookTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateWebhookTemplateDto> }) => {
-      const response = await api.put(`/api/v1/webhook-templates/${id}`, data);
+      const response = await webhookTemplateService.update(id, data);
       return response.data;
     },
     onSuccess: () => {
@@ -100,7 +49,7 @@ export function useDeleteWebhookTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/webhook-templates/${id}`);
+      await webhookTemplateService.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -113,7 +62,7 @@ export function useToggleWebhookTemplateFavorite() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.patch(`/api/v1/webhook-templates/${id}/favorite`);
+      const { data } = await webhookTemplateService.toggleFavorite(id);
       return data;
     },
     onSuccess: () => {
@@ -127,7 +76,7 @@ export function useDuplicateWebhookTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/webhook-templates/${id}/duplicate`);
+      const { data } = await webhookTemplateService.duplicate(id);
       return data;
     },
     onSuccess: () => {

@@ -42,6 +42,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -141,6 +151,7 @@ export default function AbTestsPage() {
   const [viewingTest, setViewingTest] = useState<AbTest | null>(null);
   const [testResults, setTestResults] = useState<AbTestResults | null>(null);
   const [selectedWinnerId, setSelectedWinnerId] = useState<string>('');
+  const [stopTestTarget, setStopTestTarget] = useState<AbTest | null>(null);
 
   const { data: stats } = useQuery<AbTestStats>({
     queryKey: ['ab-tests-stats'],
@@ -166,6 +177,7 @@ export default function AbTestsPage() {
       queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
       queryClient.invalidateQueries({ queryKey: ['ab-tests-stats'] });
       toast.success('A/B 测试已停止');
+      setStopTestTarget(null);
     },
     onError: () => {
       toast.error('操作失败');
@@ -406,11 +418,7 @@ export default function AbTestsPage() {
                           {test.status === 'running' && (
                             <>
                               <DropdownMenuItem
-                                onClick={() => {
-                                  if (confirm('确定要停止此测试吗？')) {
-                                    stopTestMutation.mutate(test.id);
-                                  }
-                                }}
+                                onClick={() => setStopTestTarget(test)}
                               >
                                 <Pause className="mr-2 h-4 w-4" />
                                 停止测试
@@ -700,6 +708,29 @@ export default function AbTestsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 停止测试确认对话框 */}
+      <AlertDialog open={!!stopTestTarget} onOpenChange={(open) => !open && setStopTestTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认停止测试</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要停止 A/B 测试 "{stopTestTarget?.name}" 吗？
+              停止后将无法恢复运行，但您可以查看已收集的测试数据。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => stopTestTarget && stopTestMutation.mutate(stopTestTarget.id)}
+            >
+              <Pause className="mr-2 h-4 w-4" />
+              停止测试
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

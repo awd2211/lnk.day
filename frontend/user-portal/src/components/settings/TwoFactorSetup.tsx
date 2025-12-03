@@ -83,11 +83,27 @@ export function TwoFactorSetup() {
   const enableMutation = useMutation({
     mutationFn: () => authService.enable2FA(),
     onSuccess: (response) => {
-      setEnableData(response.data as EnableResponse);
+      const data = response.data as EnableResponse;
+      console.log('[2FA] Enable response:', {
+        hasQrCodeUrl: !!data?.qrCodeUrl,
+        qrCodeUrlPrefix: data?.qrCodeUrl?.substring(0, 30),
+        hasSecret: !!data?.secret,
+        backupCodesCount: data?.backupCodes?.length,
+      });
+      if (!data?.qrCodeUrl) {
+        toast({
+          title: '启用失败',
+          description: '未能生成二维码，请刷新页面重试',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setEnableData(data);
       setStep('qr');
       setShowEnableDialog(true);
     },
     onError: (error: any) => {
+      console.error('[2FA] Enable error:', error);
       toast({
         title: '启用失败',
         description: error.response?.data?.message || '请稍后重试',

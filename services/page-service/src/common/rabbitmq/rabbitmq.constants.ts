@@ -1,0 +1,3 @@
+export const RABBITMQ_CONNECTION = 'RABBITMQ_CONNECTION';
+export const RABBITMQ_CHANNEL = 'RABBITMQ_CHANNEL';
+export const PAGE_EVENTS_EXCHANGE = 'page.events';

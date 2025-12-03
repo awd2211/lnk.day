@@ -43,6 +43,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -155,6 +165,8 @@ export default function TenantsPage() {
   const [viewingTenant, setViewingTenant] = useState<Tenant | null>(null);
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
+  const [impersonateTarget, setImpersonateTarget] = useState<Tenant | null>(null);
   const queryClient = useQueryClient();
 
   // Form state for creating/editing
@@ -429,8 +441,13 @@ export default function TenantsPage() {
   };
 
   const handleDelete = (tenant: Tenant) => {
-    if (confirm(`确定要删除租户 "${tenant.name}" 吗？此操作将永久删除所有数据！`)) {
-      console.log('Delete tenant:', tenant.id);
+    setDeleteTarget(tenant);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      console.log('Delete tenant:', deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -456,10 +473,15 @@ export default function TenantsPage() {
   };
 
   const handleImpersonate = (tenant: Tenant) => {
-    if (confirm(`确定要以租户 "${tenant.name}" 的身份登录吗？`)) {
-      console.log('Impersonate tenant:', tenant.id);
+    setImpersonateTarget(tenant);
+  };
+
+  const confirmImpersonate = () => {
+    if (impersonateTarget) {
+      console.log('Impersonate tenant:', impersonateTarget.id);
       // In real implementation, this would redirect to the user portal with impersonation token
-      window.open(`/impersonate/${tenant.id}`, '_blank');
+      window.open(`/impersonate/${impersonateTarget.id}`, '_blank');
+      setImpersonateTarget(null);
     }
   };
 
@@ -1286,6 +1308,45 @@ export default function TenantsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除租户</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除租户 "{deleteTarget?.name}" 吗？此操作将永久删除所有数据，包括用户、链接和分析数据，且无法恢复！
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={confirmDelete}
+            >
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Impersonate Confirmation */}
+      <AlertDialog open={!!impersonateTarget} onOpenChange={(open) => !open && setImpersonateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认模拟登录</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要以租户 "{impersonateTarget?.name}" 的身份登录吗？此操作将被记录在审计日志中。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmImpersonate}>
+              确认登录
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

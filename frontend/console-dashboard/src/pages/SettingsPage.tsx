@@ -34,6 +34,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -165,6 +175,7 @@ export default function SettingsPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showClearCacheDialog, setShowClearCacheDialog] = useState(false);
+  const [restoreBackupTarget, setRestoreBackupTarget] = useState<any | null>(null);
 
   // Fetch config (不再获取邮件设置，已移至通知管理)
   const { data: config, isLoading } = useQuery({
@@ -299,6 +310,7 @@ export default function SettingsPage() {
     mutationFn: (id: string) => systemService.restoreBackup(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system', 'backups'] });
+      setRestoreBackupTarget(null);
     },
   });
 
@@ -831,7 +843,7 @@ export default function SettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => restoreBackupMutation.mutate(backup.id)}
+                        onClick={() => setRestoreBackupTarget(backup)}
                         disabled={backup.status !== 'completed' || restoreBackupMutation.isPending}
                       >
                         <Upload className="mr-1 h-4 w-4" />
@@ -962,6 +974,33 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 恢复备份确认对话框 */}
+      <AlertDialog open={!!restoreBackupTarget} onOpenChange={(open) => !open && setRestoreBackupTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认恢复备份</AlertDialogTitle>
+            <AlertDialogDescription>
+              您即将恢复备份 "{restoreBackupTarget?.database || 'Database'}"（创建于 {restoreBackupTarget?.createdAt ? new Date(restoreBackupTarget.createdAt).toLocaleString('zh-CN') : '-'}）。
+              此操作将用备份数据覆盖当前数据库内容，可能导致部分数据丢失。是否确认恢复？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => restoreBackupTarget && restoreBackupMutation.mutate(restoreBackupTarget.id)}
+            >
+              {restoreBackupMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-2 h-4 w-4" />
+              )}
+              确认恢复
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

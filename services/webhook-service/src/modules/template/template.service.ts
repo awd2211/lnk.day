@@ -29,14 +29,16 @@ export class WebhookTemplateService {
   async findAll(
     teamId: string,
     options?: {
-      page?: number;
-      limit?: number;
+      page?: number | string;
+      limit?: number | string;
       isFavorite?: boolean;
       platform?: string;
       search?: string;
     },
   ): Promise<{ data: WebhookTemplate[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 20, isFavorite, platform, search } = options || {};
+    const { isFavorite, platform, search } = options || {};
+    const page = Number(options?.page) || 1;
+    const limit = Number(options?.limit) || 20;
     const skip = (page - 1) * limit;
 
     const qb = this.templateRepository

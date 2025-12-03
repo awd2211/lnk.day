@@ -18,6 +18,7 @@ import {
 } from './entities/custom-domain.entity';
 import { CreateDomainDto, UpdateDomainDto } from './dto/create-domain.dto';
 import { DomainVerificationDto } from './dto/verify-domain.dto';
+import { DomainEventService } from '../../common/rabbitmq/domain-event.service';
 
 const resolveTxt = promisify(dns.resolveTxt);
 const resolveCname = promisify(dns.resolveCname);
@@ -31,6 +32,7 @@ export class DomainService {
     @InjectRepository(CustomDomain)
     private readonly domainRepository: Repository<CustomDomain>,
     private readonly configService: ConfigService,
+    private readonly domainEventService: DomainEventService,
   ) {
     const brandDomain = this.configService.get('BRAND_DOMAIN', 'lnk.day');
     this.targetCname = this.configService.get('TARGET_CNAME', `cname.${brandDomain}`);
@@ -77,7 +79,18 @@ export class DomainService {
       ],
     });
 
-    return this.domainRepository.save(domain);
+    const savedDomain = await this.domainRepository.save(domain);
+
+    // Publish domain created event
+    await this.domainEventService.publishDomainCreated({
+      domainId: savedDomain.id,
+      domain: savedDomain.domain,
+      type: savedDomain.type,
+      userId: savedDomain.userId,
+      teamId: savedDomain.teamId,
+    });
+
+    return savedDomain;
   }
 
   async findAll(
@@ -153,8 +166,17 @@ export class DomainService {
     return this.domainRepository.save(domain);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId?: string): Promise<void> {
     const domain = await this.findOne(id);
+
+    // Publish domain deleted event before removing
+    await this.domainEventService.publishDomainDeleted({
+      domainId: domain.id,
+      domain: domain.domain,
+      userId: userId || domain.userId,
+      teamId: domain.teamId,
+    });
+
     await this.domainRepository.remove(domain);
   }
 
@@ -276,6 +298,26 @@ export class DomainService {
     }
 
     await this.domainRepository.save(domain);
+
+    // Publish verification event
+    if (txtVerified && cnameVerified) {
+      await this.domainEventService.publishDomainVerified({
+        domainId: domain.id,
+        domain: domain.domain,
+        userId: domain.userId,
+        teamId: domain.teamId,
+        verificationMethod: 'dns',
+      });
+    } else {
+      await this.domainEventService.publishDomainVerificationFailed({
+        domainId: domain.id,
+        domain: domain.domain,
+        userId: domain.userId,
+        teamId: domain.teamId,
+        reason: domain.lastCheckError || 'Verification failed',
+        attempts: domain.verificationAttempts,
+      });
+    }
 
     return {
       success: txtVerified && cnameVerified,

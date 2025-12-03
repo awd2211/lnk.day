@@ -41,6 +41,11 @@ import UtmTemplatesPage from '@/pages/UtmTemplatesPage';
 import CampaignTemplatesPage from '@/pages/CampaignTemplatesPage';
 import BioLinkTemplatesPage from '@/pages/BioLinkTemplatesPage';
 import QrStylesPage from '@/pages/QrStylesPage';
+import DeepLinkTemplatesPage from '@/pages/DeepLinkTemplatesPage';
+import WebhookTemplatesPage from '@/pages/WebhookTemplatesPage';
+import RedirectRuleTemplatesPage from '@/pages/RedirectRuleTemplatesPage';
+import SeoTemplatesPage from '@/pages/SeoTemplatesPage';
+import ReportTemplatesPage from '@/pages/ReportTemplatesPage';
 import SsoConfigPage from '@/pages/SsoConfigPage';
 import SecurityScanPage from '@/pages/SecurityScanPage';
 import AbTestsPage from '@/pages/AbTestsPage';
@@ -101,6 +106,11 @@ function App() {
         <Route path="templates/campaigns" element={<CampaignTemplatesPage />} />
         <Route path="templates/bio-links" element={<BioLinkTemplatesPage />} />
         <Route path="templates/qr-styles" element={<QrStylesPage />} />
+        <Route path="templates/deeplinks" element={<DeepLinkTemplatesPage />} />
+        <Route path="templates/webhooks" element={<WebhookTemplatesPage />} />
+        <Route path="templates/redirect-rules" element={<RedirectRuleTemplatesPage />} />
+        <Route path="templates/seo" element={<SeoTemplatesPage />} />
+        <Route path="templates/reports" element={<ReportTemplatesPage />} />
         <Route path="sso-config" element={<SsoConfigPage />} />
         <Route path="security-scan" element={<SecurityScanPage />} />
         <Route path="ab-tests" element={<AbTestsPage />} />

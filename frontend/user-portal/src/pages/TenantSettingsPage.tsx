@@ -20,7 +20,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-import AppLayout from '@/components/AppLayout';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { tenantService, domainService, billingService } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';

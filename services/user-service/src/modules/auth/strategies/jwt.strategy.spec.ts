@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
+import { UnifiedJwtPayload, AuthenticatedUser } from '@lnk/nestjs-common';
 
-import { JwtStrategy, JwtPayload, AuthenticatedUser } from './jwt.strategy';
+import { JwtStrategy } from './jwt.strategy';
 import { UserService } from '../../user/user.service';
 
 describe('JwtStrategy', () => {
@@ -86,51 +87,55 @@ describe('JwtStrategy', () => {
   describe('validate', () => {
     describe('admin users', () => {
       it('should return admin user for SUPER_ADMIN role without database lookup', async () => {
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'admin-123',
           email: 'admin@example.com',
+          type: 'admin',
+          scope: { level: 'platform' },
           role: 'SUPER_ADMIN',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result).toEqual({
-          id: 'admin-123',
-          email: 'admin@example.com',
-          teamRole: 'SUPER_ADMIN',
-          permissions: [],
-          isConsoleAdmin: true,
-        });
+        expect(result.id).toBe('admin-123');
+        expect(result.email).toBe('admin@example.com');
+        expect(result.type).toBe('admin');
+        expect(result.role).toBe('SUPER_ADMIN');
+        expect(result.scope).toEqual({ level: 'platform' });
 
         // Should not call userService.findOne for admin users
         expect(mockUserService.findOne).not.toHaveBeenCalled();
       });
 
       it('should return admin user for ADMIN role without database lookup', async () => {
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'admin-456',
           email: 'admin2@example.com',
+          type: 'admin',
+          scope: { level: 'platform' },
           role: 'ADMIN',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result.isConsoleAdmin).toBe(true);
-        expect(result.teamRole).toBe('ADMIN');
+        expect(result.type).toBe('admin');
+        expect(result.role).toBe('ADMIN');
         expect(mockUserService.findOne).not.toHaveBeenCalled();
       });
 
       it('should return admin user for OPERATOR role without database lookup', async () => {
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'operator-789',
           email: 'operator@example.com',
+          type: 'admin',
+          scope: { level: 'platform' },
           role: 'OPERATOR',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result.isConsoleAdmin).toBe(true);
-        expect(result.teamRole).toBe('OPERATOR');
+        expect(result.type).toBe('admin');
+        expect(result.role).toBe('OPERATOR');
         expect(mockUserService.findOne).not.toHaveBeenCalled();
       });
     });
@@ -139,24 +144,22 @@ describe('JwtStrategy', () => {
       it('should validate and return user from database', async () => {
         mockUserService.findOne.mockResolvedValue(mockUser);
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
-          teamId: 'team-456',
-          teamRole: 'OWNER',
-          permissions: ['links:view', 'links:create'],
+          type: 'user',
+          scope: { level: 'team', teamId: 'team-456' },
+          role: 'OWNER',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result).toEqual({
-          id: 'user-123',
-          email: 'test@example.com',
-          name: 'Test User',
-          teamId: 'team-456',
-          teamRole: 'OWNER',
-          permissions: ['links:view', 'links:create'],
-        });
+        expect(result.id).toBe('user-123');
+        expect(result.email).toBe('test@example.com');
+        expect(result.name).toBe('Test User');
+        expect(result.type).toBe('user');
+        expect(result.role).toBe('OWNER');
+        expect(result.scope).toEqual({ level: 'team', teamId: 'team-456' });
 
         expect(mockUserService.findOne).toHaveBeenCalledWith('user-123');
       });
@@ -164,85 +167,50 @@ describe('JwtStrategy', () => {
       it('should throw UnauthorizedException if user not found', async () => {
         mockUserService.findOne.mockResolvedValue(null);
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'nonexistent-user',
           email: 'notfound@example.com',
+          type: 'user',
+          scope: { level: 'personal', teamId: 'nonexistent-user' },
+          role: 'OWNER',
         };
 
         await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
       });
 
-      it('should use payload teamId if provided', async () => {
+      it('should preserve scope from payload', async () => {
+        mockUserService.findOne.mockResolvedValue(mockUser);
+
+        const payload: UnifiedJwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          type: 'user',
+          scope: { level: 'personal', teamId: 'user-123' },
+          role: 'OWNER',
+        };
+
+        const result = await strategy.validate(payload);
+
+        expect(result.scope).toEqual({ level: 'personal', teamId: 'user-123' });
+      });
+
+      it('should use user name from database', async () => {
         mockUserService.findOne.mockResolvedValue({
           ...mockUser,
-          teamId: 'user-default-team',
+          name: 'Database Name',
         });
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
-          teamId: 'payload-team-id',
+          type: 'user',
+          scope: { level: 'personal', teamId: 'user-123' },
+          role: 'MEMBER',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result.teamId).toBe('payload-team-id');
-      });
-
-      it('should fall back to user teamId if payload has none', async () => {
-        mockUserService.findOne.mockResolvedValue({
-          ...mockUser,
-          teamId: 'user-default-team',
-        });
-
-        const payload: JwtPayload = {
-          sub: 'user-123',
-          email: 'test@example.com',
-        };
-
-        const result = await strategy.validate(payload);
-
-        expect(result.teamId).toBe('user-default-team');
-      });
-
-      it('should use empty permissions array if not in payload', async () => {
-        mockUserService.findOne.mockResolvedValue(mockUser);
-
-        const payload: JwtPayload = {
-          sub: 'user-123',
-          email: 'test@example.com',
-        };
-
-        const result = await strategy.validate(payload);
-
-        expect(result.permissions).toEqual([]);
-      });
-
-      it('should use permissions from payload if provided', async () => {
-        mockUserService.findOne.mockResolvedValue(mockUser);
-
-        const payload: JwtPayload = {
-          sub: 'user-123',
-          email: 'test@example.com',
-          permissions: ['admin:users:view', 'admin:users:manage'],
-        };
-
-        const result = await strategy.validate(payload);
-
-        expect(result.permissions).toEqual(['admin:users:view', 'admin:users:manage']);
-      });
-
-      it('should set teamRole to undefined if not in payload', async () => {
-        mockUserService.findOne.mockResolvedValue(mockUser);
-
-        const payload: JwtPayload = {
-          sub: 'user-123',
-          email: 'test@example.com',
-        };
-
-        const result = await strategy.validate(payload);
-
-        expect(result.teamRole).toBeUndefined();
+        expect(result.name).toBe('Database Name');
       });
     });
 
@@ -253,9 +221,12 @@ describe('JwtStrategy', () => {
           name: undefined,
         });
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
+          type: 'user',
+          scope: { level: 'personal', teamId: 'user-123' },
+          role: 'MEMBER',
         };
 
         const result = await strategy.validate(payload);
@@ -263,27 +234,32 @@ describe('JwtStrategy', () => {
         expect(result.name).toBeUndefined();
       });
 
-      it('should not treat regular roles as admin', async () => {
+      it('should not treat regular user roles as admin', async () => {
         mockUserService.findOne.mockResolvedValue(mockUser);
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
-          role: 'USER', // Not an admin role
+          type: 'user',
+          scope: { level: 'team', teamId: 'team-456' },
+          role: 'OWNER',
         };
 
         const result = await strategy.validate(payload);
 
-        expect(result.isConsoleAdmin).toBeUndefined();
+        expect(result.type).toBe('user');
         expect(mockUserService.findOne).toHaveBeenCalled();
       });
 
       it('should handle payload with iat and exp', async () => {
         mockUserService.findOne.mockResolvedValue(mockUser);
 
-        const payload: JwtPayload = {
+        const payload: UnifiedJwtPayload = {
           sub: 'user-123',
           email: 'test@example.com',
+          type: 'user',
+          scope: { level: 'personal', teamId: 'user-123' },
+          role: 'OWNER',
           iat: Math.floor(Date.now() / 1000),
           exp: Math.floor(Date.now() / 1000) + 3600,
         };
@@ -291,6 +267,22 @@ describe('JwtStrategy', () => {
         const result = await strategy.validate(payload);
 
         expect(result.id).toBe('user-123');
+      });
+
+      it('should handle VIEWER role', async () => {
+        mockUserService.findOne.mockResolvedValue(mockUser);
+
+        const payload: UnifiedJwtPayload = {
+          sub: 'user-123',
+          email: 'test@example.com',
+          type: 'user',
+          scope: { level: 'team', teamId: 'team-456' },
+          role: 'VIEWER',
+        };
+
+        const result = await strategy.validate(payload);
+
+        expect(result.role).toBe('VIEWER');
       });
     });
   });

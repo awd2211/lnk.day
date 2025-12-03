@@ -59,6 +59,11 @@ import {
 } from '@/hooks/useReportTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { PresetTemplatesSection, PresetTemplateCard } from '@/components/shared';
+import {
+  usePresetReportTemplates,
+  type PresetReportTemplate,
+} from '@/hooks/usePresetTemplates';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -116,6 +121,8 @@ export default function ReportTemplatesPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [presetSearch, setPresetSearch] = useState('');
+  const [presetCategoryFilter, setPresetCategoryFilter] = useState<string>('');
 
   const { data: templates, isLoading } = useReportTemplates({
     category: categoryFilter || undefined,
@@ -127,6 +134,11 @@ export default function ReportTemplatesPage() {
   const duplicateTemplate = useDuplicateReportTemplate();
   const toggleFavorite = useToggleReportTemplateFavorite();
   const generateReport = useGenerateReport();
+
+  const { data: presetTemplatesData, isLoading: presetLoading } = usePresetReportTemplates({
+    search: presetSearch || undefined,
+    category: presetCategoryFilter || undefined,
+  });
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editTemplate, setEditTemplate] = useState<ReportTemplate | null>(null);
@@ -229,6 +241,37 @@ export default function ReportTemplatesPage() {
     }
   };
 
+  const handleUsePresetTemplate = (preset: PresetReportTemplate) => {
+    // Convert preset config to form data, providing defaults for missing fields
+    const category = preset.category as CreateReportTemplateDto['category'] || 'custom';
+    const format = (preset.config?.format === 'excel' ? 'excel' : preset.config?.format || 'pdf') as CreateReportTemplateDto['format'];
+
+    // Convert schedule if present
+    const schedule = preset.config?.schedule
+      ? {
+          enabled: true,
+          frequency: preset.config.schedule.frequency as 'daily' | 'weekly' | 'monthly',
+          recipients: preset.config.schedule.recipients,
+        }
+      : undefined;
+
+    setFormData({
+      name: `${preset.name} (副本)`,
+      description: preset.description || '',
+      category,
+      metrics: preset.config?.metrics || ['clicks', 'unique_visitors'],
+      dimensions: preset.config?.dimensions || ['date'],
+      filters: preset.config?.filters as Record<string, unknown> | undefined,
+      dateRange: preset.config?.dateRange || { type: 'last_30_days' },
+      format,
+      includeCharts: true,
+      includeSummary: true,
+      schedule,
+    });
+    setCreateDialogOpen(true);
+    toast({ title: '已加载预设模板配置，可自行修改后保存' });
+  };
+
   const openEditDialog = (template: ReportTemplate) => {
     setFormData({
       name: template.name,
@@ -303,6 +346,33 @@ export default function ReportTemplatesPage() {
           </Dialog>
         </div>
 
+        {/* Preset Templates Section */}
+        <PresetTemplatesSection<PresetReportTemplate>
+          title="系统预设报告模板"
+          description="浏览平台提供的预设报告模板，可直接使用或作为创建自定义模板的起点"
+          templates={presetTemplatesData?.data || []}
+          isLoading={presetLoading}
+          searchQuery={presetSearch}
+          onSearchChange={setPresetSearch}
+          categoryFilter={presetCategoryFilter}
+          onCategoryChange={setPresetCategoryFilter}
+          categories={CATEGORIES}
+          renderTemplate={(preset) => (
+            <PresetTemplateCard
+              key={preset.id}
+              name={preset.name}
+              description={preset.description}
+              category={CATEGORIES.find((c) => c.value === preset.category)?.label || preset.category}
+              tags={[
+                `${preset.config?.metrics?.length || 0} 个指标`,
+                `${preset.config?.dimensions?.length || 0} 个维度`,
+                preset.config?.format?.toUpperCase() || 'PDF',
+              ]}
+              onUse={() => handleUsePresetTemplate(preset)}
+            />
+          )}
+        />
+
         {/* Filters */}
         <div className="flex gap-4">
           <div className="relative flex-1 max-w-md">
@@ -314,12 +384,12 @@ export default function ReportTemplatesPage() {
               className="pl-9"
             />
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter || 'all'} onValueChange={(v) => setCategoryFilter(v === 'all' ? '' : v)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="所有分类" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有分类</SelectItem>
+              <SelectItem value="all">所有分类</SelectItem>
               {CATEGORIES.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}

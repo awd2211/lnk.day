@@ -90,6 +90,53 @@ export class CreateCheckoutSessionDto {
 
 // Response DTOs
 
+export class PricingPlanDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: 'Plan code like free, starter, pro, enterprise' })
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  description: string;
+
+  @ApiProperty()
+  priceMonthly: number;
+
+  @ApiProperty()
+  priceYearly: number;
+
+  @ApiPropertyOptional()
+  priceIdMonthly?: string;
+
+  @ApiPropertyOptional()
+  priceIdYearly?: string;
+
+  @ApiProperty()
+  features: string[];
+
+  @ApiProperty()
+  limits: {
+    links: number;
+    clicks: number;
+    customDomains: number;
+    teamMembers: number;
+    apiRequests: number;
+  };
+
+  @ApiPropertyOptional()
+  popular?: boolean;
+}
+
+export class PricingResponseDto {
+  @ApiProperty({ type: [PricingPlanDto] })
+  plans: PricingPlanDto[];
+}
+
+// Legacy format for backward compatibility
 export class PricingDto {
   @ApiProperty()
   plan: PlanType;

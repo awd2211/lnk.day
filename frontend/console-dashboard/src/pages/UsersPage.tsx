@@ -32,6 +32,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -89,6 +99,16 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [showBulkActions, setShowBulkActions] = useState(false);
+
+  // 确认对话框状态
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [toggleStatusTarget, setToggleStatusTarget] = useState<User | null>(null);
+  const [forceLogoutTarget, setForceLogoutTarget] = useState<User | null>(null);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<User | null>(null);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showBulkDisableConfirm, setShowBulkDisableConfirm] = useState(false);
+  const [showBulkEnableConfirm, setShowBulkEnableConfirm] = useState(false);
+
   const queryClient = useQueryClient();
   const limit = 20;
 
@@ -152,6 +172,8 @@ export default function UsersPage() {
     mutationFn: (id: string) => proxyService.deleteUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleteTarget(null);
+      setViewingUser(null);
     },
   });
 
@@ -169,6 +191,7 @@ export default function UsersPage() {
       proxyService.toggleUserStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setToggleStatusTarget(null);
     },
   });
 
@@ -177,6 +200,7 @@ export default function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setSelectedUsers([]);
+      setShowBulkDeleteConfirm(false);
     },
   });
 
@@ -186,27 +210,27 @@ export default function UsersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setSelectedUsers([]);
+      setShowBulkDisableConfirm(false);
+      setShowBulkEnableConfirm(false);
     },
   });
 
   const forceLogout = useMutation({
     mutationFn: (id: string) => proxyService.forceLogout(id),
     onSuccess: () => {
-      alert('已强制用户登出');
+      setForceLogoutTarget(null);
     },
   });
 
   const resetPassword = useMutation({
     mutationFn: (id: string) => proxyService.resetUserPassword(id),
     onSuccess: () => {
-      alert('密码重置邮件已发送');
+      setResetPasswordTarget(null);
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm('确定要删除此用户吗？此操作不可恢复。')) {
-      deleteUser.mutate(id);
-    }
+  const handleDelete = (user: User) => {
+    setDeleteTarget(user);
   };
 
   const handleEdit = (user: User) => {
@@ -225,8 +249,7 @@ export default function UsersPage() {
   };
 
   const handleToggleStatus = (user: User) => {
-    const newStatus = user.status === 'active' ? 'disabled' : 'active';
-    toggleStatus.mutate({ id: user.id, status: newStatus });
+    setToggleStatusTarget(user);
   };
 
   const handleSelectUser = (userId: string, checked: boolean) => {
@@ -246,19 +269,15 @@ export default function UsersPage() {
   };
 
   const handleBulkDelete = () => {
-    if (confirm(`确定要删除选中的 ${selectedUsers.length} 个用户吗？`)) {
-      bulkDelete.mutate(selectedUsers);
-    }
+    setShowBulkDeleteConfirm(true);
   };
 
   const handleBulkDisable = () => {
-    if (confirm(`确定要禁用选中的 ${selectedUsers.length} 个用户吗？`)) {
-      bulkToggleStatus.mutate({ ids: selectedUsers, status: 'disabled' });
-    }
+    setShowBulkDisableConfirm(true);
   };
 
   const handleBulkEnable = () => {
-    bulkToggleStatus.mutate({ ids: selectedUsers, status: 'active' });
+    setShowBulkEnableConfirm(true);
   };
 
   const formatDate = (date: string) => {
@@ -492,7 +511,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => forceLogout.mutate(user.id)}
+                          onClick={() => setForceLogoutTarget(user)}
                           title="强制登出"
                         >
                           <LogOut className="h-4 w-4" />
@@ -500,7 +519,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => resetPassword.mutate(user.id)}
+                          onClick={() => setResetPasswordTarget(user)}
                           title="重置密码"
                         >
                           <Key className="h-4 w-4" />
@@ -508,7 +527,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(user.id)}
+                          onClick={() => handleDelete(user)}
                           title="删除用户"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
@@ -772,7 +791,10 @@ export default function UsersPage() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => forceLogout.mutate(viewingUser.id)}
+                  onClick={() => {
+                    setForceLogoutTarget(viewingUser);
+                    setViewingUser(null);
+                  }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   强制登出
@@ -781,7 +803,7 @@ export default function UsersPage() {
                   variant="destructive"
                   className="flex-1"
                   onClick={() => {
-                    handleDelete(viewingUser.id);
+                    handleDelete(viewingUser);
                     setViewingUser(null);
                   }}
                 >
@@ -793,6 +815,171 @@ export default function UsersPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* 删除用户确认对话框 */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要删除用户 <strong>{deleteTarget?.name}</strong> ({deleteTarget?.email}) 吗？
+              此操作不可恢复，该用户的所有数据将被永久删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteUser.mutate(deleteTarget.id)}
+            >
+              {deleteUser.isPending ? '删除中...' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 切换状态确认对话框 */}
+      <AlertDialog open={!!toggleStatusTarget} onOpenChange={() => setToggleStatusTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleStatusTarget?.status === 'active' ? '禁用用户' : '启用用户'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleStatusTarget?.status === 'active' ? (
+                <>
+                  您确定要禁用用户 <strong>{toggleStatusTarget?.name}</strong> 吗？
+                  禁用后该用户将无法登录系统。
+                </>
+              ) : (
+                <>
+                  您确定要启用用户 <strong>{toggleStatusTarget?.name}</strong> 吗？
+                  启用后该用户可以正常登录系统。
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (toggleStatusTarget) {
+                  const newStatus = toggleStatusTarget.status === 'active' ? 'disabled' : 'active';
+                  toggleStatus.mutate({ id: toggleStatusTarget.id, status: newStatus });
+                }
+              }}
+            >
+              {toggleStatus.isPending ? '处理中...' : '确认'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 强制登出确认对话框 */}
+      <AlertDialog open={!!forceLogoutTarget} onOpenChange={() => setForceLogoutTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>强制登出用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要强制登出用户 <strong>{forceLogoutTarget?.name}</strong> 吗？
+              该用户的所有活动会话将被终止，需要重新登录。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => forceLogoutTarget && forceLogout.mutate(forceLogoutTarget.id)}
+            >
+              {forceLogout.isPending ? '处理中...' : '确认登出'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 重置密码确认对话框 */}
+      <AlertDialog open={!!resetPasswordTarget} onOpenChange={() => setResetPasswordTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>重置用户密码</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要重置用户 <strong>{resetPasswordTarget?.name}</strong> 的密码吗？
+              系统将发送密码重置邮件到 {resetPasswordTarget?.email}。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resetPasswordTarget && resetPassword.mutate(resetPasswordTarget.id)}
+            >
+              {resetPassword.isPending ? '发送中...' : '发送重置邮件'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量删除用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要删除选中的 <strong>{selectedUsers.length}</strong> 个用户吗？
+              此操作不可恢复，所有选中用户的数据将被永久删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => bulkDelete.mutate(selectedUsers)}
+            >
+              {bulkDelete.isPending ? '删除中...' : `删除 ${selectedUsers.length} 个用户`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量禁用确认对话框 */}
+      <AlertDialog open={showBulkDisableConfirm} onOpenChange={setShowBulkDisableConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量禁用用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要禁用选中的 <strong>{selectedUsers.length}</strong> 个用户吗？
+              禁用后这些用户将无法登录系统。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkToggleStatus.mutate({ ids: selectedUsers, status: 'disabled' })}
+            >
+              {bulkToggleStatus.isPending ? '处理中...' : `禁用 ${selectedUsers.length} 个用户`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量启用确认对话框 */}
+      <AlertDialog open={showBulkEnableConfirm} onOpenChange={setShowBulkEnableConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量启用用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              您确定要启用选中的 <strong>{selectedUsers.length}</strong> 个用户吗？
+              启用后这些用户可以正常登录系统。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bulkToggleStatus.mutate({ ids: selectedUsers, status: 'active' })}
+            >
+              {bulkToggleStatus.isPending ? '处理中...' : `启用 ${selectedUsers.length} 个用户`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -43,6 +43,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -129,6 +139,7 @@ export default function SsoConfigPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<SsoConfig | null>(null);
   const [viewingConfig, setViewingConfig] = useState<SsoConfig | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SsoConfig | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     type: 'oidc' as SsoConfig['type'],
@@ -204,6 +215,7 @@ export default function SsoConfigPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sso-configs'] });
       queryClient.invalidateQueries({ queryKey: ['sso-stats'] });
+      setDeleteTarget(null);
       toast.success('SSO 配置已删除');
     },
     onError: () => {
@@ -505,11 +517,7 @@ export default function SsoConfigPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-600"
-                          onClick={() => {
-                            if (confirm('确定要删除此 SSO 配置吗？')) {
-                              deleteMutation.mutate(config.id);
-                            }
-                          }}
+                          onClick={() => setDeleteTarget(config)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           删除
@@ -879,6 +887,27 @@ export default function SsoConfigPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除 SSO 配置</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除 SSO 配置 "{deleteTarget?.name}" 吗？使用此配置登录的用户将无法继续使用 SSO 登录。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

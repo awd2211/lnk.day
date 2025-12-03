@@ -1,49 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { deepLinkTemplateService } from '@/lib/api';
+import type { DeepLinkTemplate, CreateDeepLinkTemplateDto } from '@lnk/shared-types';
 
-export interface DeepLinkTemplate {
-  id: string;
-  teamId: string;
-  createdBy: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category: 'social' | 'commerce' | 'media' | 'utility' | 'custom';
-  ios?: {
-    bundleId?: string;
-    appStoreId?: string;
-    customScheme?: string;
-    universalLink?: string;
-    fallbackUrl?: string;
-  };
-  android?: {
-    packageName?: string;
-    playStoreUrl?: string;
-    customScheme?: string;
-    appLinks?: string[];
-    fallbackUrl?: string;
-  };
-  fallbackUrl?: string;
-  enableDeferred?: boolean;
-  isFavorite: boolean;
-  usageCount: number;
-  lastUsedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateDeepLinkTemplateDto {
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  category?: string;
-  ios?: DeepLinkTemplate['ios'];
-  android?: DeepLinkTemplate['android'];
-  fallbackUrl?: string;
-  enableDeferred?: boolean;
-}
+export type { DeepLinkTemplate, CreateDeepLinkTemplateDto };
 
 const QUERY_KEY = ['deeplink-templates'];
 
@@ -51,12 +10,7 @@ export function useDeepLinkTemplates(options?: { category?: string; isFavorite?:
   return useQuery({
     queryKey: [...QUERY_KEY, options],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (options?.category) params.append('category', options.category);
-      if (options?.isFavorite !== undefined) params.append('isFavorite', String(options.isFavorite));
-      if (options?.search) params.append('search', options.search);
-
-      const { data } = await api.get(`/api/v1/deeplink-templates?${params}`);
+      const { data } = await deepLinkTemplateService.getAll(options);
       return data.data as DeepLinkTemplate[];
     },
   });
@@ -66,7 +20,7 @@ export function useDeepLinkTemplate(id: string) {
   return useQuery({
     queryKey: [...QUERY_KEY, id],
     queryFn: async () => {
-      const { data } = await api.get(`/api/v1/deeplink-templates/${id}`);
+      const { data } = await deepLinkTemplateService.getOne(id);
       return data as DeepLinkTemplate;
     },
     enabled: !!id,
@@ -78,7 +32,7 @@ export function useCreateDeepLinkTemplate() {
 
   return useMutation({
     mutationFn: async (dto: CreateDeepLinkTemplateDto) => {
-      const { data } = await api.post('/api/v1/deeplink-templates', dto);
+      const { data } = await deepLinkTemplateService.create(dto);
       return data;
     },
     onSuccess: () => {
@@ -92,7 +46,7 @@ export function useUpdateDeepLinkTemplate() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateDeepLinkTemplateDto> }) => {
-      const response = await api.put(`/api/v1/deeplink-templates/${id}`, data);
+      const response = await deepLinkTemplateService.update(id, data);
       return response.data;
     },
     onSuccess: () => {
@@ -106,7 +60,7 @@ export function useDeleteDeepLinkTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/api/v1/deeplink-templates/${id}`);
+      await deepLinkTemplateService.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEY });
@@ -119,7 +73,7 @@ export function useToggleDeepLinkTemplateFavorite() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.patch(`/api/v1/deeplink-templates/${id}/favorite`);
+      const { data } = await deepLinkTemplateService.toggleFavorite(id);
       return data;
     },
     onSuccess: () => {
@@ -133,7 +87,7 @@ export function useDuplicateDeepLinkTemplate() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data } = await api.post(`/api/v1/deeplink-templates/${id}/duplicate`);
+      const { data } = await deepLinkTemplateService.duplicate(id);
       return data;
     },
     onSuccess: () => {

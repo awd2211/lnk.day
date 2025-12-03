@@ -157,6 +157,11 @@ const navigationGroups: NavGroup[] = [
       { name: '活动模板', href: '/templates/campaigns', icon: Megaphone },
       { name: 'Bio Link 模板', href: '/templates/bio-links', icon: UserSquare },
       { name: 'QR 码样式', href: '/templates/qr-styles', icon: Palette },
+      { name: 'Deep Link 模板', href: '/templates/deeplinks', icon: Smartphone },
+      { name: 'Webhook 模板', href: '/templates/webhooks', icon: Webhook },
+      { name: '重定向规则模板', href: '/templates/redirect-rules', icon: GitBranch },
+      { name: 'SEO 模板', href: '/templates/seo', icon: Search },
+      { name: '报告模板', href: '/templates/reports', icon: BarChart3 },
     ],
   },
   {

@@ -45,6 +45,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -124,6 +134,7 @@ function PlatformConfigTab() {
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<Partial<IntegrationConfig>>({});
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const { data: configsData, isLoading, refetch } = useQuery({
     queryKey: ['integration-configs'],
@@ -143,6 +154,7 @@ function PlatformConfigTab() {
       queryClient.invalidateQueries({ queryKey: ['integration-config-stats'] });
       setShowConfigDialog(false);
       setSelectedConfig(null);
+      setShowSaveConfirm(false);
     },
   });
 
@@ -180,6 +192,10 @@ function PlatformConfigTab() {
   };
 
   const handleSave = () => {
+    setShowSaveConfirm(true);
+  };
+
+  const confirmSave = () => {
     if (selectedConfig) {
       updateMutation.mutate({
         id: selectedConfig.id,
@@ -509,6 +525,31 @@ function PlatformConfigTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 保存敏感凭证确认对话框 */}
+      <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认保存配置</AlertDialogTitle>
+            <AlertDialogDescription>
+              您即将更新 {selectedConfig && getTypeInfo(selectedConfig.type).name} 的集成配置，
+              包括可能的 OAuth 凭证（Client Secret、API Secret 等敏感信息）。
+              请确保输入的凭证正确无误，错误的凭证可能导致集成功能无法正常工作。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSave}>
+              {updateMutation.isPending ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              确认保存
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

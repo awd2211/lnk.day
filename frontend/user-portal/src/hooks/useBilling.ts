@@ -4,12 +4,13 @@ import { billingService } from '@/lib/api';
 // Types
 export interface PricingPlan {
   id: string;
+  code?: string; // Plan code like 'free', 'starter', 'pro', 'enterprise'
   name: string;
   description: string;
   priceMonthly: number;
   priceYearly: number;
-  priceIdMonthly: string;
-  priceIdYearly: string;
+  priceIdMonthly?: string;  // Optional: 只有配置了 Stripe 才有值
+  priceIdYearly?: string;   // Optional: 只有配置了 Stripe 才有值
   features: string[];
   limits: {
     links: number;
@@ -65,6 +66,9 @@ export interface PaymentMethod {
   createdAt: string;
 }
 
+// Helper to check if team context is available
+const hasTeamContext = () => !!localStorage.getItem('teamId');
+
 // Hooks
 export function useSubscription() {
   return useQuery({
@@ -73,6 +77,7 @@ export function useSubscription() {
       const { data } = await billingService.getSubscription();
       return data as Subscription | null;
     },
+    enabled: hasTeamContext(),
   });
 }
 
@@ -93,6 +98,7 @@ export function useInvoices(params?: { limit?: number; starting_after?: string }
       const { data } = await billingService.getInvoices(params);
       return data as { invoices: Invoice[]; hasMore: boolean };
     },
+    enabled: hasTeamContext(),
   });
 }
 
@@ -103,12 +109,13 @@ export function usePaymentMethods() {
       const { data } = await billingService.getPaymentMethods();
       return data as { paymentMethods: PaymentMethod[] };
     },
+    enabled: hasTeamContext(),
   });
 }
 
 export function useCreateCheckoutSession() {
   return useMutation({
-    mutationFn: (data: { priceId: string; successUrl: string; cancelUrl: string }) =>
+    mutationFn: (data: { plan: string; billingCycle: 'monthly' | 'yearly' }) =>
       billingService.createCheckoutSession(data),
     onSuccess: (response) => {
       // Redirect to Stripe Checkout
